@@ -1,0 +1,337 @@
+import AudioCapture
+import MeetingStore
+import SmartMeetCalendar
+import Summarization
+import SwiftUI
+import Transcription
+
+struct MenuBarContent: View {
+    @Bindable var session: RecordingSession
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            Divider()
+
+            if case .failed(let message) = session.state {
+                errorBanner(message)
+            }
+
+            if !session.isRecording {
+                templatePicker
+            }
+
+            if let meeting = session.detectedCalendarMeeting, !session.isRecording {
+                calendarHint(meeting)
+            }
+
+            if session.isRecording || !session.segments.isEmpty {
+                TranscriptView(segments: session.segments, volatile: session.volatileText)
+                    .frame(height: 240)
+                Divider()
+            }
+
+            summaryBanner
+            MeetingListView(session: session, openWindow: openWindow)
+        }
+        .padding(.bottom, 8)
+        .task { await session.refreshCalendarContext() }
+    }
+
+    private var header: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("SmartMeet").font(.headline)
+                Text(statusText).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+
+            Button {
+                Task { await session.toggle() }
+            } label: {
+                Label(
+                    session.isRecording ? "Arrêter" : "Enregistrer",
+                    systemImage: session.isRecording ? "stop.fill" : "record.circle"
+                )
+                .frame(minWidth: 88)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(session.isRecording ? .red : .accentColor)
+            .disabled(session.isBusy)
+
+            Button { openWindow(id: "settings") } label: { Image(systemName: "gearshape") }
+                .buttonStyle(.borderless)
+                .help("Réglages")
+
+            Button { NSApplication.shared.terminate(nil) } label: { Image(systemName: "power") }
+                .buttonStyle(.borderless)
+                .help("Quitter")
+        }
+        .padding(12)
+    }
+
+    /// Le type est choisi avant l'enregistrement : c'est lui qui détermine les
+    /// sections demandées au modèle, donc il doit être figé dès le départ.
+    private var templatePicker: some View {
+        HStack(spacing: 8) {
+            Picker("Type", selection: $session.selectedTemplateID) {
+                ForEach(session.settings.allTemplates) { template in
+                    Label(template.name, systemImage: template.symbol).tag(template.id)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+
+            Text(session.selectedTemplate.sections.map(\.displayName).joined(separator: " · "))
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+    }
+
+    private var statusText: String {
+        switch session.state {
+        case .idle: session.settings.providerKind.displayName
+        case .preparing: "Préparation des modèles…"
+        case .recording(let since):
+            "Enregistrement · \(Self.elapsed(since: since))"
+        case .finishing: "Finalisation…"
+        case .failed: "Erreur"
+        }
+    }
+
+    private static func elapsed(since date: Date) -> String {
+        let total = Int(Date.now.timeIntervalSince(date))
+        return String(format: "%02d:%02d", total / 60, total % 60)
+    }
+
+    private func calendarHint(_ meeting: CalendarMeeting) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: meeting.hasVideoLink ? "video" : "calendar")
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(meeting.title).font(.callout).lineLimit(1)
+                if !meeting.attendees.isEmpty {
+                    Text(meeting.attendees.prefix(4).joined(separator: ", "))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.quaternary.opacity(0.4))
+    }
+
+    @ViewBuilder
+    private var summaryBanner: some View {
+        switch session.summaryState {
+        case .running(let message):
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text(message).font(.caption).foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+        case .failed(let message):
+            Label(message, systemImage: "exclamationmark.triangle")
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .lineLimit(2)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+        default:
+            EmptyView()
+        }
+    }
+
+    private func errorBanner(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            Text(message).font(.callout).fixedSize(horizontal: false, vertical: true)
+            Spacer()
+            Button("OK") { session.dismissError() }.buttonStyle(.borderless)
+        }
+        .padding(12)
+        .background(.orange.opacity(0.12))
+    }
+}
+
+struct TranscriptView: View {
+    let segments: [TranscriptSegment]
+    let volatile: [AudioTrack: String]
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    ForEach(segments) { segment in
+                        row(
+                            speaker: segment.speaker,
+                            timecode: segment.timecode,
+                            text: segment.text,
+                            track: segment.track,
+                            isVolatile: false
+                        )
+                        .id(segment.id)
+                    }
+                    ForEach(AudioTrack.allCases, id: \.self) { track in
+                        if let text = volatile[track], !text.isEmpty {
+                            row(
+                                speaker: track.speakerLabel,
+                                timecode: "…",
+                                text: text,
+                                track: track,
+                                isVolatile: true
+                            )
+                        }
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .onChange(of: segments.count) {
+                if let last = segments.last {
+                    withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                }
+            }
+            .overlay {
+                if segments.isEmpty, volatile.values.allSatisfy(\.isEmpty) {
+                    ContentUnavailableView(
+                        "En écoute",
+                        systemImage: "waveform",
+                        description: Text("Le transcript s'affichera au fil de la réunion.")
+                    )
+                }
+            }
+        }
+    }
+
+    private func row(
+        speaker: String,
+        timecode: String,
+        text: String,
+        track: AudioTrack,
+        isVolatile: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(track == .microphone ? Color.accentColor : Color.purple)
+                    .frame(width: 7, height: 7)
+                Text(speaker).font(.caption.weight(.semibold))
+                Text(timecode).font(.caption).foregroundStyle(.tertiary)
+            }
+            Text(text)
+                .font(.callout)
+                .foregroundStyle(isVolatile ? .secondary : .primary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct MeetingListView: View {
+    @Bindable var session: RecordingSession
+    let openWindow: OpenWindowAction
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Réunions")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if session.meetings.count > 3 {
+                    TextField("Rechercher", text: $session.searchQuery)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 150)
+                        .controlSize(.small)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+
+            if session.filteredMeetings.isEmpty {
+                Text(session.meetings.isEmpty ? "Aucune réunion." : "Aucun résultat.")
+                    .font(.callout)
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 4)
+            } else {
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(session.filteredMeetings.prefix(10)) { meeting in
+                            MeetingRow(meeting: meeting, session: session, openWindow: openWindow)
+                        }
+                    }
+                }
+                .frame(maxHeight: 170)
+            }
+        }
+    }
+}
+
+private struct MeetingRow: View {
+    let meeting: Meeting
+    @Bindable var session: RecordingSession
+    let openWindow: OpenWindowAction
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(meeting.title).font(.callout).lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(meeting.formattedDuration)
+                    if meeting.hasSummary {
+                        Image(systemName: "sparkles").foregroundStyle(.purple)
+                    }
+                    if meeting.isPublished {
+                        Image(systemName: "checkmark.icloud").foregroundStyle(.green)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            Spacer()
+
+            if isHovered {
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(
+                        session.exportMarkdown(for: meeting), forType: .string
+                    )
+                } label: { Image(systemName: "doc.on.doc") }
+                    .buttonStyle(.borderless)
+                    .help("Copier en markdown")
+
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([session.directory(for: meeting)])
+                } label: { Image(systemName: "folder") }
+                    .buttonStyle(.borderless)
+                    .help("Révéler dans le Finder")
+
+                Button { session.delete(meeting) } label: { Image(systemName: "trash") }
+                    .buttonStyle(.borderless)
+                    .help("Supprimer")
+            }
+        }
+        .contentShape(.rect)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(isHovered ? Color.primary.opacity(0.06) : .clear)
+        .onHover { isHovered = $0 }
+        .onTapGesture {
+            session.openReview(meeting)
+            openWindow(id: "review")
+        }
+    }
+}

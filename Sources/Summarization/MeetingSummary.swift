@@ -1,0 +1,394 @@
+import Foundation
+
+/// Compte rendu structuré produit par le LLM. C'est le contrat partagé par tous les
+/// providers : aucun ne dispose de sortie structurée native, le schéma est donc
+/// imposé par le prompt puis validé à la réception.
+public struct MeetingSummary: Codable, Sendable, Equatable {
+    public var title: String
+    public var tldr: String
+    public var attendees: [String]
+    public var topics: [Topic]
+    public var decisions: [String]
+    public var actionItems: [ActionItem]
+    public var openQuestions: [String]
+    public var nextSteps: [String]
+
+    // Sections propres à certains types de réunion. Vides quand le modèle n'a pas
+    // été sollicité dessus.
+
+    /// Ce qui bloque l'équipe — un daily ouvre là-dessus.
+    public var blockers: [Blocker]
+    /// Un point par personne, pour un daily.
+    public var participantReports: [ParticipantReport]
+    /// Ressenti nominatif, pour une rétrospective.
+    public var moods: [ParticipantMood]
+
+    /// Type de réunion utilisé pour la génération, qui pilote aussi le rendu.
+    public var templateID: String?
+
+    public init(
+        title: String = "",
+        tldr: String = "",
+        attendees: [String] = [],
+        topics: [Topic] = [],
+        decisions: [String] = [],
+        actionItems: [ActionItem] = [],
+        openQuestions: [String] = [],
+        nextSteps: [String] = [],
+        blockers: [Blocker] = [],
+        participantReports: [ParticipantReport] = [],
+        moods: [ParticipantMood] = [],
+        templateID: String? = nil
+    ) {
+        self.title = title
+        self.tldr = tldr
+        self.attendees = attendees
+        self.topics = topics
+        self.decisions = decisions
+        self.actionItems = actionItems
+        self.openQuestions = openQuestions
+        self.nextSteps = nextSteps
+        self.blockers = blockers
+        self.participantReports = participantReports
+        self.moods = moods
+        self.templateID = templateID
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case title, tldr, attendees, topics, decisions, actionItems, openQuestions, nextSteps
+        case blockers, participantReports, moods, templateID
+    }
+
+    /// Décodage tolérant : les modèles omettent régulièrement les sections vides.
+    /// Exiger toutes les clés faisait échouer la génération entière pour un `attendees`
+    /// manquant, alors que le compte rendu était par ailleurs exploitable.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        title = try container.decodeIfPresent(String.self, forKey: .title) ?? ""
+        tldr = try container.decodeIfPresent(String.self, forKey: .tldr) ?? ""
+        attendees = try container.decodeIfPresent([String].self, forKey: .attendees) ?? []
+        topics = try container.decodeIfPresent([Topic].self, forKey: .topics) ?? []
+        decisions = try container.decodeIfPresent([String].self, forKey: .decisions) ?? []
+        actionItems = try container.decodeIfPresent([ActionItem].self, forKey: .actionItems) ?? []
+        openQuestions = try container.decodeIfPresent([String].self, forKey: .openQuestions) ?? []
+        nextSteps = try container.decodeIfPresent([String].self, forKey: .nextSteps) ?? []
+        blockers = try container.decodeIfPresent([Blocker].self, forKey: .blockers) ?? []
+        participantReports = try container.decodeIfPresent(
+            [ParticipantReport].self, forKey: .participantReports
+        ) ?? []
+        moods = try container.decodeIfPresent([ParticipantMood].self, forKey: .moods) ?? []
+        templateID = try container.decodeIfPresent(String.self, forKey: .templateID)
+    }
+
+    /// Un obstacle signalé pendant la réunion.
+    public struct Blocker: Codable, Sendable, Equatable, Identifiable {
+        public enum Severity: String, Codable, Sendable, CaseIterable {
+            case blocking = "bloquant"
+            case risk = "risque"
+
+            public var symbol: String {
+                switch self {
+                case .blocking: "exclamationmark.octagon.fill"
+                case .risk: "exclamationmark.triangle.fill"
+                }
+            }
+        }
+
+        public var id: UUID
+        public var person: String?
+        public var description: String
+        public var severity: Severity
+
+        public init(
+            id: UUID = UUID(),
+            person: String? = nil,
+            description: String,
+            severity: Severity = .blocking
+        ) {
+            self.id = id
+            self.person = person
+            self.description = description
+            self.severity = severity
+        }
+
+        private enum CodingKeys: String, CodingKey { case person, description, severity }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = UUID()
+            person = try container.decodeIfPresent(String.self, forKey: .person)
+            description = try container.decodeIfPresent(String.self, forKey: .description) ?? ""
+            // Le modèle s'écarte parfois du vocabulaire imposé : on retombe sur
+            // « bloquant », le cas le plus coûteux à manquer.
+            let raw = try container.decodeIfPresent(String.self, forKey: .severity)?.lowercased()
+            severity = raw.flatMap(Severity.init(rawValue:)) ?? .blocking
+        }
+    }
+
+    /// Le point d'une personne lors d'un daily.
+    public struct ParticipantReport: Codable, Sendable, Equatable, Identifiable {
+        public var id: UUID
+        public var person: String
+        public var done: [String]
+        public var next: [String]
+        public var blockers: [String]
+
+        public init(
+            id: UUID = UUID(),
+            person: String,
+            done: [String] = [],
+            next: [String] = [],
+            blockers: [String] = []
+        ) {
+            self.id = id
+            self.person = person
+            self.done = done
+            self.next = next
+            self.blockers = blockers
+        }
+
+        private enum CodingKeys: String, CodingKey { case person, done, next, blockers }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = UUID()
+            person = try container.decodeIfPresent(String.self, forKey: .person) ?? ""
+            done = try container.decodeIfPresent([String].self, forKey: .done) ?? []
+            next = try container.decodeIfPresent([String].self, forKey: .next) ?? []
+            blockers = try container.decodeIfPresent([String].self, forKey: .blockers) ?? []
+        }
+    }
+
+    /// Le ressenti d'une personne lors d'une rétrospective.
+    public struct ParticipantMood: Codable, Sendable, Equatable, Identifiable {
+        public enum Tone: String, Codable, Sendable, CaseIterable {
+            case positive = "positif"
+            case neutral = "neutre"
+            case negative = "négatif"
+
+            public var symbol: String {
+                switch self {
+                case .positive: "face.smiling"
+                case .neutral: "minus.circle"
+                case .negative: "face.dashed"
+                }
+            }
+        }
+
+        public var id: UUID
+        public var person: String
+        public var mood: Tone
+        public var comment: String
+
+        public init(
+            id: UUID = UUID(),
+            person: String,
+            mood: Tone = .neutral,
+            comment: String = ""
+        ) {
+            self.id = id
+            self.person = person
+            self.mood = mood
+            self.comment = comment
+        }
+
+        private enum CodingKeys: String, CodingKey { case person, mood, comment }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = UUID()
+            person = try container.decodeIfPresent(String.self, forKey: .person) ?? ""
+            comment = try container.decodeIfPresent(String.self, forKey: .comment) ?? ""
+            let raw = try container.decodeIfPresent(String.self, forKey: .mood)?
+                .lowercased()
+                .folding(options: .diacriticInsensitive, locale: nil)
+            mood = switch raw {
+            case "positif", "positive", "positiv": .positive
+            case "negatif", "negative": .negative
+            default: .neutral
+            }
+        }
+    }
+
+    public struct Topic: Codable, Sendable, Equatable, Identifiable {
+        public var id: UUID
+        public var heading: String
+        public var bullets: [String]
+
+        public init(id: UUID = UUID(), heading: String, bullets: [String]) {
+            self.id = id
+            self.heading = heading
+            self.bullets = bullets
+        }
+
+        private enum CodingKeys: String, CodingKey { case heading, bullets }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = UUID()
+            heading = try container.decodeIfPresent(String.self, forKey: .heading) ?? ""
+            bullets = try container.decodeIfPresent([String].self, forKey: .bullets) ?? []
+        }
+    }
+
+    public struct ActionItem: Codable, Sendable, Equatable, Identifiable {
+        public var id: UUID
+        public var owner: String?
+        public var description: String
+        public var dueDate: String?
+        /// Coché dans la fenêtre de relecture : seuls ces items deviennent des tickets.
+        public var isSelected: Bool
+        /// Renseigné après publication.
+        public var jiraKey: String?
+
+        public init(
+            id: UUID = UUID(),
+            owner: String? = nil,
+            description: String,
+            dueDate: String? = nil,
+            isSelected: Bool = true,
+            jiraKey: String? = nil
+        ) {
+            self.id = id
+            self.owner = owner
+            self.description = description
+            self.dueDate = dueDate
+            self.isSelected = isSelected
+            self.jiraKey = jiraKey
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case owner, description, dueDate, isSelected, jiraKey
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = UUID()
+            owner = try container.decodeIfPresent(String.self, forKey: .owner)
+            description = try container.decodeIfPresent(String.self, forKey: .description) ?? ""
+            dueDate = try container.decodeIfPresent(String.self, forKey: .dueDate)
+            isSelected = try container.decodeIfPresent(Bool.self, forKey: .isSelected) ?? true
+            jiraKey = try container.decodeIfPresent(String.self, forKey: .jiraKey)
+        }
+    }
+}
+
+public extension MeetingSummary {
+    /// Contrôle de cohérence minimal : un compte rendu sans titre signale une
+    /// génération ratée, même si le JSON est syntaxiquement valide.
+    ///
+    /// La synthèse n'est pas exigée : un daily met les points bloquants en tête et
+    /// relègue le `tldr` en fin, quand il le demande.
+    var isUsable: Bool {
+        guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        return !tldr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !blockers.isEmpty
+            || !participantReports.isEmpty
+            || !moods.isEmpty
+            || !topics.isEmpty
+            || !decisions.isEmpty
+            || !actionItems.isEmpty
+    }
+
+    /// Vrai si la section contient quelque chose à afficher.
+    func hasContent(_ section: SummarySection) -> Bool {
+        switch section {
+        case .tldr: !tldr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .blockers: !blockers.isEmpty
+        case .participantReports: !participantReports.isEmpty
+        case .moods: !moods.isEmpty
+        case .topics: !topics.isEmpty
+        case .decisions: !decisions.isEmpty
+        case .actionItems: !actionItems.isEmpty
+        case .openQuestions: !openQuestions.isEmpty
+        case .nextSteps: !nextSteps.isEmpty
+        }
+    }
+
+    /// Rendu markdown dans l'ordre des sections du type de réunion.
+    func markdown(template: MeetingTemplate = .generic) -> String {
+        var output = "# \(title)\n\n"
+        if !attendees.isEmpty {
+            output += "**Participants :** \(attendees.joined(separator: ", "))\n\n"
+        }
+
+        for section in template.sections where hasContent(section) {
+            switch section {
+            case .tldr:
+                output += "\(tldr)\n\n"
+
+            case .blockers:
+                output += "## \(section.displayName)\n\n"
+                for blocker in blockers {
+                    let marker = blocker.severity == .blocking ? "🛑" : "⚠️"
+                    let who = blocker.person.map { "**\($0)** — " } ?? ""
+                    output += "- \(marker) \(who)\(blocker.description)\n"
+                }
+                output += "\n"
+
+            case .participantReports:
+                output += "## \(section.displayName)\n\n"
+                for report in participantReports {
+                    output += "### \(report.person)\n\n"
+                    if !report.done.isEmpty {
+                        output += "_Fait :_\n" + report.done.map { "- \($0)\n" }.joined()
+                    }
+                    if !report.next.isEmpty {
+                        output += "_À venir :_\n" + report.next.map { "- \($0)\n" }.joined()
+                    }
+                    if !report.blockers.isEmpty {
+                        output += "_Bloqué par :_\n" + report.blockers.map { "- \($0)\n" }.joined()
+                    }
+                    output += "\n"
+                }
+
+            case .moods:
+                output += "## \(section.displayName)\n\n"
+                for mood in moods {
+                    let icon = switch mood.mood {
+                    case .positive: "🙂"
+                    case .neutral: "😐"
+                    case .negative: "🙁"
+                    }
+                    output += "- \(icon) **\(mood.person)** — \(mood.comment)\n"
+                }
+                output += "\n"
+
+            case .topics:
+                for topic in topics where !topic.heading.isEmpty {
+                    output += "## \(topic.heading)\n\n"
+                    output += topic.bullets.map { "- \($0)\n" }.joined()
+                    output += "\n"
+                }
+
+            case .decisions:
+                output += "## \(section.displayName)\n\n"
+                output += decisions.map { "- \($0)\n" }.joined() + "\n"
+
+            case .actionItems:
+                output += "## \(section.displayName)\n\n"
+                for item in actionItems {
+                    let owner = item.owner.map { "**\($0)** — " } ?? ""
+                    let due = item.dueDate.map { " _(échéance \($0))_" } ?? ""
+                    let key = item.jiraKey.map { " [\($0)]" } ?? ""
+                    output += "- \(owner)\(item.description)\(due)\(key)\n"
+                }
+                output += "\n"
+
+            case .openQuestions:
+                output += "## \(section.displayName)\n\n"
+                output += openQuestions.map { "- \($0)\n" }.joined() + "\n"
+
+            case .nextSteps:
+                output += "## \(section.displayName)\n\n"
+                output += nextSteps.map { "- \($0)\n" }.joined() + "\n"
+            }
+        }
+        return output
+    }
+
+    /// Rendu avec le type de réunion enregistré dans le compte rendu.
+    var markdown: String {
+        markdown(template: MeetingTemplate.resolve(id: templateID, in: []))
+    }
+}

@@ -1,0 +1,6 @@
+.build/
+build/
+spike-output/
+spike-synthetic/
+spike-diag*/
+spike-voix/

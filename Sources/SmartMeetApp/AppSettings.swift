@@ -1,0 +1,161 @@
+import Atlassian
+import Foundation
+import Observation
+import Summarization
+
+/// Réglages persistés dans `UserDefaults`, hors secrets qui vont au trousseau.
+@MainActor
+@Observable
+public final class AppSettings {
+    private enum Key {
+        static let provider = "summaryProvider"
+        static let opencodeModel = "opencodeModel"
+        static let ollamaModel = "ollamaModel"
+        static let locale = "transcriptionLocale"
+        static let vocabulary = "vocabulary"
+        static let atlassian = "atlassianConfiguration"
+        static let autoSummarize = "autoSummarize"
+        static let useCalendar = "useCalendar"
+        static let customTemplates = "customTemplates"
+        static let defaultTemplate = "defaultTemplateID"
+        static let userName = "userName"
+    }
+
+    private let defaults = UserDefaults.standard
+    private let keychain = KeychainStore()
+    static let tokenAccount = "atlassian-api-token"
+
+    public var providerKind: SummaryProviderKind {
+        didSet { defaults.set(providerKind.rawValue, forKey: Key.provider) }
+    }
+    public var opencodeModel: String {
+        didSet { defaults.set(opencodeModel, forKey: Key.opencodeModel) }
+    }
+    public var ollamaModel: String {
+        didSet { defaults.set(ollamaModel, forKey: Key.ollamaModel) }
+    }
+    public var localeIdentifier: String {
+        didSet { defaults.set(localeIdentifier, forKey: Key.locale) }
+    }
+    public var vocabulary: [String] {
+        didSet { defaults.set(vocabulary, forKey: Key.vocabulary) }
+    }
+    /// Nom de l'utilisateur : le transcript ne le connaît que sous le libellé « Moi ».
+    public var userName: String {
+        didSet { defaults.set(userName, forKey: Key.userName) }
+    }
+    public var autoSummarize: Bool {
+        didSet { defaults.set(autoSummarize, forKey: Key.autoSummarize) }
+    }
+    public var useCalendar: Bool {
+        didSet { defaults.set(useCalendar, forKey: Key.useCalendar) }
+    }
+    /// Types de réunion créés par l'utilisateur, en plus des modèles fournis.
+    public var customTemplates: [MeetingTemplate] {
+        didSet {
+            guard let data = try? JSONEncoder().encode(customTemplates) else { return }
+            defaults.set(data, forKey: Key.customTemplates)
+        }
+    }
+    /// Type proposé par défaut au démarrage d'un enregistrement.
+    public var defaultTemplateID: String {
+        didSet { defaults.set(defaultTemplateID, forKey: Key.defaultTemplate) }
+    }
+
+    public var atlassian: AtlassianConfiguration {
+        didSet {
+            guard let data = try? JSONEncoder().encode(atlassian) else { return }
+            defaults.set(data, forKey: Key.atlassian)
+        }
+    }
+
+    /// Jeton d'API : lu et écrit dans le trousseau, jamais dans les préférences.
+    public var atlassianToken: String {
+        didSet { keychain.write(atlassianToken, account: Self.tokenAccount) }
+    }
+
+    public init() {
+        providerKind = SummaryProviderKind(
+            rawValue: defaults.string(forKey: Key.provider) ?? ""
+        ) ?? .opencode
+        opencodeModel = defaults.string(forKey: Key.opencodeModel) ?? "github-copilot/claude-sonnet-5"
+        ollamaModel = defaults.string(forKey: Key.ollamaModel) ?? "gemma4"
+        localeIdentifier = defaults.string(forKey: Key.locale) ?? "fr-FR"
+        vocabulary = defaults.stringArray(forKey: Key.vocabulary) ?? [
+            "Crowdin", "ACME", "Confluence", "Jira", "ACME",
+            "SmartMeet", "ACME", "ACME",
+        ]
+        userName = defaults.string(forKey: Key.userName) ?? NSFullUserName()
+        autoSummarize = defaults.object(forKey: Key.autoSummarize) as? Bool ?? true
+        useCalendar = defaults.object(forKey: Key.useCalendar) as? Bool ?? true
+
+        if let data = defaults.data(forKey: Key.customTemplates),
+           let decoded = try? JSONDecoder().decode([MeetingTemplate].self, from: data) {
+            customTemplates = decoded
+        } else {
+            customTemplates = []
+        }
+        defaultTemplateID = defaults.string(forKey: Key.defaultTemplate)
+            ?? MeetingTemplate.generic.id
+
+        if let data = defaults.data(forKey: Key.atlassian),
+           let decoded = try? JSONDecoder().decode(AtlassianConfiguration.self, from: data) {
+            atlassian = decoded
+        } else {
+            atlassian = AtlassianConfiguration()
+        }
+
+        let keychain = KeychainStore()
+        keychain.seedFromEnvironmentIfNeeded(
+            account: Self.tokenAccount, variable: "ATLASSIAN_API_TOKEN"
+        )
+        atlassianToken = keychain.read(account: Self.tokenAccount) ?? ""
+    }
+
+    public var locale: Locale { Locale(identifier: localeIdentifier) }
+
+    public func makeProvider() -> any SummaryProvider {
+        switch providerKind {
+        case .opencode: OpencodeProvider(model: opencodeModel)
+        case .ollama: OllamaProvider(model: ollamaModel)
+        }
+    }
+
+    public var canPublish: Bool {
+        atlassian.isConfluenceReady && !atlassianToken.isEmpty
+    }
+
+    /// Modèles fournis puis modèles personnalisés, dans l'ordre d'affichage.
+    public var allTemplates: [MeetingTemplate] {
+        MeetingTemplate.builtIns + customTemplates
+    }
+
+    public func template(id: String?) -> MeetingTemplate {
+        MeetingTemplate.resolve(id: id, in: customTemplates)
+    }
+
+    /// Duplique un modèle fourni pour le rendre modifiable.
+    public func duplicate(_ template: MeetingTemplate) -> MeetingTemplate {
+        var copy = template
+        copy.id = UUID().uuidString
+        copy.name = "\(template.name) (copie)"
+        copy.isBuiltIn = false
+        customTemplates.append(copy)
+        return copy
+    }
+
+    public func upsert(_ template: MeetingTemplate) {
+        guard !template.isBuiltIn else { return }
+        if let index = customTemplates.firstIndex(where: { $0.id == template.id }) {
+            customTemplates[index] = template
+        } else {
+            customTemplates.append(template)
+        }
+    }
+
+    public func remove(_ template: MeetingTemplate) {
+        guard !template.isBuiltIn else { return }
+        customTemplates.removeAll { $0.id == template.id }
+        if defaultTemplateID == template.id { defaultTemplateID = MeetingTemplate.generic.id }
+    }
+}
