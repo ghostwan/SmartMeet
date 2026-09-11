@@ -4,16 +4,21 @@ import SwiftUI
 
 struct SettingsWindow: View {
     @Bindable var settings: AppSettings
+    /// Nécessaire pour résoudre la page de sprint, qui exige un appel réseau.
+    @Bindable var session: RecordingSession
     @State private var spaces: [ConfluenceSpaceSummary] = []
     @State private var issueTypes: [String] = []
     @State private var statusMessage: String?
     @State private var vocabularyText: String = ""
+    @State private var sprintPageInput: String = ""
+    @State private var sprintStatus: String?
+    @State private var isResolvingSprint = false
 
     var body: some View {
         TabView {
             transcriptionTab.tabItem { Label("Transcription", systemImage: "waveform") }
             summaryTab.tabItem { Label("Compte rendu", systemImage: "sparkles") }
-            TemplatesSettingsView(settings: settings)
+            TemplatesSettingsView(settings: settings, session: session)
                 .tabItem { Label("Types de réunion", systemImage: "square.stack") }
             atlassianTab.tabItem { Label("Atlassian", systemImage: "cloud") }
         }
@@ -98,7 +103,7 @@ struct SettingsWindow: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("Confluence") {
+            Section("Confluence par défaut") {
                 if spaces.isEmpty {
                     TextField("Clé de l'espace", text: $settings.atlassian.spaceKey)
                 } else {
@@ -112,7 +117,12 @@ struct SettingsWindow: View {
                     "Page parente (id, vide = accueil)",
                     text: $settings.atlassian.parentPageID
                 )
+                Text("Valeurs utilisées par les types de réunion qui ne définissent pas leur propre destination.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
+
+            sprintSection
 
             Section("Jira") {
                 TextField("Projet", text: $settings.atlassian.jiraProjectKey)
@@ -138,6 +148,56 @@ struct SettingsWindow: View {
         }
         .formStyle(.grouped)
         .padding()
+    }
+
+    /// La page de sprint se fixe une fois en début de sprint ; tous les types de
+    /// réunion qui la référencent suivent ensuite automatiquement.
+    private var sprintSection: some View {
+        Section("Page de sprint courante") {
+            if let sprint = settings.sprintPage {
+                HStack {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(sprint.title).font(.callout).lineLimit(1)
+                        Text("\(sprint.spaceKey) · définie le \(sprint.setAt.formatted(date: .abbreviated, time: .shortened))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Retirer") {
+                        session.clearSprintPage()
+                        sprintStatus = nil
+                    }
+                }
+            }
+
+            HStack {
+                TextField(
+                    settings.sprintPage == nil ? "URL ou identifiant de la page" : "Changer de page",
+                    text: $sprintPageInput
+                )
+                .onSubmit { Task { await applySprintPage() } }
+
+                Button(isResolvingSprint ? "…" : "Définir") {
+                    Task { await applySprintPage() }
+                }
+                .disabled(sprintPageInput.isEmpty || isResolvingSprint)
+            }
+
+            if let sprintStatus {
+                Text(sprintStatus).font(.caption).foregroundStyle(.secondary)
+            }
+
+            Text("Colle l'URL de la page qui agrège le sprint. Les types de réunion réglés sur « page de sprint » y publieront leurs comptes rendus, dans l'espace de cette page.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func applySprintPage() async {
+        isResolvingSprint = true
+        sprintStatus = await session.setSprintPage(from: sprintPageInput)
+        isResolvingSprint = false
+        if settings.sprintPage != nil { sprintPageInput = "" }
     }
 
     private func loadRemoteOptions() async {

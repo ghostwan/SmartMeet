@@ -1,3 +1,4 @@
+import Atlassian
 import Summarization
 import SwiftUI
 
@@ -5,6 +6,7 @@ import SwiftUI
 /// dupliquent ; les modèles personnalisés se modifient librement.
 struct TemplatesSettingsView: View {
     @Bindable var settings: AppSettings
+    @Bindable var session: RecordingSession
     @State private var selectedID: String = MeetingTemplate.generic.id
 
     private var selected: MeetingTemplate {
@@ -75,6 +77,8 @@ struct TemplatesSettingsView: View {
                 }
 
                 identity
+                titleEditor
+                destinationEditor
                 sectionsEditor
                 instructionsEditor
 
@@ -99,6 +103,106 @@ struct TemplatesSettingsView: View {
             Text("Nom").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             TextField("Nom", text: binding(\.name)).textFieldStyle(.roundedBorder)
         }
+    }
+
+    /// Le titre produit par le modèle varie d'une réunion à l'autre ; le format
+    /// impose une convention de nommage stable dans l'arborescence Confluence.
+    private var titleEditor: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Titre de la page publiée")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            TextField("Format", text: binding(\.titleFormat)).textFieldStyle(.roundedBorder)
+
+            Text("Aperçu : " + selected.pageTitle(
+                summaryTitle: "Point sur la migration", date: .now
+            ))
+            .font(.caption)
+            .foregroundStyle(.primary)
+
+            FlowText(
+                items: TitleFormat.placeholders.map { "\($0.token) → \($0.description)" }
+            )
+        }
+    }
+
+    private var destinationEditor: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Destination")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Picker("Page parente", selection: parentModeBinding) {
+                Text("Page de sprint courante").tag(ParentMode.sprint)
+                Text("Page fixe").tag(ParentMode.fixed)
+                Text("Accueil de l'espace").tag(ParentMode.home)
+            }
+            .pickerStyle(.radioGroup)
+
+            if case .page(let id) = selected.parent {
+                TextField(
+                    "URL ou identifiant de la page",
+                    text: Binding(
+                        get: { id },
+                        set: { newValue in
+                            var template = selected
+                            template.parent = .page(
+                                id: SprintPage.extractPageID(from: newValue) ?? newValue
+                            )
+                            settings.upsert(template)
+                        }
+                    )
+                )
+                .textFieldStyle(.roundedBorder)
+            }
+
+            if !selected.parent.isSprintPage {
+                TextField(
+                    "Espace (vide = espace par défaut)",
+                    text: binding(\.spaceKeyOverride)
+                )
+                .textFieldStyle(.roundedBorder)
+            }
+
+            Label(
+                session.destinationSummary(for: selected),
+                systemImage: "tray.and.arrow.down"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+            if selected.parent.isSprintPage, settings.sprintPage == nil {
+                Label(
+                    "Aucune page de sprint définie — onglet Atlassian. En attendant, les comptes rendus iront à l'accueil de l'espace.",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.caption)
+                .foregroundStyle(.orange)
+            }
+        }
+    }
+
+    private enum ParentMode: Hashable { case sprint, fixed, home }
+
+    private var parentModeBinding: Binding<ParentMode> {
+        Binding(
+            get: {
+                switch selected.parent {
+                case .sprintPage: .sprint
+                case .page: .fixed
+                case .spaceHome: .home
+                }
+            },
+            set: { mode in
+                var template = selected
+                template.parent = switch mode {
+                case .sprint: .sprintPage
+                case .fixed: .page(id: selected.parent.fixedPageID ?? "")
+                case .home: .spaceHome
+                }
+                settings.upsert(template)
+            }
+        )
     }
 
     private var sectionsEditor: some View {
@@ -186,5 +290,18 @@ struct TemplatesSettingsView: View {
         guard template.sections.indices.contains(target) else { return }
         template.sections.swapAt(index, target)
         settings.upsert(template)
+    }
+}
+
+/// Liste compacte des jetons disponibles, sur plusieurs lignes.
+private struct FlowText: View {
+    let items: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            ForEach(items, id: \.self) { item in
+                Text(item).font(.caption2).foregroundStyle(.tertiary)
+            }
+        }
     }
 }

@@ -125,6 +125,17 @@ public final class AppSettings {
         atlassian.isConfluenceReady && !atlassianToken.isEmpty
     }
 
+    /// Page de sprint courante, parent commun des réunions du sprint.
+    public var sprintPage: SprintPage? {
+        get { atlassian.sprintPage }
+        set { atlassian.sprintPage = newValue }
+    }
+
+    /// Vrai si au moins un type de réunion s'appuie sur la page de sprint.
+    public var usesSprintPage: Bool {
+        allTemplates.contains { $0.parent.isSprintPage }
+    }
+
     /// Modèles fournis puis modèles personnalisés, dans l'ordre d'affichage.
     public var allTemplates: [MeetingTemplate] {
         MeetingTemplate.builtIns + customTemplates

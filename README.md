@@ -16,8 +16,11 @@ distant. Aucun modèle de diarisation n'est nécessaire.
 **Types de réunion.** Le compte rendu n'a pas un format unique. Un daily ouvre sur les
 points bloquants et détaille le point de chaque personne ; une rétrospective ouvre sur
 le ressenti nominatif de l'équipe puis regroupe les échanges par sujet, sans attribuer
-aucun propos. Le type choisi pilote à la fois le schéma demandé au modèle et l'ordre de
-rendu.
+aucun propos. Le type choisi pilote le schéma demandé au modèle, l'ordre de rendu, le
+titre de la page et sa destination.
+
+**Page de sprint.** On la fixe une fois en début de sprint ; tous les comptes rendus de
+réunions du sprint s'y rattachent ensuite, sans rien reconfigurer.
 
 ## Prérequis
 
@@ -66,15 +69,45 @@ Chaque réunion est un dossier autonome :
 
 ### Types fournis
 
-| Type | Sections, dans l'ordre |
-|---|---|
-| Réunion générique | synthèse, décisions, action items, sujets, questions ouvertes, prochaines étapes |
-| Daily | **points bloquants**, point par personne, action items, synthèse |
-| Synchro | synthèse, décisions, action items, sujets, questions ouvertes, prochaines étapes |
-| Rétrospective | **ressenti nominatif**, sujets dépersonnalisés, action items, décisions |
+| Type | Sections, dans l'ordre | Titre | Destination |
+|---|---|---|---|
+| Réunion générique | synthèse, décisions, action items, sujets, questions ouvertes, prochaines étapes | `{summary} — {date}` | espace par défaut |
+| Daily | **points bloquants**, point par personne, action items, synthèse | `Daily {Weekday} {date}` | page de sprint |
+| Synchro | synthèse, décisions, action items, sujets, questions ouvertes, prochaines étapes | `{summary} — {Weekday} {date}` | page de sprint |
+| Rétrospective | **ressenti nominatif**, sujets dépersonnalisés, action items, décisions | `Rétrospective — {date}` | page de sprint |
 
-Ils se dupliquent et se modifient dans *Réglages › Types de réunion* : sections,
-ordre, et consignes de rédaction envoyées au modèle.
+Ils se dupliquent et se modifient dans *Réglages › Types de réunion* : sections, ordre,
+consignes de rédaction, format de titre et destination.
+
+### Titre des pages
+
+Le titre produit par le modèle varie d'une réunion à l'autre, ce qui rend
+l'arborescence Confluence illisible. Le format reprend la main dessus :
+
+| Jeton | Rendu |
+|---|---|
+| `{summary}` | titre proposé par le modèle |
+| `{type}` | nom du type de réunion |
+| `{Weekday}` / `{weekday}` | `Lundi` / `lundi` |
+| `{date}` | `7 septembre 2026` |
+| `{shortDate}` | `07/09/2026` |
+| `{isoDate}` | `2026-09-07` |
+| `{time}` | `14:30` |
+
+Confluence refusant deux pages de même titre dans un espace, une collision est
+résolue par un suffixe `(2)`, `(3)`…
+
+### Destination
+
+Chaque type publie vers l'une de ces cibles :
+
+- **page de sprint courante** — définie dans *Réglages › Atlassian*, en collant l'URL
+  de la page. L'espace est déduit de la page. Tant qu'aucune page n'est définie, les
+  comptes rendus vont à l'accueil de l'espace plutôt que d'échouer ;
+- **page fixe** — identifiant ou URL Confluence ;
+- **accueil de l'espace**.
+
+La destination effective est affichée dans le menu et avant publication.
 
 ### Mode headless
 

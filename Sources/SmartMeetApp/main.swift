@@ -35,6 +35,14 @@ if let index = arguments.firstIndex(of: "--headless") {
         )
     }
     RunLoop.main.run()
+} else if arguments.contains("--set-sprint-page") {
+    let input = value(after: "--set-sprint-page") ?? ""
+    Task { @MainActor in
+        let session = RecordingSession()
+        print(await session.setSprintPage(from: input))
+        exit(0)
+    }
+    RunLoop.main.run()
 } else {
     SmartMeetApp.main()
 }

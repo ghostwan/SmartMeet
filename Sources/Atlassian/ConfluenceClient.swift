@@ -58,7 +58,8 @@ public struct ConfluenceClient: Sendable {
         title: String,
         storageBody: String,
         spaceID: String,
-        parentID: String?
+        parentID: String?,
+        spaceKey: String? = nil
     ) async throws -> ConfluencePage {
         var body: [String: Any] = [
             "spaceId": spaceID,
@@ -72,9 +73,33 @@ public struct ConfluenceClient: Sendable {
         let id = string(payload["id"])
         guard !id.isEmpty else { throw AtlassianError.unexpectedResponse }
 
+        // L'espace peut différer de celui des réglages : un type de réunion peut
+        // publier ailleurs, et la page de sprint impose le sien.
+        let key = spaceKey ?? configuration.spaceKey
         let url = configuration.baseURL
-            .map { $0.appending(path: "wiki/spaces/\(configuration.spaceKey)/pages/\(id)") }
+            .map { $0.appending(path: "wiki/spaces/\(key)/pages/\(id)") }
         return ConfluencePage(id: id, title: title, url: url)
+    }
+
+    /// Relit une page pour confirmer qu'elle existe et récupérer son titre. Sert à
+    /// valider la page de sprint saisie par l'utilisateur.
+    public func page(id: String) async throws -> ConfluencePage {
+        let payload = try await client.request("GET", "/wiki/api/v2/pages/\(id)")
+        let title = payload["title"] as? String ?? ""
+        guard !title.isEmpty else { throw AtlassianError.unexpectedResponse }
+        let spaceID = string(payload["spaceId"])
+        let url = configuration.baseURL.map { $0.appending(path: "wiki/spaces/\(spaceID)/pages/\(id)") }
+        return ConfluencePage(id: id, title: title, url: url)
+    }
+
+    /// Espace auquel appartient une page, pour rattacher la page de sprint au bon
+    /// espace sans obliger l'utilisateur à le saisir.
+    public func spaceKey(forPage id: String) async throws -> String {
+        let payload = try await client.request("GET", "/wiki/api/v2/pages/\(id)")
+        let spaceID = string(payload["spaceId"])
+        guard !spaceID.isEmpty else { return configuration.spaceKey }
+        let space = try await client.request("GET", "/wiki/api/v2/spaces/\(spaceID)")
+        return space["key"] as? String ?? configuration.spaceKey
     }
 
     public func deletePage(id: String) async throws {

@@ -120,6 +120,15 @@ struct ReviewWindow: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     field("Titre", text: $draft.title)
+                    Label(
+                        "Publié sous : " + template.pageTitle(
+                            summaryTitle: draft.title, date: meeting.startedAt
+                        ),
+                        systemImage: "text.badge.checkmark"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                     EditableList(title: "Participants", items: $draft.attendees)
 
                     // L'ordre d'édition suit celui du rendu : ce qu'on voit ici est ce
@@ -360,10 +369,10 @@ struct ReviewWindow: View {
                     Text(message).font(.caption).foregroundStyle(.secondary)
                 }
             }
-            if case .published(let url, let issues, let failures) = session.publishState {
+            if case .published(let url, let pageTitle, let issues, let failures) = session.publishState {
                 VStack(alignment: .leading, spacing: 4) {
                     if let pageURL = URL(string: url) {
-                        Link("Page publiée sur Confluence", destination: pageURL).font(.callout)
+                        Link("« \(pageTitle) »", destination: pageURL).font(.callout)
                     }
                     if !issues.isEmpty {
                         Text("Tickets créés : \(issues.joined(separator: ", "))")
@@ -380,6 +389,16 @@ struct ReviewWindow: View {
                 Label(message, systemImage: "xmark.octagon")
                     .font(.caption).foregroundStyle(.red)
                     .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            HStack(spacing: 8) {
+                // La destination effective dépend du type de réunion et de la page de
+                // sprint : on la montre avant de publier, pas après.
+                Label(session.destinationSummary(for: template), systemImage: "tray.and.arrow.down")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Spacer()
             }
 
             HStack {

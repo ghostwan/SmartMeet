@@ -1,5 +1,47 @@
 import Foundation
 
+/// Page Confluence servant de parent commun, typiquement la page qui agrège un sprint.
+/// Elle se fixe une fois en début de sprint : toutes les réunions du sprint s'y
+/// rattachent ensuite automatiquement.
+public struct SprintPage: Codable, Sendable, Equatable {
+    public var id: String
+    public var title: String
+    public var spaceKey: String
+    public var setAt: Date
+
+    public init(id: String, title: String, spaceKey: String, setAt: Date = .now) {
+        self.id = id
+        self.title = title
+        self.spaceKey = spaceKey
+        self.setAt = setAt
+    }
+
+    /// Accepte un identifiant nu ou une URL Confluence copiée depuis le navigateur.
+    ///
+    /// Les URL prennent plusieurs formes selon l'ancienneté de la page :
+    /// `/wiki/spaces/KEY/pages/12345/Titre`, `/wiki/pages/viewpage.action?pageId=12345`.
+    public static func extractPageID(from input: String) -> String? {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if trimmed.allSatisfy(\.isNumber) { return trimmed }
+
+        if let components = URLComponents(string: trimmed) {
+            if let pageId = components.queryItems?.first(where: { $0.name == "pageId" })?.value,
+               pageId.allSatisfy(\.isNumber) {
+                return pageId
+            }
+            let parts = components.path.split(separator: "/").map(String.init)
+            if let index = parts.firstIndex(of: "pages"),
+               parts.indices.contains(index + 1),
+               parts[index + 1].allSatisfy(\.isNumber) {
+                return parts[index + 1]
+            }
+        }
+        return nil
+    }
+}
+
 /// Réglages de publication. Les identifiants vivent dans le trousseau, jamais ici.
 public struct AtlassianConfiguration: Codable, Sendable, Equatable {
     public var site: String
@@ -12,6 +54,8 @@ public struct AtlassianConfiguration: Codable, Sendable, Equatable {
     /// Certains projets imposent un epic parent via un validateur de workflow, ce que
     /// `/createmeta` ne déclare pas. Sans lui, la création échoue en 400.
     public var jiraParentKey: String
+    /// Page de sprint courante, parent commun des réunions qui s'y rattachent.
+    public var sprintPage: SprintPage?
 
     public init(
         site: String = ProcessInfo.processInfo.environment["CONFLUENCE_SITE"] ?? "",
@@ -20,7 +64,8 @@ public struct AtlassianConfiguration: Codable, Sendable, Equatable {
         parentPageID: String = "",
         jiraProjectKey: String = ProcessInfo.processInfo.environment["JIRA_DEFAULT_PROJECT"] ?? "",
         jiraIssueType: String = "Task",
-        jiraParentKey: String = ""
+        jiraParentKey: String = "",
+        sprintPage: SprintPage? = nil
     ) {
         self.site = site
         self.email = email
@@ -29,6 +74,7 @@ public struct AtlassianConfiguration: Codable, Sendable, Equatable {
         self.jiraProjectKey = jiraProjectKey
         self.jiraIssueType = jiraIssueType
         self.jiraParentKey = jiraParentKey
+        self.sprintPage = sprintPage
     }
 
     public var baseURL: URL? {

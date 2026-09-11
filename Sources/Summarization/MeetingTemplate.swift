@@ -92,6 +92,12 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
     public var sections: [SummarySection]
     /// Consignes libres ajoutées au prompt.
     public var instructions: String
+    /// Composition du titre de la page publiée. Voir `TitleFormat.placeholders`.
+    public var titleFormat: String
+    /// Espace Confluence de destination. Vide = espace par défaut des réglages.
+    public var spaceKeyOverride: String
+    /// Page sous laquelle publier.
+    public var parent: ParentPageReference
     /// Les modèles fournis ne sont pas supprimables, seulement dupliquables.
     public var isBuiltIn: Bool
 
@@ -101,6 +107,9 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
         symbol: String = "doc.text",
         sections: [SummarySection],
         instructions: String = "",
+        titleFormat: String = "{summary} — {date}",
+        spaceKeyOverride: String = "",
+        parent: ParentPageReference = .spaceHome,
         isBuiltIn: Bool = false
     ) {
         self.id = id
@@ -108,7 +117,42 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
         self.symbol = symbol
         self.sections = sections
         self.instructions = instructions
+        self.titleFormat = titleFormat
+        self.spaceKeyOverride = spaceKeyOverride
+        self.parent = parent
         self.isBuiltIn = isBuiltIn
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, symbol, sections, instructions
+        case titleFormat, spaceKeyOverride, parent, isBuiltIn
+    }
+
+    /// Décodage tolérant : les types enregistrés avant l'ajout de la destination
+    /// doivent rester utilisables.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        symbol = try container.decodeIfPresent(String.self, forKey: .symbol) ?? "doc.text"
+        sections = try container.decodeIfPresent([SummarySection].self, forKey: .sections) ?? []
+        instructions = try container.decodeIfPresent(String.self, forKey: .instructions) ?? ""
+        titleFormat = try container.decodeIfPresent(String.self, forKey: .titleFormat)
+            ?? "{summary} — {date}"
+        spaceKeyOverride = try container.decodeIfPresent(String.self, forKey: .spaceKeyOverride) ?? ""
+        parent = try container.decodeIfPresent(ParentPageReference.self, forKey: .parent)
+            ?? .spaceHome
+        isBuiltIn = try container.decodeIfPresent(Bool.self, forKey: .isBuiltIn) ?? false
+    }
+
+    /// Titre de la page publiée pour une réunion donnée.
+    public func pageTitle(summaryTitle: String, date: Date) -> String {
+        TitleFormat.render(
+            titleFormat,
+            summaryTitle: summaryTitle,
+            templateName: name,
+            date: date
+        )
     }
 }
 
@@ -119,6 +163,7 @@ public extension MeetingTemplate {
         symbol: "doc.text",
         sections: [.tldr, .decisions, .actionItems, .topics, .openQuestions, .nextSteps],
         instructions: "",
+        titleFormat: "{summary} — {date}",
         isBuiltIn: true
     )
 
@@ -142,6 +187,10 @@ public extension MeetingTemplate {
 
         La synthèse `tldr` vient en dernier et tient en deux phrases.
         """,
+        // Un daily se retrouve par sa date, pas par un titre que le modèle
+        // reformule différemment chaque jour.
+        titleFormat: "Daily {Weekday} {date}",
+        parent: .sprintPage,
         isBuiltIn: true
     )
 
@@ -158,6 +207,8 @@ public extension MeetingTemplate {
         suspens : tout ce qui n'a pas été explicitement décidé va dans les questions \
         ouvertes.
         """,
+        titleFormat: "{summary} — {Weekday} {date}",
+        parent: .sprintPage,
         isBuiltIn: true
     )
 
@@ -181,6 +232,8 @@ public extension MeetingTemplate {
 
         Les action items restent nominatifs, puisqu'il faut bien un responsable.
         """,
+        titleFormat: "Rétrospective — {date}",
+        parent: .sprintPage,
         isBuiltIn: true
     )
 

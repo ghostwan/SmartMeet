@@ -30,7 +30,7 @@ public final class RecordingSession {
     public enum PublishState: Equatable {
         case none
         case running(String)
-        case published(url: String, issues: [String], failures: [String])
+        case published(url: String, title: String, issues: [String], failures: [String])
         case failed(String)
     }
 
@@ -73,6 +73,57 @@ public final class RecordingSession {
 
     public var selectedTemplate: MeetingTemplate {
         settings.template(id: selectedTemplateID)
+    }
+
+    /// Destination lisible, calculée localement sans appel réseau, pour l'afficher
+    /// avant de publier.
+    public func destinationSummary(for template: MeetingTemplate) -> String {
+        let space = template.parent.isSprintPage
+            ? (settings.sprintPage?.spaceKey ?? settings.atlassian.spaceKey)
+            : (template.spaceKeyOverride.isEmpty ? settings.atlassian.spaceKey : template.spaceKeyOverride)
+
+        guard !space.isEmpty else { return "Destination non configurée" }
+
+        switch template.parent {
+        case .sprintPage:
+            if let sprint = settings.sprintPage {
+                return "\(space) › \(sprint.title)"
+            }
+            return "\(space) › accueil — aucune page de sprint définie"
+        case .page(let id) where !id.isEmpty:
+            return "\(space) › page \(id)"
+        case .page, .spaceHome:
+            return settings.atlassian.parentPageID.isEmpty
+                ? "\(space) › accueil de l'espace"
+                : "\(space) › page \(settings.atlassian.parentPageID)"
+        }
+    }
+
+    /// Fixe la page de sprint à partir d'un identifiant ou d'une URL Confluence.
+    /// L'espace est déduit de la page, pas saisi à la main.
+    public func setSprintPage(from input: String) async -> String {
+        guard let pageID = SprintPage.extractPageID(from: input) else {
+            return "❌ Identifiant ou URL de page non reconnu."
+        }
+        guard settings.canPublish else {
+            return "❌ Configure d'abord le site, l'e-mail et le jeton Atlassian."
+        }
+
+        let client = ConfluenceClient(
+            configuration: settings.atlassian, token: settings.atlassianToken
+        )
+        do {
+            let page = try await client.page(id: pageID)
+            let spaceKey = try await client.spaceKey(forPage: pageID)
+            settings.sprintPage = SprintPage(id: pageID, title: page.title, spaceKey: spaceKey)
+            return "✅ \(spaceKey) › \(page.title)"
+        } catch {
+            return "❌ \(error.localizedDescription)"
+        }
+    }
+
+    public func clearSprintPage() {
+        settings.sprintPage = nil
     }
 
     // MARK: - État dérivé
@@ -300,7 +351,8 @@ public final class RecordingSession {
                 transcript: transcript,
                 audioNote: audioNote,
                 createJiraIssues: createJiraIssues,
-                template: settings.template(id: meeting.templateID)
+                template: settings.template(id: meeting.templateID),
+                meetingDate: meeting.startedAt
             ) { step in
                 Task { @MainActor [weak self] in
                     self?.publishState = .running(Self.describe(step))
@@ -324,8 +376,14 @@ public final class RecordingSession {
             meetings = store.loadAll()
             reviewedMeeting = updated
 
+            updated.title = result.pageTitle
+            try? store.update(updated)
+            meetings = store.loadAll()
+            reviewedMeeting = updated
+
             publishState = .published(
                 url: result.pageURL?.absoluteString ?? "",
+                title: result.pageTitle,
                 issues: updated.jiraIssueKeys,
                 failures: result.failures
             )
@@ -336,6 +394,7 @@ public final class RecordingSession {
 
     private static func describe(_ step: PublishStep) -> String {
         switch step {
+        case .resolvingDestination: "Résolution de la destination…"
         case .creatingPage: "Création de la page Confluence…"
         case .creatingIssue(let index, let total): "Création du ticket \(index)/\(total)…"
         case .linkingIssues: "Mise à jour de la page avec les clés Jira…"
@@ -369,7 +428,12 @@ public final class RecordingSession {
         reviewedMeeting = meeting
         summaryState = meeting.hasSummary ? .ready : .none
         publishState = meeting.isPublished
-            ? .published(url: meeting.confluencePageURL ?? "", issues: meeting.jiraIssueKeys, failures: [])
+            ? .published(
+                url: meeting.confluencePageURL ?? "",
+                title: meeting.title,
+                issues: meeting.jiraIssueKeys,
+                failures: []
+            )
             : .none
     }
 

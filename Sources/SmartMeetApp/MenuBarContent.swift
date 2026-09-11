@@ -1,6 +1,7 @@
 import AudioCapture
 import MeetingStore
 import SmartMeetCalendar
+import Atlassian
 import Summarization
 import SwiftUI
 import Transcription
@@ -83,10 +84,23 @@ struct MenuBarContent: View {
             .labelsHidden()
             .pickerStyle(.menu)
 
-            Text(session.selectedTemplate.sections.map(\.displayName).joined(separator: " · "))
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-                .lineLimit(1)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(session.selectedTemplate.sections.map(\.displayName).joined(separator: " · "))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                // La destination dépend du type choisi : autant la voir maintenant,
+                // pas au moment de publier.
+                Text(session.destinationSummary(for: session.selectedTemplate))
+                    .font(.caption2)
+                    .foregroundStyle(
+                        session.selectedTemplate.parent.isSprintPage
+                            && session.settings.sprintPage == nil
+                            ? Color.orange
+                            : Color.secondary.opacity(0.6)
+                    )
+                    .lineLimit(1)
+            }
             Spacer()
         }
         .padding(.horizontal, 12)

@@ -19,7 +19,7 @@ struct SmartMeetApp: App {
         .defaultSize(width: 720, height: 640)
 
         Window("Réglages SmartMeet", id: "settings") {
-            SettingsWindow(settings: session.settings)
+            SettingsWindow(settings: session.settings, session: session)
         }
         .windowResizability(.contentSize)
     }
