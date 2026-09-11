@@ -1,4 +1,5 @@
 import Foundation
+import Summarization
 
 // `open` passe un argument -psn_… qu'il faut ignorer.
 let arguments = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("-psn_") }
@@ -31,7 +32,8 @@ if let index = arguments.firstIndex(of: "--headless") {
         await HeadlessSummarizer.run(
             transcriptPath: path,
             publish: arguments.contains("--publish"),
-            templateID: value(after: "--template")
+            templateID: value(after: "--template"),
+            language: SummaryLanguage(rawValue: value(after: "--lang") ?? "fr") ?? .french
         )
     }
     RunLoop.main.run()

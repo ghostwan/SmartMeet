@@ -27,6 +27,10 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp Sources/SmartMeetApp/Info.plist "$APP/Contents/Info.plist"
 cp "$BIN" "$APP/Contents/MacOS/SmartMeet"
 
+# Icône : régénérée depuis le dessin vectoriel, jamais commitée en binaire.
+swift Scripts/make-icon.swift >/dev/null
+iconutil -c icns build/SmartMeet.iconset -o "$APP/Contents/Resources/SmartMeet.icns"
+
 codesign --force \
 	--sign "$IDENTITY" \
 	--options runtime \

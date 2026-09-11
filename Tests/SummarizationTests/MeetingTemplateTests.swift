@@ -14,9 +14,9 @@ struct MeetingTemplateTests {
         #expect(MeetingTemplate.daily.sections.last == .tldr)
     }
 
-    @Test("La rétrospective ouvre sur le ressenti et ne demande pas de synthèse")
-    func retroLeadsWithMoods() {
-        #expect(MeetingTemplate.retrospective.sections.first == .moods)
+    @Test("La rétrospective ouvre sur la météo et ne demande pas de synthèse")
+    func retroLeadsWithWeather() {
+        #expect(MeetingTemplate.retrospective.sections.first == .sprintWeather)
         #expect(!MeetingTemplate.retrospective.sections.contains(.tldr))
     }
 
@@ -25,7 +25,8 @@ struct MeetingTemplateTests {
         let prompt = SummaryPrompt.single(
             transcript: "…",
             context: SummaryContext(),
-            template: .retrospective
+            template: .retrospective,
+            language: .french
         )
         #expect(prompt.contains("n'attribue aucun propos"))
         #expect(prompt.contains("Rétrospective"))
@@ -41,7 +42,8 @@ struct MeetingTemplateTests {
         #expect(!daily.contains("openQuestions"))
 
         let retro = SummaryPrompt.schema(for: .retrospective)
-        #expect(retro.contains("moods"))
+        #expect(retro.contains("sprintWeather"))
+        #expect(retro.contains("fourL"))
         #expect(!retro.contains("participantReports"))
     }
 
@@ -56,10 +58,14 @@ struct MeetingTemplateTests {
 
     @Test("Les consignes de section accompagnent la section demandée")
     func sectionGuidanceIsIncluded() {
-        let daily = SummaryPrompt.instructions(context: SummaryContext(), template: .daily)
+        let daily = SummaryPrompt.instructions(
+            context: SummaryContext(), template: .daily, language: .french
+        )
         #expect(daily.contains("severity"))
 
-        let generic = SummaryPrompt.instructions(context: SummaryContext(), template: .generic)
+        let generic = SummaryPrompt.instructions(
+            context: SummaryContext(), template: .generic, language: .french
+        )
         #expect(!generic.contains("severity"))
     }
 
@@ -181,15 +187,20 @@ struct TemplateRenderingTests {
         #expect(!html.contains(#"ac:name="warning""#))
     }
 
-    @Test("Le ressenti d'une rétrospective est rendu en tableau nominatif")
+    @Test("Le ressenti est rendu en tableau nominatif, avant les sujets")
     func moodsRenderAsTable() {
+        // `moods` reste disponible pour un type personnalisé, même si la
+        // rétrospective fournie lui préfère désormais la météo du sprint.
+        let template = MeetingTemplate(
+            name: "Retro simple", sections: [.moods, .topics]
+        )
         let summary = MeetingSummary(
             title: "Retro",
             topics: [.init(heading: "Charge de travail", bullets: ["Trop de contextes"])],
             moods: [.init(person: "Sandra", mood: .negative, comment: "Sous l'eau")]
         )
         let html = ConfluenceStorageRenderer.render(
-            summary: summary, transcript: "", audioNote: nil, template: .retrospective
+            summary: summary, transcript: "", audioNote: nil, template: template
         )
         let moodIndex = html.range(of: "Sandra")?.lowerBound
         let topicIndex = html.range(of: "Charge de travail")?.lowerBound

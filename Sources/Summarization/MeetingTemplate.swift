@@ -11,6 +11,12 @@ public enum SummarySection: String, Codable, Sendable, CaseIterable, Identifiabl
     case participantReports
     /// Ressenti nominatif de chaque membre, pour une rétrospective.
     case moods
+    /// Météo du sprint : chaque membre choisit une ou plusieurs icônes, explique son
+    /// choix, et dit ce qu'il retient de son sprint. Partie nominative, destinée à
+    /// être transmise aux managers.
+    case sprintWeather
+    /// Format 4L d'une rétrospective : Liked, Learned, Lacked, Longed for.
+    case fourL
     /// Sujets abordés, regroupés par thème.
     case topics
     case decisions
@@ -20,19 +26,24 @@ public enum SummarySection: String, Codable, Sendable, CaseIterable, Identifiabl
 
     public var id: String { rawValue }
 
-    public var displayName: String {
+    public var displayName: String { displayName(in: .french) }
+
+    public func displayName(in language: SummaryLanguage) -> String {
         switch self {
-        case .tldr: "Synthèse"
-        case .blockers: "Points bloquants"
-        case .participantReports: "Point par personne"
-        case .moods: "Ressenti de l'équipe"
-        case .topics: "Sujets"
-        case .decisions: "Décisions"
-        case .actionItems: "Action items"
-        case .openQuestions: "Questions ouvertes"
-        case .nextSteps: "Prochaines étapes"
+        case .tldr: language.pick(fr: "Synthèse", en: "Summary")
+        case .blockers: language.pick(fr: "Points bloquants", en: "Blockers")
+        case .participantReports: language.pick(fr: "Point par personne", en: "Individual updates")
+        case .moods: language.pick(fr: "Ressenti de l'équipe", en: "Team mood")
+        case .sprintWeather: language.pick(fr: "Météo du sprint", en: "Sprint weather")
+        case .fourL: language.pick(fr: "4L", en: "4L")
+        case .topics: language.pick(fr: "Sujets", en: "Topics")
+        case .decisions: language.pick(fr: "Décisions", en: "Decisions")
+        case .actionItems: language.pick(fr: "Action items", en: "Action items")
+        case .openQuestions: language.pick(fr: "Questions ouvertes", en: "Open questions")
+        case .nextSteps: language.pick(fr: "Prochaines étapes", en: "Next steps")
         }
     }
+
 
     /// Fragment de schéma JSON demandé au modèle pour cette section.
     var schemaFragment: String {
@@ -45,6 +56,10 @@ public enum SummarySection: String, Codable, Sendable, CaseIterable, Identifiabl
             #""participantReports": [{ "person": "string", "done": ["string"], "next": ["string"], "blockers": ["string"] }]"#
         case .moods:
             #""moods": [{ "person": "string", "mood": "positif|neutre|négatif", "comment": "string" }]"#
+        case .sprintWeather:
+            #""sprintWeather": [{ "person": "string", "icons": ["string"], "explanation": "string", "sprintFeedback": ["string"] }]"#
+        case .fourL:
+            #""fourL": { "liked": [{ "heading": "string", "bullets": ["string"] }], "learned": [{ "heading": "string", "bullets": ["string"] }], "lacked": [{ "heading": "string", "bullets": ["string"] }], "longedFor": [{ "heading": "string", "bullets": ["string"] }] }"#
         case .topics:
             #""topics": [{ "heading": "string", "bullets": ["string"] }]"#
         case .decisions:
@@ -58,25 +73,105 @@ public enum SummarySection: String, Codable, Sendable, CaseIterable, Identifiabl
         }
     }
 
-    /// Consigne de remplissage propre à la section.
-    var guidance: String? {
+    /// Consigne de remplissage propre à la section, dans la langue du compte rendu.
+    func guidance(in language: SummaryLanguage) -> String? {
         switch self {
         case .blockers:
-            "Dans `blockers`, ne liste que ce qui empêche réellement quelqu'un d'avancer "
-                + "ou menace une échéance. `severity` vaut « bloquant » si la personne est "
-                + "à l'arrêt, « risque » si elle avance encore mais qu'un danger est identifié."
+            language.pick(
+                fr: """
+                Dans `blockers`, ne liste que ce qui empêche réellement quelqu'un \
+                d'avancer ou menace une échéance. `severity` vaut « bloquant » si la \
+                personne est à l'arrêt, « risque » si elle avance encore mais qu'un \
+                danger est identifié.
+                """,
+                en: """
+                In `blockers`, list only what actually prevents someone from making \
+                progress or threatens a deadline. `severity` is "bloquant" when the \
+                person is stuck, "risque" when they can still move forward but a danger \
+                has been identified.
+                """
+            )
+
         case .participantReports:
-            "Dans `participantReports`, une entrée par personne ayant parlé, dans l'ordre "
-                + "de prise de parole. `done` est ce qu'elle a terminé, `next` ce qu'elle "
-                + "prévoit, `blockers` ce qui la freine. N'invente pas d'entrée pour "
-                + "quelqu'un qui ne s'est pas exprimé."
+            language.pick(
+                fr: """
+                Dans `participantReports`, une entrée par personne ayant parlé, dans \
+                l'ordre de prise de parole. `done` est ce qu'elle a terminé, `next` ce \
+                qu'elle prévoit, `blockers` ce qui la freine. N'invente pas d'entrée \
+                pour quelqu'un qui ne s'est pas exprimé.
+                """,
+                en: """
+                In `participantReports`, one entry per person who spoke, in speaking \
+                order. `done` is what they completed, `next` what they plan, `blockers` \
+                what is slowing them down. Do not invent an entry for someone who did \
+                not speak.
+                """
+            )
+
         case .moods:
-            "Dans `moods`, une entrée par personne, avec son ressenti explicite ou déduit "
-                + "de son ton et de ses propos. `comment` cite ou reformule brièvement ce "
-                + "qui justifie ce ressenti."
-        case .topics:
-            nil
-        default:
+            language.pick(
+                fr: """
+                Dans `moods`, une entrée par personne, avec son ressenti explicite ou \
+                déduit de son ton et de ses propos. `comment` cite ou reformule \
+                brièvement ce qui justifie ce ressenti.
+                """,
+                en: """
+                In `moods`, one entry per person, with the mood they stated or that can \
+                be inferred from their tone and words. `comment` briefly quotes or \
+                rephrases what justifies it.
+                """
+            )
+
+        case .sprintWeather:
+            language.pick(
+                fr: """
+                Dans `sprintWeather`, une entrée par personne ayant pris la parole. \
+                `icons` contient une ou plusieurs valeurs parmi : \(WeatherIcon.promptVocabulary). \
+                Un membre peut en choisir plusieurs — soleil et orage pour un sprint \
+                contrasté, par exemple : reprends-les toutes. `explanation` restitue ce \
+                qu'il a dit pour justifier ce choix. `sprintFeedback` reprend ce qu'il \
+                raconte de son sprint : charge, difficultés, satisfactions, relations \
+                avec l'équipe. Reste fidèle à ses propos et à ses nuances, ne lisse pas \
+                et ne résume pas à l'excès : cette partie est transmise à son manager et \
+                doit refléter ce que la personne a réellement exprimé. Ne retranscris \
+                pas le contenu des post-its, uniquement ce qui est dit à l'oral.
+                """,
+                en: """
+                In `sprintWeather`, one entry per person who spoke. `icons` holds one or \
+                more values from: \(WeatherIcon.promptVocabulary). Someone may pick \
+                several — sun and storm for a mixed sprint, for instance: keep them all. \
+                `explanation` conveys what they said to justify that choice. \
+                `sprintFeedback` captures what they say about their sprint: workload, \
+                difficulties, satisfactions, relationships within the team. Stay faithful \
+                to their words and their nuance, do not smooth things over or \
+                over-summarise: this part is shared with their manager and must reflect \
+                what the person actually expressed. Do not transcribe sticky notes, only \
+                what is said out loud.
+                """
+            )
+
+        case .fourL:
+            language.pick(
+                fr: """
+                Dans `fourL`, répartis les échanges selon les quatre axes : `liked` ce \
+                qui a plu, `learned` ce qui a été appris, `lacked` ce qui a manqué, \
+                `longedFor` ce qui aurait été souhaité. Chaque axe regroupe les remarques \
+                par sujet : `heading` nomme le thème, `bullets` détaille. N'attribue \
+                aucun propos à personne dans cette partie et fusionne les remarques \
+                convergentes de plusieurs participants. Un axe sans matière reste une \
+                liste vide.
+                """,
+                en: """
+                In `fourL`, split the discussion across the four axes: `liked` what went \
+                well, `learned` what was learned, `lacked` what was missing, `longedFor` \
+                what people wished for. Each axis groups remarks by topic: `heading` names \
+                the theme, `bullets` gives the detail. Do not attribute any statement to \
+                anyone in this part, and merge converging remarks from several \
+                participants. An axis with nothing to say stays an empty list.
+                """
+            )
+
+        case .tldr, .topics, .decisions, .actionItems, .openQuestions, .nextSteps:
             nil
         }
     }
@@ -93,6 +188,11 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
     /// Consignes libres ajoutées au prompt.
     public var instructions: String
     /// Composition du titre de la page publiée. Voir `TitleFormat.placeholders`.
+    ///
+    /// Les parties littérales ne sont pas traduites : c'est une convention de nommage
+    /// choisie par l'équipe, pas du contenu. Seuls les jetons de date suivent la
+    /// langue du compte rendu. Préférer `{type}` à un libellé en dur permet au titre
+    /// de rester cohérent avec le nom du type affiché dans l'application.
     public var titleFormat: String
     /// Espace Confluence de destination. Vide = espace par défaut des réglages.
     public var spaceKeyOverride: String
@@ -146,12 +246,17 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
     }
 
     /// Titre de la page publiée pour une réunion donnée.
-    public func pageTitle(summaryTitle: String, date: Date) -> String {
+    public func pageTitle(
+        summaryTitle: String,
+        date: Date,
+        language: SummaryLanguage = .french
+    ) -> String {
         TitleFormat.render(
             titleFormat,
             summaryTitle: summaryTitle,
             templateName: name,
-            date: date
+            date: date,
+            language: language
         )
     }
 }
@@ -216,23 +321,29 @@ public extension MeetingTemplate {
         id: "builtin.retro",
         name: "Rétrospective",
         symbol: "arrow.counterclockwise",
-        sections: [.moods, .topics, .actionItems, .decisions],
+        sections: [.sprintWeather, .fourL, .actionItems, .decisions],
         instructions: """
-        C'est une rétrospective d'équipe.
+        C'est une rétrospective d'équipe au format 4L, ouverte par une météo du sprint.
 
-        Commence par le ressenti de chaque membre, nominativement : c'est la seule \
-        partie où les personnes sont citées.
+        La météo du sprint est nominative et destinée à être transmise aux managers : \
+        restitue fidèlement ce que chaque personne dit de son sprint, avec ses nuances \
+        et ses réserves. Ne lisse pas, ne reformule pas en positif ce qui est exprimé \
+        négativement. Plusieurs icônes météo par personne sont normales et doivent \
+        toutes être conservées.
 
-        Regroupe ensuite les échanges par sujet, et surtout **n'attribue aucun propos \
-        à qui que ce soit** dans cette partie. Les titres de sujets décrivent le thème \
-        (« Charge de travail », « Qualité des specs », « Outillage de test »), pas les \
-        personnes. Fusionne les remarques convergentes de plusieurs participants en un \
-        seul point. Cette dépersonnalisation est volontaire : elle permet d'aborder les \
-        sujets sensibles sans mettre personne en cause.
+        Les 4L sont au contraire dépersonnalisés : **n'attribue aucun propos à qui que \
+        ce soit** dans cette partie. Les titres décrivent le thème (« Charge de \
+        travail », « Qualité des specs », « Outillage de test »), jamais les personnes. \
+        Fusionne les remarques convergentes de plusieurs participants en un seul point. \
+        Cette dépersonnalisation est volontaire : elle permet d'aborder les sujets \
+        sensibles sans mettre personne en cause.
+
+        Les post-its et le tableau ne sont pas dans le transcript : appuie-toi \
+        uniquement sur ce qui est dit à l'oral.
 
         Les action items restent nominatifs, puisqu'il faut bien un responsable.
         """,
-        titleFormat: "Rétrospective — {date}",
+        titleFormat: "{type} — {date}",
         parent: .sprintPage,
         isBuiltIn: true
     )

@@ -6,6 +6,10 @@
 	<string>com.smartmeet.app</string>
 	<key>CFBundleName</key>
 	<string>SmartMeet</string>
+	<key>CFBundleIconFile</key>
+	<string>SmartMeet</string>
+	<key>CFBundleIconName</key>
+	<string>SmartMeet</string>
 	<key>CFBundleExecutable</key>
 	<string>SmartMeet</string>
 	<key>CFBundlePackageType</key>

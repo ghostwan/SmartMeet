@@ -111,6 +111,7 @@ public struct PublishService: Sendable {
         createJiraIssues: Bool,
         template: MeetingTemplate = .generic,
         meetingDate: Date = .now,
+        language: SummaryLanguage = .french,
         onStep: @Sendable (PublishStep) -> Void = { _ in }
     ) async throws -> PublicationResult {
         guard configuration.isConfluenceReady || !template.spaceKeyOverride.isEmpty else {
@@ -121,13 +122,16 @@ public struct PublishService: Sendable {
         let destination = try await resolveDestination(for: template)
 
         onStep(.creatingPage)
-        let baseTitle = template.pageTitle(summaryTitle: summary.title, date: meetingDate)
+        let baseTitle = template.pageTitle(
+            summaryTitle: summary.title, date: meetingDate, language: language
+        )
         var enriched = summary
         let body = ConfluenceStorageRenderer.render(
             summary: enriched,
             transcript: transcript,
             audioNote: audioNote,
-            template: template
+            template: template,
+            language: language
         )
         let (page, title) = try await createPageResolvingTitleConflict(
             baseTitle: baseTitle,
@@ -163,7 +167,8 @@ public struct PublishService: Sendable {
                         summary: enriched,
                         transcript: transcript,
                         audioNote: audioNote,
-                        template: template
+                        template: template,
+                        language: language
                     )
                 )
             }

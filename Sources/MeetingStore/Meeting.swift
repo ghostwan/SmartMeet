@@ -18,6 +18,9 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
     public var knownAttendees: [String]
     /// Type de réunion retenu : pilote le schéma demandé au modèle et l'ordre de rendu.
     public var templateID: String
+    /// Langue du compte rendu, choisie avant l'enregistrement et indépendante de la
+    /// langue parlée pendant la réunion.
+    public var outputLanguage: SummaryLanguage
     /// Compte rendu généré, une fois disponible.
     public var summary: MeetingSummary?
     /// Renseignés après publication.
@@ -33,6 +36,7 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         trackStartOffsets: [String: TimeInterval] = [:],
         knownAttendees: [String] = [],
         templateID: String = MeetingTemplate.generic.id,
+        outputLanguage: SummaryLanguage = .french,
         summary: MeetingSummary? = nil,
         confluencePageURL: String? = nil,
         jiraIssueKeys: [String] = []
@@ -45,6 +49,7 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         self.trackStartOffsets = trackStartOffsets
         self.knownAttendees = knownAttendees
         self.templateID = templateID
+        self.outputLanguage = outputLanguage
         self.summary = summary
         self.confluencePageURL = confluencePageURL
         self.jiraIssueKeys = jiraIssueKeys
@@ -52,7 +57,8 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case id, title, startedAt, duration, locale, trackStartOffsets
-        case knownAttendees, templateID, summary, confluencePageURL, jiraIssueKeys
+        case knownAttendees, templateID, outputLanguage
+        case summary, confluencePageURL, jiraIssueKeys
     }
 
     // Décodage tolérant : les réunions enregistrées avant l'ajout du compte rendu
@@ -70,6 +76,9 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         knownAttendees = try container.decodeIfPresent([String].self, forKey: .knownAttendees) ?? []
         templateID = try container.decodeIfPresent(String.self, forKey: .templateID)
             ?? MeetingTemplate.generic.id
+        outputLanguage = try container.decodeIfPresent(
+            SummaryLanguage.self, forKey: .outputLanguage
+        ) ?? .french
         summary = try container.decodeIfPresent(MeetingSummary.self, forKey: .summary)
         confluencePageURL = try container.decodeIfPresent(String.self, forKey: .confluencePageURL)
         jiraIssueKeys = try container.decodeIfPresent([String].self, forKey: .jiraIssueKeys) ?? []

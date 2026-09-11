@@ -66,6 +66,8 @@ struct ReviewWindow: View {
                     Text(meeting.startedAt.formatted(date: .long, time: .shortened))
                     Text("·")
                     Text(meeting.formattedDuration)
+                    Text("·")
+                    Text("\(meeting.outputLanguage.flag) \(meeting.outputLanguage.displayName)")
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -134,7 +136,7 @@ struct ReviewWindow: View {
                     // L'ordre d'édition suit celui du rendu : ce qu'on voit ici est ce
                     // qui sera publié, sections comprises.
                     ForEach(template.sections) { section in
-                        sectionEditor(section)
+                        sectionEditor(section, language: meeting.outputLanguage)
                     }
                 }
                 .padding()
@@ -145,8 +147,12 @@ struct ReviewWindow: View {
     }
 
     @ViewBuilder
-    private func sectionEditor(_ section: SummarySection) -> some View {
+    private func sectionEditor(_ section: SummarySection, language: SummaryLanguage) -> some View {
         switch section {
+        case .sprintWeather:
+            sprintWeatherSection(language: language)
+        case .fourL:
+            fourLSection(language: language)
         case .tldr:
             multiline(section.displayName, text: $draft.tldr, height: 70)
         case .blockers:
@@ -239,6 +245,100 @@ struct ReviewWindow: View {
             .buttonStyle(.borderless)
             .font(.caption)
         }
+    }
+
+    /// Partie nominative destinée aux managers : elle doit rester relisible et
+    /// corrigeable avant d'être transmise.
+    private func sprintWeatherSection(language: SummaryLanguage) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle(SummarySection.sprintWeather.displayName(in: language))
+            ForEach($draft.sprintWeather) { $entry in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        TextField("Personne", text: $entry.person)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.callout.weight(.semibold))
+                        Button {
+                            draft.sprintWeather.removeAll { $0.id == entry.id }
+                        } label: { Image(systemName: "minus.circle") }
+                            .buttonStyle(.borderless)
+                    }
+
+                    // Plusieurs icônes par personne : un sprint contrasté se raconte
+                    // rarement avec une seule image.
+                    HStack(spacing: 4) {
+                        ForEach(WeatherIcon.allCases) { icon in
+                            let isOn = entry.icons.contains(icon)
+                            Button {
+                                if isOn {
+                                    entry.icons.removeAll { $0 == icon }
+                                } else {
+                                    entry.icons.append(icon)
+                                }
+                            } label: {
+                                Text(icon.emoji)
+                                    .font(.title3)
+                                    .opacity(isOn ? 1 : 0.3)
+                            }
+                            .buttonStyle(.borderless)
+                            .help(icon.label(in: language))
+                        }
+                    }
+
+                    TextField("Pourquoi ces images", text: $entry.explanation, axis: .vertical)
+                        .textFieldStyle(.roundedBorder)
+
+                    EditableList(title: "Ce qu'il ou elle dit du sprint", items: $entry.sprintFeedback)
+                }
+                .padding(8)
+                .background(.quaternary.opacity(0.3), in: .rect(cornerRadius: 6))
+            }
+            Button("Ajouter une personne") {
+                draft.sprintWeather.append(.init(person: ""))
+            }
+            .buttonStyle(.borderless)
+            .font(.caption)
+        }
+    }
+
+    private func fourLSection(language: SummaryLanguage) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle(SummarySection.fourL.displayName(in: language))
+            let binding = Binding(
+                get: { draft.fourL ?? MeetingSummary.FourL() },
+                set: { draft.fourL = $0 }
+            )
+            fourLAxis(label: binding.wrappedValue.axes(in: language)[0].label, topics: binding.liked)
+            fourLAxis(label: binding.wrappedValue.axes(in: language)[1].label, topics: binding.learned)
+            fourLAxis(label: binding.wrappedValue.axes(in: language)[2].label, topics: binding.lacked)
+            fourLAxis(label: binding.wrappedValue.axes(in: language)[3].label, topics: binding.longedFor)
+        }
+    }
+
+    private func fourLAxis(label: String, topics: Binding<[MeetingSummary.Topic]>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label).font(.callout.weight(.semibold))
+            ForEach(topics) { $topic in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        TextField("Sujet", text: $topic.heading)
+                            .textFieldStyle(.roundedBorder)
+                        Button {
+                            topics.wrappedValue.removeAll { $0.id == topic.id }
+                        } label: { Image(systemName: "minus.circle") }
+                            .buttonStyle(.borderless)
+                    }
+                    EditableList(title: "", items: $topic.bullets)
+                }
+            }
+            Button("Ajouter un sujet") {
+                topics.wrappedValue.append(.init(heading: "", bullets: []))
+            }
+            .buttonStyle(.borderless)
+            .font(.caption)
+        }
+        .padding(8)
+        .background(.quaternary.opacity(0.25), in: .rect(cornerRadius: 6))
     }
 
     private var moodsSection: some View {
@@ -408,7 +508,8 @@ struct ReviewWindow: View {
                 Button("Copier en markdown") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(
-                        draft.markdown(template: template), forType: .string
+                        draft.markdown(template: template, language: meeting.outputLanguage),
+                        forType: .string
                     )
                 }
                 Button("Enregistrer") { session.saveReviewedSummary(draft) }

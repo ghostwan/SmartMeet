@@ -44,8 +44,9 @@ public struct TitleFormat: Sendable {
         summaryTitle: String,
         templateName: String,
         date: Date,
-        locale: Locale = Locale(identifier: "fr_FR")
+        language: SummaryLanguage = .french
     ) -> String {
+        let locale = language.locale
         let weekday = date.formatted(.dateTime.weekday(.wide).locale(locale))
         let substitutions: [String: String] = [
             "{summary}": summaryTitle,

@@ -76,7 +76,7 @@ public struct MeetingStore: Sendable {
     private func writeSummary(_ meeting: Meeting, to directory: URL) throws {
         guard let summary = meeting.summary else { return }
         let template = MeetingTemplate.resolve(id: meeting.templateID, in: customTemplates)
-        try summary.markdown(template: template).write(
+        try summary.markdown(template: template, language: meeting.outputLanguage).write(
             to: directory.appending(path: "summary.md"),
             atomically: true,
             encoding: .utf8

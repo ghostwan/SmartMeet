@@ -22,6 +22,10 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
     public var participantReports: [ParticipantReport]
     /// Ressenti nominatif, pour une rétrospective.
     public var moods: [ParticipantMood]
+    /// Météo du sprint : icônes, justification et propos de chaque membre.
+    public var sprintWeather: [SprintWeatherEntry]
+    /// Format 4L d'une rétrospective.
+    public var fourL: FourL?
 
     /// Type de réunion utilisé pour la génération, qui pilote aussi le rendu.
     public var templateID: String?
@@ -38,6 +42,8 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
         blockers: [Blocker] = [],
         participantReports: [ParticipantReport] = [],
         moods: [ParticipantMood] = [],
+        sprintWeather: [SprintWeatherEntry] = [],
+        fourL: FourL? = nil,
         templateID: String? = nil
     ) {
         self.title = title
@@ -51,12 +57,14 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
         self.blockers = blockers
         self.participantReports = participantReports
         self.moods = moods
+        self.sprintWeather = sprintWeather
+        self.fourL = fourL
         self.templateID = templateID
     }
 
     private enum CodingKeys: String, CodingKey {
         case title, tldr, attendees, topics, decisions, actionItems, openQuestions, nextSteps
-        case blockers, participantReports, moods, templateID
+        case blockers, participantReports, moods, sprintWeather, fourL, templateID
     }
 
     /// Décodage tolérant : les modèles omettent régulièrement les sections vides.
@@ -77,6 +85,10 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
             [ParticipantReport].self, forKey: .participantReports
         ) ?? []
         moods = try container.decodeIfPresent([ParticipantMood].self, forKey: .moods) ?? []
+        sprintWeather = try container.decodeIfPresent(
+            [SprintWeatherEntry].self, forKey: .sprintWeather
+        ) ?? []
+        fourL = try container.decodeIfPresent(FourL.self, forKey: .fourL)
         templateID = try container.decodeIfPresent(String.self, forKey: .templateID)
     }
 
@@ -156,6 +168,97 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
             done = try container.decodeIfPresent([String].self, forKey: .done) ?? []
             next = try container.decodeIfPresent([String].self, forKey: .next) ?? []
             blockers = try container.decodeIfPresent([String].self, forKey: .blockers) ?? []
+        }
+    }
+
+    /// Ce qu'une personne dit de son sprint, avec la météo qu'elle a choisie.
+    ///
+    /// Partie nominative et volontairement peu résumée : elle est transmise au manager
+    /// de la personne, et doit refléter ce qu'elle a réellement exprimé.
+    public struct SprintWeatherEntry: Codable, Sendable, Equatable, Identifiable {
+        public var id: UUID
+        public var person: String
+        /// Un membre peut retenir plusieurs icônes pour un sprint contrasté.
+        public var icons: [WeatherIcon]
+        /// Pourquoi ces icônes.
+        public var explanation: String
+        /// Ce que la personne raconte de son sprint.
+        public var sprintFeedback: [String]
+
+        public init(
+            id: UUID = UUID(),
+            person: String,
+            icons: [WeatherIcon] = [],
+            explanation: String = "",
+            sprintFeedback: [String] = []
+        ) {
+            self.id = id
+            self.person = person
+            self.icons = icons
+            self.explanation = explanation
+            self.sprintFeedback = sprintFeedback
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case person, icons, explanation, sprintFeedback
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = UUID()
+            person = try container.decodeIfPresent(String.self, forKey: .person) ?? ""
+            explanation = try container.decodeIfPresent(String.self, forKey: .explanation) ?? ""
+            sprintFeedback = try container.decodeIfPresent(
+                [String].self, forKey: .sprintFeedback
+            ) ?? []
+            // Le modèle rend du texte libre : on le ramène au vocabulaire contrôlé et
+            // on ignore ce qui n'est pas reconnu plutôt que d'échouer.
+            let raw = try container.decodeIfPresent([String].self, forKey: .icons) ?? []
+            icons = raw.compactMap(WeatherIcon.parse).uniqued()
+        }
+    }
+
+    /// Rétrospective au format 4L, dépersonnalisée et regroupée par sujet.
+    public struct FourL: Codable, Sendable, Equatable {
+        public var liked: [Topic]
+        public var learned: [Topic]
+        public var lacked: [Topic]
+        public var longedFor: [Topic]
+
+        public init(
+            liked: [Topic] = [],
+            learned: [Topic] = [],
+            lacked: [Topic] = [],
+            longedFor: [Topic] = []
+        ) {
+            self.liked = liked
+            self.learned = learned
+            self.lacked = lacked
+            self.longedFor = longedFor
+        }
+
+        private enum CodingKeys: String, CodingKey { case liked, learned, lacked, longedFor }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            liked = try container.decodeIfPresent([Topic].self, forKey: .liked) ?? []
+            learned = try container.decodeIfPresent([Topic].self, forKey: .learned) ?? []
+            lacked = try container.decodeIfPresent([Topic].self, forKey: .lacked) ?? []
+            longedFor = try container.decodeIfPresent([Topic].self, forKey: .longedFor) ?? []
+        }
+
+        public var isEmpty: Bool {
+            liked.isEmpty && learned.isEmpty && lacked.isEmpty && longedFor.isEmpty
+        }
+
+        /// Les quatre axes dans l'ordre, avec leur libellé localisé.
+        public func axes(in language: SummaryLanguage) -> [(label: String, symbol: String, topics: [Topic])] {
+            [
+                (language.pick(fr: "Ce qui a plu", en: "Liked"), "hand.thumbsup", liked),
+                (language.pick(fr: "Ce qu'on a appris", en: "Learned"), "lightbulb", learned),
+                (language.pick(fr: "Ce qui a manqué", en: "Lacked"), "exclamationmark.triangle", lacked),
+                (language.pick(fr: "Ce qu'on aurait voulu", en: "Longed for"), "sparkles", longedFor),
+            ]
         }
     }
 
@@ -285,6 +388,8 @@ public extension MeetingSummary {
             || !blockers.isEmpty
             || !participantReports.isEmpty
             || !moods.isEmpty
+            || !sprintWeather.isEmpty
+            || !(fourL?.isEmpty ?? true)
             || !topics.isEmpty
             || !decisions.isEmpty
             || !actionItems.isEmpty
@@ -297,6 +402,8 @@ public extension MeetingSummary {
         case .blockers: !blockers.isEmpty
         case .participantReports: !participantReports.isEmpty
         case .moods: !moods.isEmpty
+        case .sprintWeather: !sprintWeather.isEmpty
+        case .fourL: !(fourL?.isEmpty ?? true)
         case .topics: !topics.isEmpty
         case .decisions: !decisions.isEmpty
         case .actionItems: !actionItems.isEmpty
@@ -306,19 +413,24 @@ public extension MeetingSummary {
     }
 
     /// Rendu markdown dans l'ordre des sections du type de réunion.
-    func markdown(template: MeetingTemplate = .generic) -> String {
+    func markdown(
+        template: MeetingTemplate = .generic,
+        language: SummaryLanguage = .french
+    ) -> String {
         var output = "# \(title)\n\n"
         if !attendees.isEmpty {
-            output += "**Participants :** \(attendees.joined(separator: ", "))\n\n"
+            let label = language.pick(fr: "Participants", en: "Attendees")
+            output += "**\(label) :** \(attendees.joined(separator: ", "))\n\n"
         }
 
         for section in template.sections where hasContent(section) {
+            let heading = section.displayName(in: language)
             switch section {
             case .tldr:
                 output += "\(tldr)\n\n"
 
             case .blockers:
-                output += "## \(section.displayName)\n\n"
+                output += "## \(heading)\n\n"
                 for blocker in blockers {
                     let marker = blocker.severity == .blocking ? "🛑" : "⚠️"
                     let who = blocker.person.map { "**\($0)** — " } ?? ""
@@ -327,7 +439,7 @@ public extension MeetingSummary {
                 output += "\n"
 
             case .participantReports:
-                output += "## \(section.displayName)\n\n"
+                output += "## \(heading)\n\n"
                 for report in participantReports {
                     output += "### \(report.person)\n\n"
                     if !report.done.isEmpty {
@@ -343,7 +455,7 @@ public extension MeetingSummary {
                 }
 
             case .moods:
-                output += "## \(section.displayName)\n\n"
+                output += "## \(heading)\n\n"
                 for mood in moods {
                     let icon = switch mood.mood {
                     case .positive: "🙂"
@@ -354,6 +466,34 @@ public extension MeetingSummary {
                 }
                 output += "\n"
 
+            case .sprintWeather:
+                output += "## \(heading)\n\n"
+                for entry in sprintWeather {
+                    let icons = entry.icons.map(\.emoji).joined(separator: " ")
+                    output += "### \(icons.isEmpty ? "" : icons + " ")\(entry.person)\n\n"
+                    if !entry.explanation.isEmpty {
+                        output += "\(entry.explanation)\n\n"
+                    }
+                    for point in entry.sprintFeedback {
+                        output += "- \(point)\n"
+                    }
+                    output += "\n"
+                }
+
+            case .fourL:
+                guard let fourL else { break }
+                output += "## \(heading)\n\n"
+                for axis in fourL.axes(in: language) where !axis.topics.isEmpty {
+                    output += "### \(axis.label)\n\n"
+                    for topic in axis.topics {
+                        if !topic.heading.isEmpty {
+                            output += "**\(topic.heading)**\n\n"
+                        }
+                        output += topic.bullets.map { "- \($0)\n" }.joined()
+                        output += "\n"
+                    }
+                }
+
             case .topics:
                 for topic in topics where !topic.heading.isEmpty {
                     output += "## \(topic.heading)\n\n"
@@ -362,11 +502,11 @@ public extension MeetingSummary {
                 }
 
             case .decisions:
-                output += "## \(section.displayName)\n\n"
+                output += "## \(heading)\n\n"
                 output += decisions.map { "- \($0)\n" }.joined() + "\n"
 
             case .actionItems:
-                output += "## \(section.displayName)\n\n"
+                output += "## \(heading)\n\n"
                 for item in actionItems {
                     let owner = item.owner.map { "**\($0)** — " } ?? ""
                     let due = item.dueDate.map { " _(échéance \($0))_" } ?? ""
@@ -376,11 +516,11 @@ public extension MeetingSummary {
                 output += "\n"
 
             case .openQuestions:
-                output += "## \(section.displayName)\n\n"
+                output += "## \(heading)\n\n"
                 output += openQuestions.map { "- \($0)\n" }.joined() + "\n"
 
             case .nextSteps:
-                output += "## \(section.displayName)\n\n"
+                output += "## \(heading)\n\n"
                 output += nextSteps.map { "- \($0)\n" }.joined() + "\n"
             }
         }

@@ -1,56 +1,56 @@
 # Transcript — Rétrospective de sprint Home + Security
-Date : 12/09/2026 — Durée : 48 min
+Date : 12/09/2026 — Durée : 52 min
 
-**[00:00] Moi :** On commence par un tour de table sur le ressenti du sprint. Sandra ?
+**[00:00] Moi :** On commence par la météo du sprint. Chacun choisit ses images et explique.
 
-**[00:08] Participants :** Honnêtement, sprint difficile. J'ai passé plus de temps à attendre des accès et des validations qu'à travailler. Je finis la semaine frustrée.
+**[00:09] Participants :** Sandra. J'ai mis l'orage et le brouillard. L'orage parce que j'ai passé la moitié du sprint bloquée sur des accès que je n'obtenais pas, et le brouillard parce que je ne savais jamais à qui m'adresser pour débloquer. Franchement j'ai fini le sprint en me demandant à quoi j'avais servi. J'ai relancé trois fois l'IT, personne ne m'a répondu, et à la fin c'est Alex qui a dû intervenir. Ce n'est pas la première fois, c'est ça qui m'inquiète. Sur le travail en lui-même, quand j'ai pu avancer, ça allait, les traductions allemandes sont propres. Mais j'ai perdu presque quatre jours à attendre.
 
-**[00:22] Participants :** Martin. De mon côté ça s'est bien passé, j'ai eu des journées calmes, j'ai pu avancer sur le gateway sans être interrompu. Plutôt content.
+**[01:12] Participants :** Martin. Moi j'ai mis le soleil, tout simplement. J'ai eu un sprint calme, j'ai pu bosser sur le gateway sans être interrompu, j'ai livré ce que j'avais pris. C'est rare et ça fait du bien. Je dirais même que c'est le premier sprint depuis longtemps où je n'ai pas fini en courant. Le fait d'être seul sur le sujet a beaucoup aidé, je n'ai eu à me synchroniser avec personne.
 
-**[00:35] Participants :** Clément. Mitigé. Le travail était intéressant mais j'ai été interrompu en permanence par des demandes qui ne venaient pas du sprint. Je n'ai pas terminé ce que j'avais pris.
+**[01:48] Participants :** Clément. J'ai mis le soleil et l'orage. Le soleil parce que le sujet était passionnant, l'écran de réglages, j'ai vraiment aimé le faire. L'orage parce que j'ai été interrompu en permanence par des demandes qui venaient de nulle part, toutes urgentes. Résultat je n'ai pas fini ce que j'avais pris, et ça me frustre parce que le travail était bon. J'ai compté, j'ai eu six interruptions sur le sprint. Je commence à me demander si je dois apprendre à dire non plus fermement, mais je ne sais pas si c'est mon rôle.
 
-**[00:52] Participants :** Yoann. Épuisé. Deux incidents de production dans le sprint, dont un le week-end. Je n'ai rien pu faire de ce que j'avais prévu.
+**[02:40] Participants :** Yoann. Canicule et pluie. Canicule parce que j'ai eu deux incidents de production, dont un le samedi, et que j'étais en surchauffe complète. Pluie parce que c'était démoralisant : je n'ai touché à aucun de mes sujets du sprint. Zéro. Tout ce que j'avais planifié est reporté. Et ce qui m'inquiète c'est que ça arrive à chaque sprint maintenant, et toujours sur les deux mêmes personnes. Je ne tiendrai pas ce rythme longtemps, il faut vraiment qu'on parle de la rotation.
 
-**[01:08] Moi :** Merci. De mon côté je suis plutôt satisfait de la trajectoire produit, mais je vois bien que la charge n'est pas soutenable.
+**[03:35] Moi :** Merci. De mon côté j'ai mis l'éclaircie : la trajectoire produit avance bien, mais je vois que la charge de l'équipe n'est pas soutenable et ça me préoccupe.
 
-**[01:20] Moi :** Passons aux sujets. Qu'est-ce qui n'a pas marché ?
+**[03:52] Moi :** On passe aux 4L. Qu'est-ce qui vous a plu ?
 
-**[01:26] Participants :** Les specs arrivent incomplètes. J'ai dû redemander trois fois des précisions sur le comportement attendu de l'écran de réglages.
+**[03:58] Participants :** Les revues de code passent vite maintenant, dans la demi-journée. Ça c'est un vrai progrès.
 
-**[01:40] Participants :** Pareil de mon côté sur l'API caméra, les cas d'erreur n'étaient pas décrits du tout. On a découvert en développant.
+**[04:06] Participants :** Oui, je confirme, c'est beaucoup plus fluide qu'avant.
 
-**[01:52] Participants :** Et sur les traductions, le périmètre a changé en cours de sprint sans qu'on en discute.
+**[04:12] Participants :** Et avoir une personne dédiée à un sujet, ça évite de se marcher dessus.
 
-**[02:05] Moi :** Donc les specs, c'est un sujet de fond. Autre chose ?
+**[04:20] Moi :** Ce qu'on a appris ?
 
-**[02:11] Participants :** Les interruptions. On a pris trois demandes hors sprint, toutes urgentes, toutes prioritaires. Ça casse tout.
+**[04:24] Participants :** Que le payload protobuf peut être normalisé côté gateway. On ne le savait pas, ça nous ouvre des options pour la suite.
 
-**[02:22] Participants :** Je confirme, j'ai perdu au moins deux jours là-dessus.
+**[04:35] Participants :** Moi j'ai appris à me servir des nouveaux outils de trace, c'était laborieux mais c'est acquis.
 
-**[02:29] Participants :** Et les astreintes. Deux incidents dans un sprint, sans rotation claire, c'est toujours les mêmes qui prennent.
+**[04:44] Participants :** Et qu'un incident le week-end sans rotation écrite, ça se termine toujours par la même personne qui décroche.
 
-**[02:42] Moi :** Qu'est-ce qui a bien marché ?
+**[04:53] Moi :** Ce qui a manqué ?
 
-**[02:47] Participants :** Les revues de code. Elles passent vite maintenant, en général dans la demi-journée.
+**[04:57] Participants :** Des specs complètes. Les cas d'erreur ne sont jamais décrits, on les découvre en développant.
 
-**[02:55] Participants :** Oui, ça c'est un vrai progrès par rapport au sprint dernier.
+**[05:06] Participants :** Pareil, j'ai dû redemander trois fois des précisions sur le comportement attendu.
 
-**[03:01] Participants :** Et le fait d'avoir une personne dédiée au gateway a permis d'avancer vite, sans se marcher dessus.
+**[05:14] Participants :** Il a manqué de la disponibilité côté IT pour les accès.
 
-**[03:12] Moi :** Bien. Qu'est-ce qu'on décide ?
+**[05:21] Participants :** Et une protection contre les demandes hors sprint. Là c'est open bar.
 
-**[03:17] Participants :** Il faudrait une définition de « prête » pour les specs, avec les cas d'erreur obligatoires.
+**[05:29] Moi :** Et ce qu'on aurait voulu ?
 
-**[03:26] Moi :** D'accord, je m'en occupe avec l'équipe produit avant le prochain sprint.
+**[05:33] Participants :** Une définition de « prête » pour les specs, avec les cas d'erreur obligatoires.
 
-**[03:33] Participants :** Et un budget explicite pour les demandes hors sprint, genre vingt pour cent, au-delà on refuse.
+**[05:41] Participants :** Un budget explicite pour les demandes hors sprint, genre vingt pour cent, au-delà on refuse.
 
-**[03:43] Moi :** On teste ça sur le prochain sprint. Clément, tu peux tenir le compteur ?
+**[05:51] Participants :** Une rotation d'astreinte écrite, sur quatre personnes minimum.
 
-**[03:49] Participants :** Oui je peux faire ça.
+**[06:00] Moi :** D'accord. Je prends la définition de « prête » avec l'équipe produit avant le prochain sprint. Clément, tu tiens le compteur des demandes hors sprint ?
 
-**[03:52] Participants :** Pour les astreintes, il faut une rotation écrite, avec un roulement sur quatre personnes minimum.
+**[06:12] Participants :** Oui je peux faire ça.
 
-**[04:02] Moi :** Yoann, tu proposes une rotation d'ici vendredi prochain ?
+**[06:15] Moi :** Yoann, tu proposes une rotation d'ici vendredi prochain ?
 
-**[04:07] Participants :** Ça marche.
+**[06:20] Participants :** Ça marche.

@@ -83,6 +83,18 @@ struct MenuBarContent: View {
             }
             .labelsHidden()
             .pickerStyle(.menu)
+            .frame(maxWidth: 150)
+
+            // La langue du compte rendu se choisit avant d'enregistrer : elle
+            // conditionne le prompt, pas seulement la mise en forme.
+            Picker("Langue", selection: $session.selectedOutputLanguage) {
+                ForEach(SummaryLanguage.allCases) { language in
+                    Text("\(language.flag) \(language.displayName)").tag(language)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(width: 110)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(session.selectedTemplate.sections.map(\.displayName).joined(separator: " · "))

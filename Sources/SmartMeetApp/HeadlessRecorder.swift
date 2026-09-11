@@ -162,7 +162,8 @@ enum HeadlessRecorder {
                     vocabulary: settings.vocabulary,
                     userName: settings.userName
                 ),
-                template: template
+                template: template,
+                language: meeting.outputLanguage
             )
             var updated = meeting
             updated.summary = summary
@@ -180,7 +181,8 @@ enum HeadlessRecorder {
                 transcript: transcript,
                 audioNote: "durée \(meeting.formattedDuration)",
                 createJiraIssues: settings.atlassian.isJiraReady,
-                template: template
+                template: template,
+                language: meeting.outputLanguage
             )
             emit("✅ publié : \(result.pageURL?.absoluteString ?? result.pageID)")
         } catch {

@@ -86,6 +86,15 @@ struct SettingsWindow: View {
                     .foregroundStyle(.secondary)
             }
 
+            Picker("Langue par défaut du compte rendu", selection: $settings.defaultOutputLanguage) {
+                ForEach(SummaryLanguage.allCases) { language in
+                    Text("\(language.flag) \(language.displayName)").tag(language)
+                }
+            }
+            Text("Modifiable avant chaque enregistrement. Indépendante de la langue parlée en réunion : une équipe francophone peut livrer un compte rendu en anglais.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             Toggle("Générer le compte rendu automatiquement à l'arrêt", isOn: $settings.autoSummarize)
         }
         .formStyle(.grouped)

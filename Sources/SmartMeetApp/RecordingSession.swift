@@ -47,6 +47,8 @@ public final class RecordingSession {
     public var searchQuery: String = ""
     /// Type de réunion appliqué au prochain enregistrement.
     public var selectedTemplateID: String
+    /// Langue du compte rendu du prochain enregistrement.
+    public var selectedOutputLanguage: SummaryLanguage
 
     public let settings: AppSettings
     private let store: MeetingStore
@@ -61,6 +63,7 @@ public final class RecordingSession {
     public init(settings: AppSettings = AppSettings()) {
         self.settings = settings
         self.selectedTemplateID = settings.defaultTemplateID
+        self.selectedOutputLanguage = settings.defaultOutputLanguage
         self.store = MeetingStore(customTemplates: settings.customTemplates)
         meetings = store.loadAll()
     }
@@ -235,7 +238,8 @@ public final class RecordingSession {
             duration: result?.duration ?? 0,
             locale: settings.localeIdentifier,
             knownAttendees: detectedCalendarMeeting?.attendees ?? [],
-            templateID: selectedTemplateID
+            templateID: selectedTemplateID,
+            outputLanguage: selectedOutputLanguage
         )
         meeting.trackStartOffsets = Dictionary(
             uniqueKeysWithValues: (result?.trackStartOffsets ?? [:])
@@ -289,7 +293,8 @@ public final class RecordingSession {
             let summary = try await generator.generate(
                 transcript: transcript,
                 context: context,
-                template: settings.template(id: meeting.templateID)
+                template: settings.template(id: meeting.templateID),
+                language: meeting.outputLanguage
             ) { progress in
                 Task { @MainActor [weak self] in
                     self?.summaryState = .running(Self.describe(progress))
@@ -352,7 +357,8 @@ public final class RecordingSession {
                 audioNote: audioNote,
                 createJiraIssues: createJiraIssues,
                 template: settings.template(id: meeting.templateID),
-                meetingDate: meeting.startedAt
+                meetingDate: meeting.startedAt,
+                language: meeting.outputLanguage
             ) { step in
                 Task { @MainActor [weak self] in
                     self?.publishState = .running(Self.describe(step))
@@ -419,7 +425,9 @@ public final class RecordingSession {
     }
 
     public func exportMarkdown(for meeting: Meeting) -> String {
-        let summary = meeting.summary?.markdown(template: template(for: meeting)) ?? ""
+        let summary = meeting.summary?.markdown(
+            template: template(for: meeting), language: meeting.outputLanguage
+        ) ?? ""
         let transcript = store.transcriptMarkdown(for: meeting.id)
         return summary.isEmpty ? transcript : summary + "\n\n---\n\n" + transcript
     }

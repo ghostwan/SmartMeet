@@ -8,7 +8,12 @@ import Summarization
 ///     SmartMeet --summarize-file <transcript.md> [--publish]
 @MainActor
 enum HeadlessSummarizer {
-    static func run(transcriptPath: String, publish: Bool, templateID: String?) async {
+    static func run(
+        transcriptPath: String,
+        publish: Bool,
+        templateID: String?,
+        language: SummaryLanguage
+    ) async {
         guard let transcript = try? String(contentsOfFile: transcriptPath, encoding: .utf8),
               !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         else {
@@ -20,7 +25,8 @@ enum HeadlessSummarizer {
         let provider = settings.makeProvider()
         let template = settings.template(id: templateID ?? settings.defaultTemplateID)
         print("provider : \(provider.displayName)")
-        print("type     : \(template.name) — \(template.sections.map(\.displayName).joined(separator: ", "))")
+        print("type     : \(template.name) — \(template.sections.map { $0.displayName(in: language) }.joined(separator: ", "))")
+        print("langue   : \(language.flag) \(language.displayName)")
 
         guard await provider.isAvailable() else {
             print("❌ provider indisponible")
@@ -40,7 +46,8 @@ enum HeadlessSummarizer {
             summary = try await generator.generate(
                 transcript: transcript,
                 context: context,
-                template: template
+                template: template,
+                language: language
             ) { progress in
                 print("  · \(progress)")
             }
@@ -52,25 +59,40 @@ enum HeadlessSummarizer {
         print("✅ compte rendu en \(Int(Date().timeIntervalSince(started))) s")
         print("   titre : \(summary.title)")
         for section in template.sections where summary.hasContent(section) {
+            let heading = section.displayName(in: language)
             switch section {
             case .blockers:
-                print("   \(section.displayName) :")
+                print("   \(heading) :")
                 for blocker in summary.blockers {
                     let marker = blocker.severity == .blocking ? "🛑" : "⚠️"
                     print("     \(marker) [\(blocker.person ?? "—")] \(blocker.description)")
                 }
             case .participantReports:
-                print("   \(section.displayName) :")
+                print("   \(heading) :")
                 for report in summary.participantReports {
                     print("     • \(report.person) — fait \(report.done.count), à venir \(report.next.count), bloqué \(report.blockers.count)")
                 }
             case .moods:
-                print("   \(section.displayName) :")
+                print("   \(heading) :")
                 for mood in summary.moods {
                     print("     • \(mood.person) [\(mood.mood.rawValue)] \(mood.comment)")
                 }
+            case .sprintWeather:
+                print("   \(heading) :")
+                for entry in summary.sprintWeather {
+                    let icons = entry.icons.map(\.emoji).joined()
+                    print("     \(icons) \(entry.person) — \(entry.explanation)")
+                    for point in entry.sprintFeedback { print("        · \(point)") }
+                }
+            case .fourL:
+                if let fourL = summary.fourL {
+                    print("   \(heading) :")
+                    for axis in fourL.axes(in: language) where !axis.topics.isEmpty {
+                        print("     \(axis.label) : \(axis.topics.map(\.heading).joined(separator: " | "))")
+                    }
+                }
             case .topics:
-                print("   Sujets : \(summary.topics.map(\.heading).joined(separator: " | "))")
+                print("   \(heading) : \(summary.topics.map(\.heading).joined(separator: " | "))")
             case .actionItems:
                 print("   Action items :")
                 for item in summary.actionItems {
@@ -99,7 +121,8 @@ enum HeadlessSummarizer {
                 transcript: transcript,
                 audioNote: "test headless",
                 createJiraIssues: settings.atlassian.isJiraReady,
-                template: template
+                template: template,
+                language: language
             ) { step in print("  · \(step)") }
 
             print("✅ page : \(result.pageURL?.absoluteString ?? result.pageID)")

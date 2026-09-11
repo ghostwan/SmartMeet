@@ -115,10 +115,16 @@ struct TemplatesSettingsView: View {
             TextField("Format", text: binding(\.titleFormat)).textFieldStyle(.roundedBorder)
 
             Text("Aperçu : " + selected.pageTitle(
-                summaryTitle: "Point sur la migration", date: .now
+                summaryTitle: "Point sur la migration",
+                date: .now,
+                language: settings.defaultOutputLanguage
             ))
             .font(.caption)
             .foregroundStyle(.primary)
+
+            Text("Les parties littérales ne sont pas traduites : seuls les jetons de date suivent la langue du compte rendu.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
 
             FlowText(
                 items: TitleFormat.placeholders.map { "\($0.token) → \($0.description)" }

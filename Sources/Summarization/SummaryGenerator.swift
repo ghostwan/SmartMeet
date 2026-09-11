@@ -85,6 +85,7 @@ public struct SummaryGenerator: Sendable {
         transcript: String,
         context: SummaryContext,
         template: MeetingTemplate = .generic,
+        language: SummaryLanguage = .french,
         onProgress: @Sendable (SummaryProgress) -> Void = { _ in }
     ) async throws -> MeetingSummary {
         let trimmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -95,7 +96,10 @@ public struct SummaryGenerator: Sendable {
         let prompt: String
         if trimmed.count <= chunkThreshold {
             prompt = SummaryPrompt.single(
-                transcript: trimmed, context: context, template: template
+                transcript: trimmed,
+                context: context,
+                template: template,
+                language: language
             )
         } else {
             let chunks = Self.split(trimmed, maxLength: chunkThreshold)
@@ -107,17 +111,20 @@ public struct SummaryGenerator: Sendable {
                         transcript: chunk,
                         index: index + 1,
                         total: chunks.count,
-                        template: template
+                        template: template,
+                        language: language
                     )
                 )
                 notes.append(note.trimmingCharacters(in: .whitespacesAndNewlines))
             }
             onProgress(.synthesizing)
-            prompt = SummaryPrompt.reduce(notes: notes, context: context, template: template)
+            prompt = SummaryPrompt.reduce(
+                notes: notes, context: context, template: template, language: language
+            )
         }
 
         var summary = try await completeAndDecode(
-            prompt: prompt, template: template, onProgress: onProgress
+            prompt: prompt, template: template, language: language, onProgress: onProgress
         )
         // Le type retenu est conservé : c'est lui qui pilotera le rendu et la relecture.
         summary.templateID = template.id
@@ -169,12 +176,19 @@ public struct SummaryGenerator: Sendable {
             mood.person = person
             return mood
         }
+        cleaned.sprintWeather = summary.sprintWeather.compactMap {
+            guard let person = resolve($0.person) else { return nil }
+            var entry = $0
+            entry.person = person
+            return entry
+        }
         return cleaned
     }
 
     private func completeAndDecode(
         prompt: String,
         template: MeetingTemplate,
+        language: SummaryLanguage,
         onProgress: @Sendable (SummaryProgress) -> Void
     ) async throws -> MeetingSummary {
         var currentPrompt = prompt
@@ -202,7 +216,10 @@ public struct SummaryGenerator: Sendable {
             } catch {
                 lastError = error.localizedDescription
                 currentPrompt = SummaryPrompt.repair(
-                    previousOutput: raw, error: lastError, template: template
+                    previousOutput: raw,
+                    error: lastError,
+                    template: template,
+                    language: language
                 )
             }
         }

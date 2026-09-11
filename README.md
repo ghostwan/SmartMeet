@@ -22,6 +22,10 @@ titre de la page et sa destination.
 **Page de sprint.** On la fixe une fois en début de sprint ; tous les comptes rendus de
 réunions du sprint s'y rattachent ensuite, sans rien reconfigurer.
 
+**Langue de sortie.** Le compte rendu se produit en français ou en anglais,
+indépendamment de la langue parlée. Le choix se fait avant l'enregistrement : il
+conditionne le prompt, pas seulement la mise en forme.
+
 ## Prérequis
 
 macOS 26 ou supérieur, Apple Silicon, Xcode 26.
@@ -74,10 +78,25 @@ Chaque réunion est un dossier autonome :
 | Réunion générique | synthèse, décisions, action items, sujets, questions ouvertes, prochaines étapes | `{summary} — {date}` | espace par défaut |
 | Daily | **points bloquants**, point par personne, action items, synthèse | `Daily {Weekday} {date}` | page de sprint |
 | Synchro | synthèse, décisions, action items, sujets, questions ouvertes, prochaines étapes | `{summary} — {Weekday} {date}` | page de sprint |
-| Rétrospective | **ressenti nominatif**, sujets dépersonnalisés, action items, décisions | `Rétrospective — {date}` | page de sprint |
+| Rétrospective | **météo du sprint**, 4L dépersonnalisés, action items, décisions | `{type} — {date}` | page de sprint |
 
 Ils se dupliquent et se modifient dans *Réglages › Types de réunion* : sections, ordre,
 consignes de rédaction, format de titre et destination.
+
+### Rétrospective : météo du sprint et 4L
+
+La rétrospective produit deux parties de nature opposée.
+
+**Météo du sprint** — nominative, destinée à être transmise aux managers. Chaque
+membre choisit une ou plusieurs images météo (☀️ 🌤️ ☁️ 🌧️ ⛈️ 🌫️ ❄️ 🌈 💨 🔥) pour
+illustrer son sprint, explique son choix, puis raconte son sprint. Le compte rendu
+restitue ses propos avec leurs nuances plutôt que de les lisser — c'est le seul moyen
+qu'un manager y trouve autre chose qu'un résumé aseptisé. Seul l'oral est pris en
+compte : les post-its et le tableau ne sont pas dans le transcript.
+
+**4L** — dépersonnalisés. *Ce qui a plu*, *Ce qu'on a appris*, *Ce qui a manqué*, *Ce
+qu'on aurait voulu*. Les remarques sont regroupées par thème et aucun propos n'est
+attribué, ce qui permet d'aborder les sujets sensibles sans mettre personne en cause.
 
 ### Titre des pages
 
@@ -96,6 +115,9 @@ l'arborescence Confluence illisible. Le format reprend la main dessus :
 
 Confluence refusant deux pages de même titre dans un espace, une collision est
 résolue par un suffixe `(2)`, `(3)`…
+
+Les parties littérales du format ne sont pas traduites : c'est une convention de
+nommage, pas du contenu. Seuls les jetons de date suivent la langue du compte rendu.
 
 ### Destination
 
@@ -157,6 +179,8 @@ Spikes/               bancs d'essai de validation technique
   vocabulaire. Un casque améliore nettement le résultat.
 - Le changement de périphérique audio en cours de réunion provoque une discontinuité.
 - Les modèles locaux (`ollama`) résolvent moins fiablement les dates relatives.
+- L'icône météo retenue par le modèle est une interprétation : « éclaircie » peut
+  ressortir en arc-en-ciel. Elle se corrige en un clic dans la fenêtre de relecture.
 
 ## Développement
 
@@ -164,3 +188,7 @@ Spikes/               bancs d'essai de validation technique
 swift build
 swift test
 ```
+
+L'icône est dessinée en code (`Scripts/make-icon.swift`) et régénérée à chaque
+assemblage du bundle : elle reste modifiable et lisible en diff, plutôt que d'être
+un binaire opaque dans le dépôt.

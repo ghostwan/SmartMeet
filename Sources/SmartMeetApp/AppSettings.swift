@@ -19,6 +19,7 @@ public final class AppSettings {
         static let customTemplates = "customTemplates"
         static let defaultTemplate = "defaultTemplateID"
         static let userName = "userName"
+        static let outputLanguage = "outputLanguage"
     }
 
     private let defaults = UserDefaults.standard
@@ -43,6 +44,10 @@ public final class AppSettings {
     /// Nom de l'utilisateur : le transcript ne le connaît que sous le libellé « Moi ».
     public var userName: String {
         didSet { defaults.set(userName, forKey: Key.userName) }
+    }
+    /// Langue proposée par défaut pour le compte rendu.
+    public var defaultOutputLanguage: SummaryLanguage {
+        didSet { defaults.set(defaultOutputLanguage.rawValue, forKey: Key.outputLanguage) }
     }
     public var autoSummarize: Bool {
         didSet { defaults.set(autoSummarize, forKey: Key.autoSummarize) }
@@ -86,6 +91,9 @@ public final class AppSettings {
             "SmartMeet", "ACME", "ACME",
         ]
         userName = defaults.string(forKey: Key.userName) ?? NSFullUserName()
+        defaultOutputLanguage = SummaryLanguage(
+            rawValue: defaults.string(forKey: Key.outputLanguage) ?? ""
+        ) ?? .french
         autoSummarize = defaults.object(forKey: Key.autoSummarize) as? Bool ?? true
         useCalendar = defaults.object(forKey: Key.useCalendar) as? Bool ?? true
 
