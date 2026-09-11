@@ -223,6 +223,17 @@ swift build
 swift test
 ```
 
+Pour livrer — vérifie, commite et pousse d'un coup :
+
+```sh
+Scripts/ship.sh "Message de commit"
+Scripts/ship.sh --no-push "Message"   # commit local seulement
+Scripts/ship.sh --amend               # corrige le dernier commit non publié
+```
+
+Le commit est refusé si le build échoue, s'il reste un warning de compilation, si
+un test échoue, ou si un jeton d'API apparaît dans les modifications.
+
 L'icône est dessinée en code (`Scripts/make-icon.swift`) et régénérée à chaque
 assemblage du bundle : elle reste modifiable et lisible en diff, plutôt que d'être
 un binaire opaque dans le dépôt.
