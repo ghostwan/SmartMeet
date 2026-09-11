@@ -22,6 +22,8 @@ public final class AppSettings {
         static let outputLanguage = "outputLanguage"
         static let detectMeetings = "detectMeetings"
         static let autoStartOnDetection = "autoStartOnDetection"
+        static let autoPublish = "autoPublish"
+        static let autoCreateJiraIssues = "autoCreateJiraIssues"
     }
 
     private let defaults = UserDefaults.standard
@@ -62,6 +64,16 @@ public final class AppSettings {
     }
     public var autoSummarize: Bool {
         didSet { defaults.set(autoSummarize, forKey: Key.autoSummarize) }
+    }
+    /// Publie sur Confluence sans relecture. Désactivé par défaut : le compte rendu
+    /// est généré par un modèle, il mérite un coup d'œil avant d'atterrir sur un
+    /// espace d'équipe.
+    public var autoPublish: Bool {
+        didSet { defaults.set(autoPublish, forKey: Key.autoPublish) }
+    }
+    /// Crée aussi les tickets Jira lors d'une publication automatique.
+    public var autoCreateJiraIssues: Bool {
+        didSet { defaults.set(autoCreateJiraIssues, forKey: Key.autoCreateJiraIssues) }
     }
     public var useCalendar: Bool {
         didSet { defaults.set(useCalendar, forKey: Key.useCalendar) }
@@ -108,6 +120,8 @@ public final class AppSettings {
         detectMeetings = defaults.object(forKey: Key.detectMeetings) as? Bool ?? true
         autoStartOnDetection = defaults.object(forKey: Key.autoStartOnDetection) as? Bool ?? false
         autoSummarize = defaults.object(forKey: Key.autoSummarize) as? Bool ?? true
+        autoPublish = defaults.object(forKey: Key.autoPublish) as? Bool ?? false
+        autoCreateJiraIssues = defaults.object(forKey: Key.autoCreateJiraIssues) as? Bool ?? false
         useCalendar = defaults.object(forKey: Key.useCalendar) as? Bool ?? true
 
         if let data = defaults.data(forKey: Key.customTemplates),

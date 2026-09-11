@@ -104,7 +104,16 @@ struct SettingsWindow: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            Toggle("Générer le compte rendu automatiquement à l'arrêt", isOn: $settings.autoSummarize)
+            Section("À l'arrêt de l'enregistrement") {
+                Toggle("Générer le compte rendu", isOn: $settings.autoSummarize)
+                Toggle("Publier sur Confluence sans relecture", isOn: $settings.autoPublish)
+                    .disabled(!settings.autoSummarize || !settings.canPublish)
+                Toggle("Créer aussi les tickets Jira", isOn: $settings.autoCreateJiraIssues)
+                    .disabled(!settings.autoPublish || !settings.atlassian.isJiraReady)
+                Text("Une notification prévient dès que le compte rendu est prêt, avec le lien vers la page si la publication est automatique. La publication sans relecture reste désactivée par défaut : un compte rendu écrit par un modèle mérite un coup d'œil avant d'atterrir sur un espace d'équipe.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .padding()

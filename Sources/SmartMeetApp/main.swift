@@ -37,6 +37,8 @@ if let index = arguments.firstIndex(of: "--headless") {
         )
     }
     RunLoop.main.run()
+} else if arguments.contains("--check-notifications") {
+    NotificationCheck.boot(reportPath: value(after: "--check-notifications"))
 } else if arguments.contains("--set-sprint-page") {
     let input = value(after: "--set-sprint-page") ?? ""
     Task { @MainActor in

@@ -46,6 +46,9 @@ public final class RecordingSession {
     public var detectedCalendarMeeting: CalendarMeeting?
     /// Réunion détectée en cours, proposée à l'enregistrement.
     public var suggestion: MeetingSuggestion? { detector.suggestion }
+    /// Fenêtre à ouvrir, demandée depuis une notification. La scène SwiftUI est seule
+    /// à disposer de `openWindow` ; la session se contente de poser le drapeau.
+    public var windowToOpen: String?
     public var searchQuery: String = ""
     /// Type de réunion appliqué au prochain enregistrement.
     public var selectedTemplateID: String
@@ -77,6 +80,13 @@ public final class RecordingSession {
 
         notifier.onRecord = { [weak self] in Task { await self?.acceptSuggestion() } }
         notifier.onDismiss = { [weak self] in self?.dismissSuggestion() }
+        notifier.onReview = { [weak self] id in self?.openReview(id: id) }
+        notifier.onPublish = { [weak self] id in
+            Task { await self?.publishFromNotification(id) }
+        }
+        notifier.onRetrySummary = { [weak self] id in
+            Task { await self?.retrySummary(id) }
+        }
     }
 
     /// Démarre la surveillance des réunions. Appelé au lancement de l'application.
@@ -380,9 +390,44 @@ public final class RecordingSession {
             meetings = store.loadAll()
             reviewedMeeting = updated
             summaryState = .ready
+
+            if settings.autoPublish, settings.canPublish {
+                await publish(updated, createJiraIssues: settings.autoCreateJiraIssues)
+            } else {
+                notifier.announceSummaryReady(
+                    meetingID: updated.id,
+                    title: updated.title,
+                    actionItemCount: summary.actionItems.count
+                )
+            }
         } catch {
             summaryState = .failed(error.localizedDescription)
+            notifier.announceFailure(
+                meetingID: meeting.id,
+                title: meeting.title,
+                message: error.localizedDescription
+            )
         }
+    }
+
+    /// Ouvre la fenêtre de relecture sur une réunion donnée, depuis une notification.
+    private func openReview(id: UUID) {
+        guard let meeting = meetings.first(where: { $0.id == id }) else { return }
+        openReview(meeting)
+        windowToOpen = "review"
+    }
+
+    private func retrySummary(_ id: UUID) async {
+        guard let meeting = meetings.first(where: { $0.id == id }) else { return }
+        openReview(meeting)
+        windowToOpen = "review"
+        await generateSummary(for: meeting)
+    }
+
+    private func publishFromNotification(_ id: UUID) async {
+        guard let meeting = meetings.first(where: { $0.id == id }) else { return }
+        openReview(meeting)
+        await publish(meeting, createJiraIssues: settings.atlassian.isJiraReady)
     }
 
     private static func describe(_ progress: SummaryProgress) -> String {
@@ -466,8 +511,19 @@ public final class RecordingSession {
                 issues: updated.jiraIssueKeys,
                 failures: result.failures
             )
+            notifier.announcePublication(
+                meetingID: updated.id,
+                title: result.pageTitle,
+                url: result.pageURL,
+                issues: updated.jiraIssueKeys
+            )
         } catch {
             publishState = .failed(error.localizedDescription)
+            notifier.announceFailure(
+                meetingID: meeting.id,
+                title: meeting.title,
+                message: error.localizedDescription
+            )
         }
     }
 
