@@ -32,8 +32,12 @@ let package = Package(
             path: "Sources/Atlassian"
         ),
 
-        // Détection de la réunion en cours via EventKit.
-        .target(name: "SmartMeetCalendar", path: "Sources/Calendar"),
+        // Détection de la réunion en cours : calendrier et applications de visio.
+        .target(
+            name: "SmartMeetCalendar",
+            dependencies: ["AudioCapture"],
+            path: "Sources/Calendar"
+        ),
 
         // Application menu-bar.
         .executableTarget(
@@ -58,6 +62,11 @@ let package = Package(
             name: "TranscriptionTests",
             dependencies: ["Transcription", "AudioCapture"],
             path: "Tests/TranscriptionTests"
+        ),
+        .testTarget(
+            name: "DetectionTests",
+            dependencies: ["SmartMeetCalendar", "AudioCapture"],
+            path: "Tests/DetectionTests"
         ),
         .testTarget(
             name: "SummarizationTests",

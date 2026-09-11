@@ -23,7 +23,9 @@ struct MenuBarContent: View {
                 templatePicker
             }
 
-            if let meeting = session.detectedCalendarMeeting, !session.isRecording {
+            if let suggestion = session.suggestion, !session.isRecording {
+                suggestionBanner(suggestion)
+            } else if let meeting = session.detectedCalendarMeeting, !session.isRecording {
                 calendarHint(meeting)
             }
 
@@ -37,7 +39,10 @@ struct MenuBarContent: View {
             MeetingListView(session: session, openWindow: openWindow)
         }
         .padding(.bottom, 8)
-        .task { await session.refreshCalendarContext() }
+        .task {
+            await session.refreshCalendarContext()
+            await session.startMeetingDetection()
+        }
     }
 
     private var header: some View {
@@ -133,6 +138,36 @@ struct MenuBarContent: View {
     private static func elapsed(since date: Date) -> String {
         let total = Int(Date.now.timeIntervalSince(date))
         return String(format: "%02d:%02d", total / 60, total % 60)
+    }
+
+    /// Proposition d'enregistrement, quand une réunion est détectée.
+    private func suggestionBanner(_ suggestion: MeetingSuggestion) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "record.circle")
+                .font(.title3)
+                .foregroundStyle(.red)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Enregistrer « \(suggestion.title) » ?")
+                    .font(.callout.weight(.medium))
+                    .lineLimit(1)
+                Text(suggestion.reason)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Button("Plus tard") { session.dismissSuggestion() }
+                .buttonStyle(.borderless)
+                .font(.caption)
+            Button("Enregistrer") {
+                Task { await session.acceptSuggestion() }
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(.red.opacity(0.10))
     }
 
     private func calendarHint(_ meeting: CalendarMeeting) -> some View {

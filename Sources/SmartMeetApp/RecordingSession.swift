@@ -44,6 +44,8 @@ public final class RecordingSession {
     /// Réunion actuellement ouverte dans la fenêtre de relecture.
     public var reviewedMeeting: Meeting?
     public var detectedCalendarMeeting: CalendarMeeting?
+    /// Réunion détectée en cours, proposée à l'enregistrement.
+    public var suggestion: MeetingSuggestion? { detector.suggestion }
     public var searchQuery: String = ""
     /// Type de réunion appliqué au prochain enregistrement.
     public var selectedTemplateID: String
@@ -53,19 +55,84 @@ public final class RecordingSession {
     public let settings: AppSettings
     private let store: MeetingStore
     private let calendar = CalendarService()
+    private let detector: MeetingDetector
+    private let notifier = MeetingNotifier()
 
     private var recorder: DualTrackRecorder?
     private var transcriber: MeetingTranscriber?
     private var meetingID: UUID?
     private var startedAt: Date?
     private var pipelineTasks: [Task<Void, Never>] = []
+    private var suggestionObserver: Task<Void, Never>?
+    /// Titre issu d'une suggestion acceptée, quand le calendrier ne le fournit pas.
+    private var pendingSuggestionTitle: String?
 
     public init(settings: AppSettings = AppSettings()) {
         self.settings = settings
+        self.detector = MeetingDetector()
         self.selectedTemplateID = settings.defaultTemplateID
         self.selectedOutputLanguage = settings.defaultOutputLanguage
         self.store = MeetingStore(customTemplates: settings.customTemplates)
         meetings = store.loadAll()
+
+        notifier.onRecord = { [weak self] in Task { await self?.acceptSuggestion() } }
+        notifier.onDismiss = { [weak self] in self?.dismissSuggestion() }
+    }
+
+    /// Démarre la surveillance des réunions. Appelé au lancement de l'application.
+    public func startMeetingDetection() async {
+        guard settings.detectMeetings else { return }
+        if !calendar.isAuthorized { _ = await calendar.requestAccess() }
+        await notifier.prepare()
+        detector.start()
+        observeSuggestions()
+    }
+
+    public func stopMeetingDetection() {
+        detector.stop()
+        suggestionObserver?.cancel()
+        suggestionObserver = nil
+    }
+
+    /// Réagit à l'apparition d'une suggestion : notification, ou démarrage direct si
+    /// l'utilisateur l'a explicitement demandé.
+    private func observeSuggestions() {
+        suggestionObserver?.cancel()
+        suggestionObserver = Task { [weak self] in
+            var lastSeen: String?
+            while !Task.isCancelled {
+                if let self {
+                    let current = self.detector.suggestion
+                    if current?.id != lastSeen {
+                        lastSeen = current?.id
+                        if let current, !self.isRecording {
+                            if self.settings.autoStartOnDetection {
+                                await self.acceptSuggestion()
+                            } else {
+                                self.notifier.propose(current)
+                            }
+                        }
+                    }
+                }
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
+    }
+
+    /// Démarre l'enregistrement de la réunion proposée, en reprenant son titre et
+    /// ses participants.
+    public func acceptSuggestion() async {
+        guard let suggestion = detector.suggestion else { return }
+        notifier.withdraw(suggestion.id)
+        detectedCalendarMeeting = suggestion.calendarMeeting
+        pendingSuggestionTitle = suggestion.title
+        detector.acceptCurrent()
+        await start()
+    }
+
+    public func dismissSuggestion() {
+        if let suggestion = detector.suggestion { notifier.withdraw(suggestion.id) }
+        detector.dismissCurrent()
     }
 
     /// Type retenu pour une réunion donnée, avec repli sur le modèle générique si le
@@ -233,7 +300,9 @@ public final class RecordingSession {
 
         var meeting = Meeting(
             id: id,
-            title: detectedCalendarMeeting?.title ?? Self.defaultTitle(for: startedAt),
+            title: detectedCalendarMeeting?.title
+                ?? pendingSuggestionTitle
+                ?? Self.defaultTitle(for: startedAt),
             startedAt: startedAt,
             duration: result?.duration ?? 0,
             locale: settings.localeIdentifier,
@@ -258,6 +327,10 @@ public final class RecordingSession {
 
         await teardown()
         state = .idle
+        pendingSuggestionTitle = nil
+        // Une nouvelle réunion peut suivre immédiatement : on réarme les propositions.
+        detector.resetDismissals()
+        notifier.reset()
 
         if settings.autoSummarize, !finalSegments.isEmpty {
             await generateSummary(for: meeting)

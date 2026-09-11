@@ -60,6 +60,15 @@ struct SettingsWindow: View {
             }
 
             Toggle("Utiliser le calendrier pour le titre et les participants", isOn: $settings.useCalendar)
+
+            Section("Détection des réunions") {
+                Toggle("Proposer d'enregistrer quand une réunion est détectée", isOn: $settings.detectMeetings)
+                Toggle("Démarrer sans demander", isOn: $settings.autoStartOnDetection)
+                    .disabled(!settings.detectMeetings)
+                Text("La détection combine le calendrier et l'application de visioconférence qui capte le micro. Le démarrage automatique reste désactivé par défaut : enregistrer des personnes sans les prévenir n'est pas un comportement à activer à leur place.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .padding()

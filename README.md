@@ -26,6 +26,11 @@ réunions du sprint s'y rattachent ensuite, sans rien reconfigurer.
 indépendamment de la langue parlée. Le choix se fait avant l'enregistrement : il
 conditionne le prompt, pas seulement la mise en forme.
 
+**Détection des réunions.** Quand une réunion démarre, SmartMeet propose de
+l'enregistrer par une notification actionnable. La détection croise deux signaux : le
+calendrier, qui dit ce qui *devrait* avoir lieu, et l'application de visioconférence
+qui capte le micro, qui dit ce qui a *réellement* commencé.
+
 ## Prérequis
 
 macOS 26 ou supérieur, Apple Silicon, Xcode 26.
@@ -55,7 +60,36 @@ SMARTMEET_SIGN_IDENTITY="Apple Development: …" ./Scripts/bundle-app.sh
 
 ## Utilisation
 
-Choisissez un type de réunion dans le menu, cliquez **Enregistrer**. Le transcript
+Quand une réunion est détectée, une notification propose de l'enregistrer : *Enregistrer*
+ou *Pas maintenant*. Le titre et les participants sont repris du calendrier. Sinon,
+choisissez un type de réunion dans le menu et cliquez **Enregistrer**.
+
+### Détection
+
+Deux signaux, délibérément croisés :
+
+| Signal | Ce qu'il apporte | Ce qui lui manque |
+|---|---|---|
+| Calendrier (EventKit) | titre, participants | déclenche sur des réunions annulées ou décalées |
+| Micro capté par une app de visio (Core Audio) | preuve que la réunion a commencé | ne connaît ni titre ni participants |
+
+Règles retenues :
+
+- une application dédiée (Teams, Zoom, Webex, Slack, Meet…) qui capte le micro suffit,
+  même sans événement au calendrier ;
+- un **navigateur** qui capte le micro est trop ambigu — test de micro, vidéo, dictée —
+  et n'est retenu que si le calendrier confirme ;
+- un événement seul ne déclenche que s'il porte un lien de visioconférence, sinon toute
+  réunion physique ou tout créneau bloqué donnerait une proposition.
+
+Une proposition écartée ne revient pas pour la même réunion, et les propositions se
+réarment à la fin d'un enregistrement.
+
+Le démarrage automatique sans confirmation existe dans les réglages mais reste
+**désactivé par défaut** : enregistrer des personnes sans les prévenir n'est pas un
+comportement à activer à leur place.
+
+Le reste du temps : choisissez un type de réunion dans le menu, cliquez **Enregistrer**. Le transcript
 s'affiche au fil de l'eau. À l'arrêt, le compte rendu est généré, puis relisible et
 modifiable avant publication.
 
@@ -162,7 +196,7 @@ Sources/
 ├── Transcription/    SpeechAnalyzer, fusion des pistes, filtre de diaphonie
 ├── Summarization/    types de réunion, prompts, providers LLM
 ├── Atlassian/        Confluence, Jira, rendu storage
-├── Calendar/         détection de la réunion via EventKit
+├── Calendar/         détection : calendrier et applications de visio
 ├── MeetingStore/     persistance sur disque
 └── SmartMeetApp/     interface menu-bar
 Spikes/               bancs d'essai de validation technique

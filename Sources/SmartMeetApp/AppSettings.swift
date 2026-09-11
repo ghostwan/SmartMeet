@@ -20,6 +20,8 @@ public final class AppSettings {
         static let defaultTemplate = "defaultTemplateID"
         static let userName = "userName"
         static let outputLanguage = "outputLanguage"
+        static let detectMeetings = "detectMeetings"
+        static let autoStartOnDetection = "autoStartOnDetection"
     }
 
     private let defaults = UserDefaults.standard
@@ -48,6 +50,15 @@ public final class AppSettings {
     /// Langue proposée par défaut pour le compte rendu.
     public var defaultOutputLanguage: SummaryLanguage {
         didSet { defaults.set(defaultOutputLanguage.rawValue, forKey: Key.outputLanguage) }
+    }
+    /// Propose d'enregistrer quand une réunion est détectée.
+    public var detectMeetings: Bool {
+        didSet { defaults.set(detectMeetings, forKey: Key.detectMeetings) }
+    }
+    /// Démarre sans demander. Volontairement désactivé par défaut : enregistrer des
+    /// personnes à leur insu n'est pas un comportement qu'on active pour elles.
+    public var autoStartOnDetection: Bool {
+        didSet { defaults.set(autoStartOnDetection, forKey: Key.autoStartOnDetection) }
     }
     public var autoSummarize: Bool {
         didSet { defaults.set(autoSummarize, forKey: Key.autoSummarize) }
@@ -94,6 +105,8 @@ public final class AppSettings {
         defaultOutputLanguage = SummaryLanguage(
             rawValue: defaults.string(forKey: Key.outputLanguage) ?? ""
         ) ?? .french
+        detectMeetings = defaults.object(forKey: Key.detectMeetings) as? Bool ?? true
+        autoStartOnDetection = defaults.object(forKey: Key.autoStartOnDetection) as? Bool ?? false
         autoSummarize = defaults.object(forKey: Key.autoSummarize) as? Bool ?? true
         useCalendar = defaults.object(forKey: Key.useCalendar) as? Bool ?? true
 
