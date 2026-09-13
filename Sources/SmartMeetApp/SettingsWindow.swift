@@ -217,6 +217,12 @@ struct SettingsWindow: View {
             Text("Colle l'URL de la page qui agrège le sprint. Les types de réunion réglés sur « page de sprint » y publieront leurs comptes rendus, dans l'espace de cette page.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            if settings.sprintPage != nil {
+                Text("Changer de page ne migre pas les comptes rendus déjà publiés : ils restent sur l'ancienne page de sprint.")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
         }
     }
 

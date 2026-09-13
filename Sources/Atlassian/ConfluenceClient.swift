@@ -84,7 +84,12 @@ public struct ConfluenceClient: Sendable {
     /// Relit une page pour confirmer qu'elle existe et récupérer son titre. Sert à
     /// valider la page de sprint saisie par l'utilisateur.
     public func page(id: String) async throws -> ConfluencePage {
-        let payload = try await client.request("GET", "/wiki/api/v2/pages/\(id)")
+        let payload: [String: Any]
+        do {
+            payload = try await client.request("GET", "/wiki/api/v2/pages/\(id)")
+        } catch AtlassianError.http(404, _) {
+            throw AtlassianError.pageNotFound(id: id)
+        }
         let title = payload["title"] as? String ?? ""
         guard !title.isEmpty else { throw AtlassianError.unexpectedResponse }
         let spaceID = string(payload["spaceId"])

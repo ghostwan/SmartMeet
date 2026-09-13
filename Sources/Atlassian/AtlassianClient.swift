@@ -95,6 +95,8 @@ public enum AtlassianError: LocalizedError {
     case missingToken
     case http(status: Int, body: String)
     case unexpectedResponse
+    /// La page visée (sprint ou parent explicite) n'existe plus côté Confluence.
+    case pageNotFound(id: String)
 
     public var errorDescription: String? {
         switch self {
@@ -106,6 +108,9 @@ public enum AtlassianError: LocalizedError {
             "Atlassian a répondu \(status) — \(body.prefix(300))"
         case .unexpectedResponse:
             "Réponse Atlassian inattendue."
+        case .pageNotFound(let id):
+            "La page Confluence \(id) est introuvable (supprimée ou déplacée). "
+                + "Vérifie la page de sprint dans les réglages."
         }
     }
 }

@@ -70,6 +70,10 @@ public struct PublishService: Sendable {
         switch template.parent {
         case .sprintPage:
             if let sprintPage {
+                // La page peut avoir été supprimée côté Confluence depuis qu'elle a été
+                // retenue ; mieux vaut échouer clairement ici qu'à la création de page,
+                // avec un message qui pointe vers les réglages.
+                _ = try await confluence.page(id: sprintPage.id)
                 return ResolvedDestination(
                     spaceKey: spaceKey,
                     spaceID: space.id,
@@ -85,12 +89,12 @@ public struct PublishService: Sendable {
             )
 
         case .page(let id) where !id.isEmpty:
-            let parent = try? await confluence.page(id: id)
+            let parent = try await confluence.page(id: id)
             return ResolvedDestination(
                 spaceKey: spaceKey,
                 spaceID: space.id,
                 parentPageID: id,
-                description: "\(spaceKey) › \(parent?.title ?? id)"
+                description: "\(spaceKey) › \(parent.title)"
             )
 
         case .page, .spaceHome:
