@@ -15,9 +15,6 @@ import Transcription
 /// enregistrement interrompu reste exploitable.
 public struct MeetingStore: Sendable {
     public let root: URL
-    /// Types de réunion définis par l'utilisateur, nécessaires pour retrouver l'ordre
-    /// de rendu d'un compte rendu déjà généré.
-    public var customTemplates: [MeetingTemplate]
 
     private static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
@@ -32,10 +29,9 @@ public struct MeetingStore: Sendable {
         return decoder
     }()
 
-    public init(root: URL? = nil, customTemplates: [MeetingTemplate] = []) {
+    public init(root: URL? = nil) {
         self.root = root ?? URL.applicationSupportDirectory
             .appending(path: "SmartMeet/Meetings")
-        self.customTemplates = customTemplates
     }
 
     public func directory(for id: UUID) -> URL {
@@ -49,7 +45,9 @@ public struct MeetingStore: Sendable {
         return url
     }
 
-    public func save(_ meeting: Meeting, segments: [TranscriptSegment]) throws {
+    public func save(
+        _ meeting: Meeting, segments: [TranscriptSegment], customTemplates: [MeetingTemplate] = []
+    ) throws {
         let directory = try prepareDirectory(for: meeting.id)
         try Self.encoder.encode(meeting)
             .write(to: directory.appending(path: "meeting.json"), options: .atomic)
@@ -61,19 +59,24 @@ public struct MeetingStore: Sendable {
                 atomically: true,
                 encoding: .utf8
             )
-        try writeSummary(meeting, to: directory)
+        try writeSummary(meeting, customTemplates: customTemplates, to: directory)
     }
 
     /// Réécrit les seules métadonnées, sans toucher au transcript ni à l'audio.
-    public func update(_ meeting: Meeting) throws {
+    /// `customTemplates` est pris au moment de l'appel, pas mémorisé, pour que la
+    /// modification d'un type de réunion se répercute sur les comptes rendus déjà
+    /// enregistrés.
+    public func update(_ meeting: Meeting, customTemplates: [MeetingTemplate] = []) throws {
         let directory = try prepareDirectory(for: meeting.id)
         try Self.encoder.encode(meeting)
             .write(to: directory.appending(path: "meeting.json"), options: .atomic)
-        try writeSummary(meeting, to: directory)
+        try writeSummary(meeting, customTemplates: customTemplates, to: directory)
     }
 
     /// Le markdown du compte rendu suit l'ordre de sections du type de réunion.
-    private func writeSummary(_ meeting: Meeting, to directory: URL) throws {
+    private func writeSummary(
+        _ meeting: Meeting, customTemplates: [MeetingTemplate], to directory: URL
+    ) throws {
         guard let summary = meeting.summary else { return }
         let template = MeetingTemplate.resolve(id: meeting.templateID, in: customTemplates)
         try summary.markdown(template: template, language: meeting.outputLanguage).write(

@@ -75,7 +75,7 @@ public final class RecordingSession {
         self.detector = MeetingDetector()
         self.selectedTemplateID = settings.defaultTemplateID
         self.selectedOutputLanguage = settings.defaultOutputLanguage
-        self.store = MeetingStore(customTemplates: settings.customTemplates)
+        self.store = MeetingStore()
         meetings = store.loadAll()
 
         notifier.onRecord = { [weak self] in Task { await self?.acceptSuggestion() } }
@@ -221,7 +221,10 @@ public final class RecordingSession {
     }
 
     public var filteredMeetings: [Meeting] {
-        meetings.filter { $0.matches(searchQuery) }
+        guard !searchQuery.isEmpty else { return meetings }
+        return meetings.filter {
+            $0.matches(searchQuery, transcript: store.transcriptMarkdown(for: $0.id))
+        }
     }
 
     // MARK: - Enregistrement
@@ -326,7 +329,7 @@ public final class RecordingSession {
         )
 
         do {
-            try store.save(meeting, segments: finalSegments)
+            try store.save(meeting, segments: finalSegments, customTemplates: settings.customTemplates)
             meetings = store.loadAll()
             reviewedMeeting = meeting
         } catch {
@@ -386,7 +389,7 @@ public final class RecordingSession {
             var updated = meeting
             updated.summary = summary
             if !summary.title.isEmpty { updated.title = summary.title }
-            try? store.update(updated)
+            try? store.update(updated, customTemplates: settings.customTemplates)
             meetings = store.loadAll()
             reviewedMeeting = updated
             summaryState = .ready
@@ -444,7 +447,7 @@ public final class RecordingSession {
         guard var meeting = reviewedMeeting else { return }
         meeting.summary = summary
         meeting.title = summary.title.isEmpty ? meeting.title : summary.title
-        try? store.update(meeting)
+        try? store.update(meeting, customTemplates: settings.customTemplates)
         reviewedMeeting = meeting
         meetings = store.loadAll()
     }
@@ -466,7 +469,8 @@ public final class RecordingSession {
             configuration: settings.atlassian, token: settings.atlassianToken
         )
         let transcript = store.transcriptMarkdown(for: meeting.id)
-        let audioNote = "durée \(meeting.formattedDuration), transcription on-device"
+        let audioNote = "durée \(meeting.formattedDuration), transcription on-device — "
+            + "participants informés de l'enregistrement"
 
         do {
             let result = try await service.publish(
@@ -496,12 +500,12 @@ public final class RecordingSession {
                 }
                 updated.summary = summary
             }
-            try? store.update(updated)
+            try? store.update(updated, customTemplates: settings.customTemplates)
             meetings = store.loadAll()
             reviewedMeeting = updated
 
             updated.title = result.pageTitle
-            try? store.update(updated)
+            try? store.update(updated, customTemplates: settings.customTemplates)
             meetings = store.loadAll()
             reviewedMeeting = updated
 

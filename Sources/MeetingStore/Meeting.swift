@@ -95,15 +95,20 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
     public var isPublished: Bool { confluencePageURL != nil }
     public var hasSummary: Bool { summary != nil }
 
-    /// Utilisé par la recherche dans l'historique.
-    public func matches(_ query: String) -> Bool {
+    /// Utilisé par la recherche dans l'historique. `transcript` est optionnel et
+    /// chargé par l'appelant (lecture disque via `MeetingStore`) : le contenu prononcé
+    /// en réunion, pas seulement les métadonnées, doit pouvoir être retrouvé.
+    public func matches(_ query: String, transcript: String? = nil) -> Bool {
         guard !query.isEmpty else { return true }
         let needle = query.folding(
             options: [.diacriticInsensitive, .caseInsensitive], locale: nil
         )
-        let haystack = ([title, summary?.tldr ?? ""] + knownAttendees + (summary?.decisions ?? []))
-            .joined(separator: " ")
-            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
+        let haystack = (
+            [title, summary?.tldr ?? "", transcript ?? ""]
+                + knownAttendees + (summary?.decisions ?? [])
+        )
+        .joined(separator: " ")
+        .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
         return haystack.contains(needle)
     }
 }
