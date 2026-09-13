@@ -1,5 +1,6 @@
 import AudioCapture
 import Atlassian
+import Diarization
 import Foundation
 import MeetingStore
 import Observation
@@ -301,7 +302,14 @@ public final class RecordingSession {
         state = .finishing
 
         let result = await recorder?.stop()
-        let finalSegments = await transcriber?.finish() ?? segments
+        var finalSegments = await transcriber?.finish() ?? segments
+
+        if settings.diarizeMicrophoneTrack, let result {
+            finalSegments = Self.applyDiarization(
+                to: finalSegments, recordingDirectory: result.directory,
+                trackStartOffsets: result.trackStartOffsets
+            )
+        }
         segments = finalSegments
         volatileText = [:]
 
@@ -593,5 +601,29 @@ public final class RecordingSession {
 
     private static func defaultTitle(for date: Date) -> String {
         "Réunion du \(date.formatted(date: .abbreviated, time: .shortened))"
+    }
+
+    /// Distingue jusqu'à deux locuteurs sur la piste micro, pour les réunions en
+    /// présentiel où plusieurs personnes parlent dans le même micro. Échoue en
+    /// silence (retourne les segments inchangés) : une diarisation ratée ne doit pas
+    /// faire perdre un enregistrement.
+    private static func applyDiarization(
+        to segments: [TranscriptSegment],
+        recordingDirectory: URL,
+        trackStartOffsets: [AudioTrack: TimeInterval]
+    ) -> [TranscriptSegment] {
+        let audioURL = recordingDirectory.appending(path: AudioTrack.microphone.fileName)
+        let offset = trackStartOffsets[.microphone] ?? 0
+        guard let mapping = try? MicrophoneDiarizer.diarize(
+            segments: segments, audioFileURL: audioURL, fileTimeOffset: offset
+        ) else {
+            return segments
+        }
+        return segments.map { segment in
+            guard let label = mapping[segment.id] else { return segment }
+            var updated = segment
+            updated.speakerOverride = label
+            return updated
+        }
     }
 }

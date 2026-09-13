@@ -114,6 +114,16 @@ struct SettingsWindow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section("Diarisation (expérimental)") {
+                Toggle(
+                    "Distinguer deux voix sur le micro (réunion en présentiel)",
+                    isOn: $settings.diarizeMicrophoneTrack
+                )
+                Text("Pour une réunion où plusieurs personnes parlent dans le même micro. Basé sur la hauteur et le timbre de la voix, pas sur un modèle de reconnaissance vocale : fonctionne surtout quand les deux voix sont nettement différentes, et se limite à deux locuteurs sur la piste micro. Une seule voix n'est pas scindée à tort si la séparation n'est pas nette.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .padding()
