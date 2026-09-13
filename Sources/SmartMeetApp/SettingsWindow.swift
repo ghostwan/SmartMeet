@@ -179,6 +179,11 @@ struct SettingsWindow: View {
                 TextField("Site", text: $settings.atlassian.site, prompt: Text("ACME"))
                 TextField("E-mail", text: $settings.atlassian.email)
                 SecureField("Jeton d'API", text: $settings.atlassianToken)
+                Link(
+                    "Générer un jeton sur id.atlassian.com",
+                    destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!
+                )
+                .font(.caption)
                 Text("Le jeton est conservé dans le trousseau, jamais dans les préférences.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -235,6 +240,11 @@ struct SettingsWindow: View {
         Form {
             Section("Intégration") {
                 SecureField("Jeton d'intégration", text: $settings.notionToken)
+                Link(
+                    "Créer une intégration sur notion.so/my-integrations",
+                    destination: URL(string: "https://www.notion.so/my-integrations")!
+                )
+                .font(.caption)
                 Text("Crée une intégration interne sur notion.so/my-integrations, copie son jeton ici, puis partage la page parente ci-dessous avec elle (••• sur la page → Connexions → ton intégration). Le jeton est conservé dans le trousseau, jamais dans les préférences.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
