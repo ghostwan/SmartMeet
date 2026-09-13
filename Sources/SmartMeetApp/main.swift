@@ -47,6 +47,20 @@ if let index = arguments.firstIndex(of: "--headless") {
         exit(0)
     }
     RunLoop.main.run()
+} else if arguments.contains("--rediarize") {
+    let meetingIDString = value(after: "--rediarize") ?? ""
+    Task { @MainActor in
+        let session = RecordingSession()
+        guard let id = UUID(uuidString: meetingIDString),
+              let meeting = session.meetings.first(where: { $0.id == id })
+        else {
+            print("❌ Réunion introuvable : \(meetingIDString)")
+            exit(1)
+        }
+        print(await session.rediarize(meeting))
+        exit(0)
+    }
+    RunLoop.main.run()
 } else {
     SmartMeetApp.main()
 }
