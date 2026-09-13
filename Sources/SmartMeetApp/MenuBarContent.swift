@@ -11,38 +11,45 @@ struct MenuBarContent: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            header
-            Divider()
-
-            if case .failed(let message) = session.state {
-                errorBanner(message)
-            }
-
-            if session.isRecording {
-                consentReminder
-            }
-
-            if !session.isRecording {
-                templatePicker
-            }
-
-            if let suggestion = session.suggestion, !session.isRecording {
-                suggestionBanner(suggestion)
-            } else if let meeting = session.detectedCalendarMeeting, !session.isRecording {
-                calendarHint(meeting)
-            }
-
-            if session.isRecording || !session.segments.isEmpty {
-                TranscriptView(segments: session.segments, volatile: session.volatileText)
-                    .frame(height: 240)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                header
                 Divider()
-            }
 
-            summaryBanner
-            MeetingListView(session: session, openWindow: openWindow)
+                if case .failed(let message) = session.state {
+                    errorBanner(message)
+                }
+
+                if session.isRecording {
+                    consentReminder
+                }
+
+                if !session.isRecording {
+                    templatePicker
+                }
+
+                if let suggestion = session.suggestion, !session.isRecording {
+                    suggestionBanner(suggestion)
+                } else if let meeting = session.detectedCalendarMeeting, !session.isRecording {
+                    calendarHint(meeting)
+                }
+
+                // Affiché seulement pendant l'enregistrement : une fois arrêté, `segments`
+                // reste peuplé (vidé au prochain démarrage, pas à l'arrêt) et un panneau
+                // de 240pt fixe masquerait sinon la liste des réunions en dessous, la
+                // fenêtre du menu bar ne défilant pas.
+                if session.isRecording {
+                    TranscriptView(segments: session.segments, volatile: session.volatileText)
+                        .frame(height: 240)
+                    Divider()
+                }
+
+                summaryBanner
+                MeetingListView(session: session, openWindow: openWindow)
+            }
+            .padding(.bottom, 8)
         }
-        .padding(.bottom, 8)
+        .frame(maxHeight: 560)
         .task {
             await session.refreshCalendarContext()
             await session.startMeetingDetection()
