@@ -557,6 +557,26 @@ public final class RecordingSession {
         if reviewedMeeting?.id == meeting.id { reviewedMeeting = nil }
     }
 
+    /// Vrai si l'audio brut de cette réunion est encore sur disque.
+    public func hasRawRecording(for meeting: Meeting) -> Bool {
+        store.hasRawRecording(for: meeting.id)
+    }
+
+    /// Supprime l'audio et le transcript d'une réunion, en gardant le compte rendu.
+    /// Pensé pour l'utilisateur qui a relu son compte rendu, l'a jugé fidèle, et ne
+    /// veut plus garder l'enregistrement brut. Irréversible.
+    @discardableResult
+    public func deleteRawRecording(for meeting: Meeting) -> String {
+        do {
+            try store.deleteRawRecording(for: meeting.id)
+        } catch {
+            return "Échec de la suppression : \(error.localizedDescription)"
+        }
+        if reviewedMeeting?.id == meeting.id { segments = [] }
+        meetings = store.loadAll()
+        return "Audio et transcript supprimés. Le compte rendu est conservé."
+    }
+
     public func directory(for meeting: Meeting) -> URL {
         store.directory(for: meeting.id)
     }

@@ -1,3 +1,4 @@
+import AudioCapture
 import Foundation
 import Summarization
 import Transcription
@@ -103,7 +104,8 @@ public struct MeetingStore: Sendable {
             )
     }
 
-    public func transcriptMarkdown(for id: UUID) -> String {        (try? String(
+    public func transcriptMarkdown(for id: UUID) -> String {
+        (try? String(
             contentsOf: directory(for: id).appending(path: "transcript.md"),
             encoding: .utf8
         )) ?? ""
@@ -134,5 +136,30 @@ public struct MeetingStore: Sendable {
 
     public func delete(_ id: UUID) throws {
         try FileManager.default.removeItem(at: directory(for: id))
+    }
+
+    /// Vrai si l'audio brut (au moins une des deux pistes) est encore présent.
+    public func hasRawRecording(for id: UUID) -> Bool {
+        let directory = directory(for: id)
+        return AudioTrack.allCases.contains {
+            FileManager.default.fileExists(atPath: directory.appending(path: $0.fileName).path)
+        }
+    }
+
+    /// Supprime l'audio et le transcript d'une réunion, en conservant les métadonnées
+    /// et le compte rendu déjà généré (`meeting.json`, `summary.md`). Pensé pour
+    /// l'utilisateur qui a relu son compte rendu, l'a jugé fidèle, et ne veut plus
+    /// conserver l'enregistrement brut — pour l'espace disque ou la confidentialité.
+    ///
+    /// Irréversible : sans l'audio, plus de réanalyse (diarisation) ni de nouvelle
+    /// génération de compte rendu possible pour cette réunion.
+    public func deleteRawRecording(for id: UUID) throws {
+        let directory = directory(for: id)
+        let names = AudioTrack.allCases.map(\.fileName) + ["segments.json", "transcript.md"]
+        for name in names {
+            let url = directory.appending(path: name)
+            guard FileManager.default.fileExists(atPath: url.path) else { continue }
+            try FileManager.default.removeItem(at: url)
+        }
     }
 }

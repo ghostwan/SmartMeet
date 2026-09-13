@@ -11,6 +11,8 @@ struct ReviewWindow: View {
     @State private var loadedMeetingID: UUID?
     @State private var diarizationStatus: String?
     @State private var isDiarizing = false
+    @State private var rawDeletionStatus: String?
+    @State private var showDeleteRawConfirmation = false
 
     var body: some View {
         Group {
@@ -101,9 +103,34 @@ struct ReviewWindow: View {
                         }
                     }
                 }
+                if meeting.hasSummary, session.hasRawRecording(for: meeting) {
+                    Button(role: .destructive) {
+                        showDeleteRawConfirmation = true
+                    } label: {
+                        Label("Supprimer l'audio et le transcript", systemImage: "trash")
+                    }
+                    .help("Garde le compte rendu, supprime l'audio et le transcript. Irréversible.")
+                    .confirmationDialog(
+                        "Supprimer l'audio et le transcript ?",
+                        isPresented: $showDeleteRawConfirmation,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Supprimer", role: .destructive) {
+                            rawDeletionStatus = session.deleteRawRecording(for: meeting)
+                        }
+                        Button("Annuler", role: .cancel) {}
+                    } message: {
+                        Text("Le compte rendu est conservé. L'audio (\(meeting.formattedDuration)) et le transcript seront définitivement supprimés — plus de réanalyse ni de nouvelle génération possible ensuite.")
+                    }
+                }
             }
             if let diarizationStatus {
                 Text(diarizationStatus)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let rawDeletionStatus {
+                Text(rawDeletionStatus)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

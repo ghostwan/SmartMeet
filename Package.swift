@@ -28,7 +28,7 @@ let package = Package(
         // Persistance des réunions sur disque.
         .target(
             name: "MeetingStore",
-            dependencies: ["Transcription", "Summarization"],
+            dependencies: ["Transcription", "Summarization", "AudioCapture"],
             path: "Sources/MeetingStore"
         ),
 
