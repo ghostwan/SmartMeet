@@ -7,7 +7,7 @@ Date : 11/09/2026 — Durée : 32 min
 
 **[00:41] Moi :** Sandra, tu penses pouvoir boucler ça pour vendredi ?
 
-**[00:47] Participants :** Vendredi c'est trop juste, j'ai la revue de specs ACME en parallèle. Je peux m'engager sur mardi prochain si personne ne rajoute de clés d'ici là.
+**[00:47] Participants :** Vendredi c'est trop juste, j'ai une revue de specs client en parallèle. Je peux m'engager sur mardi prochain si personne ne rajoute de clés d'ici là.
 
 **[01:05] Moi :** OK, on gèle les nouvelles clés Crowdin jusqu'à mardi alors. Je préviens l'équipe produit.
 
