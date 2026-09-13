@@ -6,3 +6,4 @@ spike-diag*/
 spike-voix/
 *.iconset/
 *.icns
+.swiftpm/

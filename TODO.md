@@ -6,60 +6,40 @@ cochés ici.
 
 ---
 
-## 1. En cours — notifications non fonctionnelles
+## 1. Résolu — notifications non fonctionnelles
 
-Tout le code est écrit et compile, mais **aucune notification n'a jamais été délivrée
-sur une machine de développement**. `requestAuthorization` échoue avec
-`Notifications are not allowed for this application`, et l'application n'apparaît
-jamais dans `~/Library/Preferences/com.apple.ncprefs.plist`.
+**Cause racine identifiée et corrigée le 13/09** : trois problèmes empilés.
 
-Diagnostic disponible :
+1. Le certificat intermédiaire Apple (WWDR G3) présent dans le trousseau de la
+   machine de développement avait **expiré en 2023**. Résultat : même un certificat
+   « Apple Development » fraîchement généré via Xcode (Accounts → Manage
+   Certificates) restait `CSSMERR_TP_NOT_TRUSTED` (`security find-identity -v -p
+   codesigning` renvoyait 0 identité valide malgré un certificat présent). Corrigé en
+   réinstallant le WWDR G3 à jour (valide jusqu'en 2030) :
+   `curl -sL -o AppleWWDRCAG3.cer https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer`
+   puis `security add-certificates -k ~/Library/Keychains/login.keychain-db AppleWWDRCAG3.cer`.
+2. **L'app doit être signée avec cette identité réelle**, pas en ad-hoc :
+   `codesign --force --sign "Apple Development: <email> (<TEAMID>)" --options runtime
+   --entitlements Sources/SmartMeetApp/SmartMeet.entitlements --timestamp=none
+   build/SmartMeet.app`. Une identité ad-hoc (`--sign -`), instable d'un build à
+   l'autre, semble empêcher macOS de mémoriser durablement une autorisation.
+3. **Le refus initial reste mémorisé par bundle ID** même après correction des deux
+   points ci-dessus : `requestAuthorization` échouait encore pour `com.smartmeet.app`
+   après tous ces changements. Il a fallu l'autoriser une fois manuellement dans
+   Réglages Système → Notifications → SmartMeet → activer le bouton. Une fois fait,
+   `requestAuthorization` fonctionne normalement et les notifications sont délivrées.
+
+Diagnostic (à relancer si un doute revient — **toujours via `open`, jamais en
+exécutant le binaire directement**, sinon LaunchServices n'enregistre pas l'app) :
 
 ```sh
 open build/SmartMeet.app --args --check-notifications /tmp/rapport.txt
 ```
 
-**Écarté par l'expérience** (ne pas refaire) :
-
-- la localisation seule — l'échec persiste depuis `/Applications` ;
-- le hardened runtime et l'identité de signature — testé en Apple Development et ad-hoc ;
-- l'absence de `NSApplication` — c'était un vrai défaut du diagnostic, corrigé, sans
-  effet sur le résultat ;
-- une politique MDM — le profil `com.apple.notificationsettings` présent ne liste que
-  deux bundles Microsoft et ne restreint pas les autres.
-- **le mode agent** (`LSUIElement`) — `MeetingNotifier.prepare()` bascule désormais en
-  `.regular` le temps de `requestAuthorization`, avant de revenir en `.accessory`. Testé
-  sur une machine sans identité de signature stable (signature ad-hoc, qui change à
-  chaque build) : le refus persiste. Soit l'hypothèse était fausse, soit une signature
-  instable interdit toute mémorisation d'autorisation avant même de poser la question —
-  **à revérifier sur la machine de développement habituelle, avec une identité de
-  signature stable**, où le point de départ (bundle minimal en `.regular`) avait
-  fonctionné.
-- **le premier refus mémorisé par bundle ID** — testé le 13/09 en changeant
-  `CFBundleIdentifier` pour un identifiant jamais vu (`com.smartmeet.app.test<epoch>`)
-  et en relançant le diagnostic : `autorisation` remonte bien `non demandée` (donc pas
-  de refus mémorisé pour ce nouvel identifiant), mais `requestAuthorization` échoue
-  quand même immédiatement avec le même message `Notifications are not allowed for
-  this application`, **sans jamais afficher de popup système à l'utilisateur**.
-  L'hypothèse est donc écartée : le blocage n'est pas lié à un refus antérieur mémorisé
-  par bundle ID, il intervient en amont, avant même que macOS ne pose la question. Sur
-  cette machine, `security find-identity -v -p codesigning` ne renvoie **aucune**
-  identité de signature (0 valid identities found) : seule la signature ad-hoc est
-  possible ici. Reste à déterminer si l'absence totale d'identité de signature (pas
-  seulement son instabilité build à build) suffit à faire échouer
-  `requestAuthorization` en amont de tout prompt — hypothèse la plus probable
-  actuellement, à confirmer sur une machine avec une identité Apple Development ou
-  Developer ID valide.
-
-**Reste à tester** :
-
-- Sur une machine avec une identité de signature valide (`security find-identity -v
-  -p codesigning` non vide) : est-ce que `requestAuthorization` affiche enfin le
-  prompt système ? Si oui, le problème est bien l'absence d'identité de signature sur
-  la machine actuelle, pas le code de l'app.
-
-Tant que ce point n'est pas levé, la réponse à « suis-je prévenu quand le compte rendu
-est prêt ? » reste **non** en pratique.
+**Point d'attention pour la suite** : le script de rebuild habituel de ce projet
+utilise `codesign --sign -` (ad-hoc). Si les notifications recommencent à échouer,
+vérifier en premier que le build a bien été signé avec l'identité `Apple
+Development: votre-email@exemple.com (3FCL3V4MNF)` et pas en ad-hoc.
 
 ---
 
