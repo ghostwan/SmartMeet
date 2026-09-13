@@ -611,6 +611,10 @@ public final class RecordingSession {
     }
 
     /// Vrai si l'audio brut de cette réunion est encore sur disque.
+    public func transcript(for meeting: Meeting) -> String {
+        store.transcriptMarkdown(for: meeting.id)
+    }
+
     public func hasRawRecording(for meeting: Meeting) -> Bool {
         store.hasRawRecording(for: meeting.id)
     }

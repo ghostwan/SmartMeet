@@ -13,6 +13,7 @@ struct ReviewWindow: View {
     @State private var isDiarizing = false
     @State private var rawDeletionStatus: String?
     @State private var showDeleteRawConfirmation = false
+    @State private var showTranscript = false
 
     var body: some View {
         Group {
@@ -59,23 +60,37 @@ struct ReviewWindow: View {
 
     private func header(for meeting: Meeting) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(meeting.title).font(.title3.weight(.semibold)).lineLimit(1)
-                    HStack(spacing: 6) {
-                        Label(
-                            session.template(for: meeting).name,
-                            systemImage: session.template(for: meeting).symbol
-                        )
-                        Text("·")
-                        Text(meeting.startedAt.formatted(date: .long, time: .shortened))
-                        Text("·")
-                        Text(meeting.formattedDuration)
-                        Text("·")
-                        Text("\(meeting.outputLanguage.flag) \(meeting.outputLanguage.displayName)")
+            // Le titre et les métadonnées (type, date, durée, langue) sont l'info de
+            // contexte de la réunion : ils occupent toute la largeur disponible,
+            // les actions étant reléguées sur leur propre ligne en dessous.
+            VStack(alignment: .leading, spacing: 2) {
+                Text(meeting.title).font(.title3.weight(.semibold)).lineLimit(1)
+                HStack(spacing: 6) {
+                    Label(
+                        session.template(for: meeting).name,
+                        systemImage: session.template(for: meeting).symbol
+                    )
+                    Text("·")
+                    Text(meeting.startedAt.formatted(date: .long, time: .shortened))
+                    Text("·")
+                    Text(meeting.formattedDuration)
+                    Text("·")
+                    Text("\(meeting.outputLanguage.flag) \(meeting.outputLanguage.displayName)")
+                    Spacer()
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack {
+                if session.hasRawRecording(for: meeting) {
+                    Button {
+                        showTranscript = true
+                    } label: {
+                        Label("Transcription", systemImage: "text.quote")
                     }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .help("Affiche le transcript brut de la réunion")
                 }
                 Spacer()
                 if session.settings.diarizeMicrophoneTrack {
@@ -136,6 +151,9 @@ struct ReviewWindow: View {
             }
         }
         .padding()
+        .sheet(isPresented: $showTranscript) {
+            TranscriptSheet(meeting: meeting, transcript: session.transcript(for: meeting))
+        }
     }
 
     private func progress(_ message: String) -> some View {
@@ -627,6 +645,50 @@ struct ReviewWindow: View {
                 .padding(4)
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
         }
+    }
+}
+
+/// Transcript brut de la réunion (celui qui a servi à générer le compte rendu),
+/// affiché en lecture seule depuis la fenêtre de relecture.
+private struct TranscriptSheet: View {
+    let meeting: Meeting
+    let transcript: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Transcription — \(meeting.title)")
+                    .font(.headline)
+                    .lineLimit(1)
+                Spacer()
+                Button("Copier") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(transcript, forType: .string)
+                }
+                Button("Fermer") { dismiss() }
+            }
+            .padding()
+            Divider()
+
+            if transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                ContentUnavailableView(
+                    "Transcript indisponible",
+                    systemImage: "text.quote",
+                    description: Text("L'audio et le transcript ont peut-être été supprimés.")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    Text(transcript)
+                        .font(.callout)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                }
+            }
+        }
+        .frame(minWidth: 520, minHeight: 480)
     }
 }
 
