@@ -283,6 +283,7 @@ public final class RecordingSession {
         do {
             let directory = try store.prepareDirectory(for: id)
 
+            settings.recordTranscriptionLocaleUsed(selectedTranscriptionLocale)
             let transcriber = MeetingTranscriber(
                 locale: Locale(identifier: selectedTranscriptionLocale),
                 vocabulary: settings.contextualVocabulary

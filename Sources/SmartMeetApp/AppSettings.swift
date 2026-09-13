@@ -29,6 +29,7 @@ public final class AppSettings {
         static let diarizeMicrophoneTrack = "diarizeMicrophoneTrack"
         static let notion = "notionConfiguration"
         static let disabledTemplateIDs = "disabledTemplateIDs"
+        static let recentTranscriptionLocales = "recentTranscriptionLocales"
     }
 
     private let defaults = UserDefaults.standard
@@ -48,6 +49,12 @@ public final class AppSettings {
     }
     public var localeIdentifier: String {
         didSet { defaults.set(localeIdentifier, forKey: Key.locale) }
+    }
+    /// Langues parlées récemment utilisées, la plus récente en tête — permet de les
+    /// remonter en haut du sélecteur plutôt que de les noyer dans la liste complète
+    /// des locales supportées par le framework.
+    public var recentTranscriptionLocales: [String] {
+        didSet { defaults.set(recentTranscriptionLocales, forKey: Key.recentTranscriptionLocales) }
     }
     public var vocabulary: [String] {
         didSet { defaults.set(vocabulary, forKey: Key.vocabulary) }
@@ -154,6 +161,7 @@ public final class AppSettings {
         opencodeModel = defaults.string(forKey: Key.opencodeModel) ?? "github-copilot/claude-sonnet-5"
         ollamaModel = defaults.string(forKey: Key.ollamaModel) ?? "gemma4"
         localeIdentifier = defaults.string(forKey: Key.locale) ?? "fr-FR"
+        recentTranscriptionLocales = defaults.stringArray(forKey: Key.recentTranscriptionLocales) ?? []
         vocabulary = defaults.stringArray(forKey: Key.vocabulary) ?? [
             "Crowdin", "ACME", "Confluence", "Jira", "ACME",
             "SmartMeet", "ACME", "ACME",
@@ -282,6 +290,16 @@ public final class AppSettings {
 
     public func template(id: String?) -> MeetingTemplate {
         MeetingTemplate.resolve(id: id, in: customTemplates)
+    }
+
+    /// Fait remonter une langue parlée en tête des « récentes », pour qu'elle
+    /// apparaisse en haut du sélecteur la prochaine fois. Appelé quand la langue est
+    /// réellement utilisée (début d'enregistrement), pas à chaque changement de
+    /// sélection dans le picker.
+    public func recordTranscriptionLocaleUsed(_ identifier: String) {
+        var recents = recentTranscriptionLocales.filter { $0 != identifier }
+        recents.insert(identifier, at: 0)
+        recentTranscriptionLocales = Array(recents.prefix(5))
     }
 
     /// Duplique un modèle pour créer une variante indépendante, avec un nouvel

@@ -64,6 +64,19 @@ struct MenuBarContent: View {
         }
     }
 
+    /// Langues parlées déjà utilisées, dans l'ordre de récence — remontées en tête
+    /// du sélecteur plutôt que noyées dans la liste complète.
+    private var recentLocales: [(id: String, label: String)] {
+        session.settings.recentTranscriptionLocales.compactMap { id in
+            availableLocales.first { $0.id == id }
+        }
+    }
+
+    private var otherLocales: [(id: String, label: String)] {
+        let recentIDs = Set(session.settings.recentTranscriptionLocales)
+        return availableLocales.filter { !recentIDs.contains($0.id) }
+    }
+
     /// Sans activer explicitement l'application, une fenêtre ouverte depuis le
     /// popover reste sur le Space courant sans y attirer le focus : si l'utilisateur
     /// est dans le Space plein écran d'une autre application, la fenêtre s'ouvre en
@@ -148,8 +161,21 @@ struct MenuBarContent: View {
             HStack(spacing: 6) {
                 Text("🗣️").font(.caption)
                 Picker("Langue parlée", selection: $session.selectedTranscriptionLocale) {
-                    ForEach(availableLocales, id: \.id) { locale in
-                        Text(locale.label).tag(locale.id)
+                    if !recentLocales.isEmpty {
+                        Section("Récent") {
+                            ForEach(recentLocales, id: \.id) { locale in
+                                Text(locale.label).tag(locale.id)
+                            }
+                        }
+                        Section("Toutes les langues") {
+                            ForEach(otherLocales, id: \.id) { locale in
+                                Text(locale.label).tag(locale.id)
+                            }
+                        }
+                    } else {
+                        ForEach(availableLocales, id: \.id) { locale in
+                            Text(locale.label).tag(locale.id)
+                        }
                     }
                 }
                 .labelsHidden()
