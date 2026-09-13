@@ -348,7 +348,30 @@ public extension MeetingTemplate {
         isBuiltIn: true
     )
 
-    static let builtIns: [MeetingTemplate] = [generic, daily, synchro, retrospective]
+    /// Pour un échange sans rapport avec le travail (personnel, familial, amical,
+    /// administratif…) : mêmes sections que le type générique, mais sans vocabulaire
+    /// ni cadre professionnel imposé par le prompt.
+    static let personal = MeetingTemplate(
+        id: "builtin.personal",
+        name: "Conversation personnelle",
+        symbol: "bubble.left.and.bubble.right",
+        sections: [.tldr, .decisions, .actionItems, .topics, .openQuestions, .nextSteps],
+        instructions: """
+        Ce n'est pas une réunion professionnelle : c'est une conversation personnelle \
+        (échange familial, amical, administratif, entre particuliers…). N'emploie \
+        aucun vocabulaire ni cadre d'entreprise — pas de « réunion », « équipe », \
+        « sprint », « ticket »… Rédige comme on résumerait une discussion entre \
+        proches.
+
+        Ne force aucune section à contenir quelque chose si la conversation n'a \
+        débouché ni sur décision, ni sur action, ni sur sujet ouvert : laisse-les \
+        vides plutôt que d'inventer du contenu qui n'a pas eu lieu.
+        """,
+        titleFormat: "{summary} — {date}",
+        isBuiltIn: true
+    )
+
+    static let builtIns: [MeetingTemplate] = [generic, daily, synchro, retrospective, personal]
 
     /// Retrouve un modèle par identifiant, avec repli sur le modèle générique.
     /// Un modèle personnalisé prime sur un modèle fourni de même identifiant : c'est

@@ -14,6 +14,7 @@ struct ReviewWindow: View {
     @State private var rawDeletionStatus: String?
     @State private var showDeleteRawConfirmation = false
     @State private var showTranscript = false
+    @State private var templateSelection: String = ""
 
     var body: some View {
         Group {
@@ -46,7 +47,10 @@ struct ReviewWindow: View {
                 editor(meeting)
             }
         }
-        .onChange(of: session.reviewedMeeting?.id, initial: true) { load(meeting) }
+        .onChange(of: session.reviewedMeeting?.id, initial: true) {
+            load(meeting)
+            templateSelection = meeting.templateID
+        }
         .onChange(of: session.summaryState) { load(session.reviewedMeeting ?? meeting) }
     }
 
@@ -111,10 +115,22 @@ struct ReviewWindow: View {
                     .help("Diarisation expérimentale de la piste micro (hauteur, timbre) — voir Réglages.")
                 }
                 if meeting.hasSummary {
+                    Picker("Type", selection: $templateSelection) {
+                        ForEach(session.settings.allTemplatesIncludingDisabled) { template in
+                            Label(template.name, systemImage: template.symbol).tag(template.id)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 170)
+                    .help("Type appliqué à la prochaine régénération")
+
                     Button("Régénérer") {
                         Task {
+                            if templateSelection != meeting.templateID {
+                                session.setTemplate(templateSelection, for: meeting)
+                            }
                             loadedMeetingID = nil
-                            await session.generateSummary(for: meeting)
+                            await session.generateSummary(for: session.reviewedMeeting ?? meeting)
                         }
                     }
                 }

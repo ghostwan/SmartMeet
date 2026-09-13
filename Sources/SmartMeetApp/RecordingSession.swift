@@ -481,6 +481,19 @@ public final class RecordingSession {
         meetings = store.loadAll()
     }
 
+    /// Change le type de réunion d'une réunion déjà enregistrée — utilisé avant une
+    /// régénération, quand le type choisi initialement s'avère inadapté (ex. une
+    /// conversation personnelle enregistrée par erreur avec un type professionnel).
+    /// Ne redemande pas de compte rendu à lui seul : c'est à l'appelant de relancer
+    /// `generateSummary` ensuite si besoin.
+    public func setTemplate(_ templateID: String, for meeting: Meeting) {
+        var updated = meeting
+        updated.templateID = templateID
+        try? store.update(updated, customTemplates: settings.customTemplates)
+        if reviewedMeeting?.id == meeting.id { reviewedMeeting = updated }
+        meetings = store.loadAll()
+    }
+
     // MARK: - Publication
 
     public func publish(_ meeting: Meeting, createJiraIssues: Bool) async {
