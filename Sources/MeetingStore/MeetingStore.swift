@@ -86,8 +86,24 @@ public struct MeetingStore: Sendable {
         )
     }
 
-    public func transcriptMarkdown(for id: UUID) -> String {
-        (try? String(
+    /// Réécrit le transcript (segments structurés + markdown lisible) sans toucher
+    /// aux métadonnées ni à l'audio. Utilisé pour appliquer a posteriori la
+    /// diarisation expérimentale de la piste micro sur une réunion déjà enregistrée.
+    public func updateSegments(
+        _ segments: [TranscriptSegment], for id: UUID, title: String, date: Date
+    ) throws {
+        let directory = try prepareDirectory(for: id)
+        try Self.encoder.encode(segments)
+            .write(to: directory.appending(path: "segments.json"), options: .atomic)
+        try segments.markdown(title: title, date: date)
+            .write(
+                to: directory.appending(path: "transcript.md"),
+                atomically: true,
+                encoding: .utf8
+            )
+    }
+
+    public func transcriptMarkdown(for id: UUID) -> String {        (try? String(
             contentsOf: directory(for: id).appending(path: "transcript.md"),
             encoding: .utf8
         )) ?? ""

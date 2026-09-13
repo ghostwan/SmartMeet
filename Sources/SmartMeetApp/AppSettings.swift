@@ -24,6 +24,7 @@ public final class AppSettings {
         static let autoStartOnDetection = "autoStartOnDetection"
         static let autoPublish = "autoPublish"
         static let autoCreateJiraIssues = "autoCreateJiraIssues"
+        static let diarizeMicrophoneTrack = "diarizeMicrophoneTrack"
     }
 
     private let defaults = UserDefaults.standard
@@ -78,6 +79,14 @@ public final class AppSettings {
     public var useCalendar: Bool {
         didSet { defaults.set(useCalendar, forKey: Key.useCalendar) }
     }
+    /// Diarisation expérimentale de la piste micro : distingue jusqu'à deux
+    /// locuteurs partageant le même micro (réunion en présentiel), à partir de
+    /// traits acoustiques classiques — pas un modèle de reconnaissance vocale.
+    /// Désactivé par défaut : la séparation peut se tromper, notamment si les deux
+    /// voix se ressemblent.
+    public var diarizeMicrophoneTrack: Bool {
+        didSet { defaults.set(diarizeMicrophoneTrack, forKey: Key.diarizeMicrophoneTrack) }
+    }
     /// Types de réunion créés par l'utilisateur, en plus des modèles fournis.
     public var customTemplates: [MeetingTemplate] {
         didSet {
@@ -123,6 +132,7 @@ public final class AppSettings {
         autoPublish = defaults.object(forKey: Key.autoPublish) as? Bool ?? false
         autoCreateJiraIssues = defaults.object(forKey: Key.autoCreateJiraIssues) as? Bool ?? false
         useCalendar = defaults.object(forKey: Key.useCalendar) as? Bool ?? true
+        diarizeMicrophoneTrack = defaults.object(forKey: Key.diarizeMicrophoneTrack) as? Bool ?? false
 
         if let data = defaults.data(forKey: Key.customTemplates),
            let decoded = try? JSONDecoder().decode([MeetingTemplate].self, from: data) {

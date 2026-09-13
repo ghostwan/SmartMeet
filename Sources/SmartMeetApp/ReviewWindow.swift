@@ -9,6 +9,8 @@ struct ReviewWindow: View {
     @State private var draft = MeetingSummary()
     @State private var createJiraIssues = true
     @State private var loadedMeetingID: UUID?
+    @State private var diarizationStatus: String?
+    @State private var isDiarizing = false
 
     var body: some View {
         Group {
@@ -54,32 +56,56 @@ struct ReviewWindow: View {
     }
 
     private func header(for meeting: Meeting) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(meeting.title).font(.title3.weight(.semibold)).lineLimit(1)
-                HStack(spacing: 6) {
-                    Label(
-                        session.template(for: meeting).name,
-                        systemImage: session.template(for: meeting).symbol
-                    )
-                    Text("·")
-                    Text(meeting.startedAt.formatted(date: .long, time: .shortened))
-                    Text("·")
-                    Text(meeting.formattedDuration)
-                    Text("·")
-                    Text("\(meeting.outputLanguage.flag) \(meeting.outputLanguage.displayName)")
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(meeting.title).font(.title3.weight(.semibold)).lineLimit(1)
+                    HStack(spacing: 6) {
+                        Label(
+                            session.template(for: meeting).name,
+                            systemImage: session.template(for: meeting).symbol
+                        )
+                        Text("·")
+                        Text(meeting.startedAt.formatted(date: .long, time: .shortened))
+                        Text("·")
+                        Text(meeting.formattedDuration)
+                        Text("·")
+                        Text("\(meeting.outputLanguage.flag) \(meeting.outputLanguage.displayName)")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-            Spacer()
-            if meeting.hasSummary {
-                Button("Régénérer") {
-                    Task {
-                        loadedMeetingID = nil
-                        await session.generateSummary(for: meeting)
+                Spacer()
+                if session.settings.diarizeMicrophoneTrack {
+                    Button {
+                        Task {
+                            isDiarizing = true
+                            diarizationStatus = await session.rediarize(meeting)
+                            isDiarizing = false
+                        }
+                    } label: {
+                        if isDiarizing {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Label("Réanalyser les locuteurs", systemImage: "person.wave.2")
+                        }
+                    }
+                    .disabled(isDiarizing)
+                    .help("Diarisation expérimentale de la piste micro (hauteur, timbre) — voir Réglages.")
+                }
+                if meeting.hasSummary {
+                    Button("Régénérer") {
+                        Task {
+                            loadedMeetingID = nil
+                            await session.generateSummary(for: meeting)
+                        }
                     }
                 }
+            }
+            if let diarizationStatus {
+                Text(diarizationStatus)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .padding()

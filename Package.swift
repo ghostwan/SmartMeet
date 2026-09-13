@@ -15,6 +15,16 @@ let package = Package(
             path: "Sources/Transcription"
         ),
 
+        // Diarisation expérimentale de la piste micro : distingue plusieurs
+        // locuteurs partageant un même micro (réunion en présentiel), à partir de
+        // traits acoustiques classiques (hauteur, timbre), sans modèle de
+        // reconnaissance vocale — Apple n'expose aucune API publique de diarisation.
+        .target(
+            name: "Diarization",
+            dependencies: ["Transcription", "AudioCapture"],
+            path: "Sources/Diarization"
+        ),
+
         // Persistance des réunions sur disque.
         .target(
             name: "MeetingStore",
@@ -44,7 +54,7 @@ let package = Package(
             name: "SmartMeet",
             dependencies: [
                 "AudioCapture", "Transcription", "MeetingStore",
-                "Summarization", "Atlassian", "SmartMeetCalendar",
+                "Summarization", "Atlassian", "SmartMeetCalendar", "Diarization",
             ],
             path: "Sources/SmartMeetApp",
             exclude: ["Info.plist", "SmartMeet.entitlements"],
@@ -62,6 +72,11 @@ let package = Package(
             name: "TranscriptionTests",
             dependencies: ["Transcription", "AudioCapture"],
             path: "Tests/TranscriptionTests"
+        ),
+        .testTarget(
+            name: "DiarizationTests",
+            dependencies: ["Diarization", "Transcription", "AudioCapture"],
+            path: "Tests/DiarizationTests"
         ),
         .testTarget(
             name: "DetectionTests",
