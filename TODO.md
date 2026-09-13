@@ -35,12 +35,28 @@ open build/SmartMeet.app --args --check-notifications /tmp/rapport.txt
   **à revérifier sur la machine de développement habituelle, avec une identité de
   signature stable**, où le point de départ (bundle minimal en `.regular`) avait
   fonctionné.
+- **le premier refus mémorisé par bundle ID** — testé le 13/09 en changeant
+  `CFBundleIdentifier` pour un identifiant jamais vu (`com.smartmeet.app.test<epoch>`)
+  et en relançant le diagnostic : `autorisation` remonte bien `non demandée` (donc pas
+  de refus mémorisé pour ce nouvel identifiant), mais `requestAuthorization` échoue
+  quand même immédiatement avec le même message `Notifications are not allowed for
+  this application`, **sans jamais afficher de popup système à l'utilisateur**.
+  L'hypothèse est donc écartée : le blocage n'est pas lié à un refus antérieur mémorisé
+  par bundle ID, il intervient en amont, avant même que macOS ne pose la question. Sur
+  cette machine, `security find-identity -v -p codesigning` ne renvoie **aucune**
+  identité de signature (0 valid identities found) : seule la signature ad-hoc est
+  possible ici. Reste à déterminer si l'absence totale d'identité de signature (pas
+  seulement son instabilité build à build) suffit à faire échouer
+  `requestAuthorization` en amont de tout prompt — hypothèse la plus probable
+  actuellement, à confirmer sur une machine avec une identité Apple Development ou
+  Developer ID valide.
 
 **Reste à tester** :
 
-- **le premier refus est mémorisé** et colle au bundle. Test : changer
-  `CFBundleIdentifier` pour `com.smartmeet.app.test` et relancer le diagnostic. Si ça
-  passe, il suffit de réinitialiser l'état côté système.
+- Sur une machine avec une identité de signature valide (`security find-identity -v
+  -p codesigning` non vide) : est-ce que `requestAuthorization` affiche enfin le
+  prompt système ? Si oui, le problème est bien l'absence d'identité de signature sur
+  la machine actuelle, pas le code de l'app.
 
 Tant que ce point n'est pas levé, la réponse à « suis-je prévenu quand le compte rendu
 est prêt ? » reste **non** en pratique.
