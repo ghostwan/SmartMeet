@@ -53,8 +53,17 @@ struct MenuBarContent: View {
         }
     }
 
-    private var header: some View {
-        HStack(spacing: 10) {
+    /// Sans activer explicitement l'application, une fenêtre ouverte depuis le
+    /// popover reste sur le Space courant sans y attirer le focus : si l'utilisateur
+    /// est dans le Space plein écran d'une autre application, la fenêtre s'ouvre en
+    /// silence sur le bureau normal, sans bascule de Space ni mise au premier plan —
+    /// ça ressemble alors à un clic sans effet.
+    private func openSettings() {
+        openWindow(id: "settings")
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private var header: some View {        HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("SmartMeet").font(.headline)
                 Text(statusText).font(.caption).foregroundStyle(.secondary)
@@ -74,7 +83,7 @@ struct MenuBarContent: View {
             .tint(session.isRecording ? .red : .accentColor)
             .disabled(session.isBusy)
 
-            Button { openWindow(id: "settings") } label: { Image(systemName: "gearshape") }
+            Button { openSettings() } label: { Image(systemName: "gearshape") }
                 .buttonStyle(.borderless)
                 .help("Réglages")
 
@@ -422,6 +431,7 @@ private struct MeetingRow: View {
         .onTapGesture {
             session.openReview(meeting)
             openWindow(id: "review")
+            NSApp.activate(ignoringOtherApps: true)
         }
     }
 }
