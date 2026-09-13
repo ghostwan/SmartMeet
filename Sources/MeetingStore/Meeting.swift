@@ -28,6 +28,9 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
     public var jiraIssueKeys: [String]
     /// Renseigné après publication sur Notion.
     public var notionPageURL: String?
+    /// Consommation cumulée de tokens pour la génération du compte rendu (tous
+    /// appels confondus : découpage éventuel + réparations de JSON invalide).
+    public var tokenUsage: TokenUsage?
 
     public init(
         id: UUID = UUID(),
@@ -42,7 +45,8 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         summary: MeetingSummary? = nil,
         confluencePageURL: String? = nil,
         jiraIssueKeys: [String] = [],
-        notionPageURL: String? = nil
+        notionPageURL: String? = nil,
+        tokenUsage: TokenUsage? = nil
     ) {
         self.id = id
         self.title = title
@@ -57,12 +61,13 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         self.confluencePageURL = confluencePageURL
         self.jiraIssueKeys = jiraIssueKeys
         self.notionPageURL = notionPageURL
+        self.tokenUsage = tokenUsage
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, title, startedAt, duration, locale, trackStartOffsets
         case knownAttendees, templateID, outputLanguage
-        case summary, confluencePageURL, jiraIssueKeys, notionPageURL
+        case summary, confluencePageURL, jiraIssueKeys, notionPageURL, tokenUsage
     }
 
     // Décodage tolérant : les réunions enregistrées avant l'ajout du compte rendu
@@ -87,6 +92,7 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         confluencePageURL = try container.decodeIfPresent(String.self, forKey: .confluencePageURL)
         jiraIssueKeys = try container.decodeIfPresent([String].self, forKey: .jiraIssueKeys) ?? []
         notionPageURL = try container.decodeIfPresent(String.self, forKey: .notionPageURL)
+        tokenUsage = try container.decodeIfPresent(TokenUsage.self, forKey: .tokenUsage)
     }
 
     public var formattedDuration: String {

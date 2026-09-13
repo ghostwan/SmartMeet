@@ -86,7 +86,8 @@ public struct SummaryGenerator: Sendable {
         context: SummaryContext,
         template: MeetingTemplate = .generic,
         language: SummaryLanguage = .french,
-        onProgress: @Sendable (SummaryProgress) -> Void = { _ in }
+        onProgress: @Sendable (SummaryProgress) -> Void = { _ in },
+        onUsage: @Sendable (TokenUsage) -> Void = { _ in }
     ) async throws -> MeetingSummary {
         let trimmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw SummaryGenerationError.emptyTranscript }
@@ -106,7 +107,7 @@ public struct SummaryGenerator: Sendable {
             var notes: [String] = []
             for (index, chunk) in chunks.enumerated() {
                 onProgress(.summarizingChunk(index: index + 1, total: chunks.count))
-                let note = try await provider.complete(
+                let completion = try await provider.complete(
                     prompt: SummaryPrompt.chunk(
                         transcript: chunk,
                         index: index + 1,
@@ -115,7 +116,8 @@ public struct SummaryGenerator: Sendable {
                         language: language
                     )
                 )
-                notes.append(note.trimmingCharacters(in: .whitespacesAndNewlines))
+                if let usage = completion.usage { onUsage(usage) }
+                notes.append(completion.text.trimmingCharacters(in: .whitespacesAndNewlines))
             }
             onProgress(.synthesizing)
             prompt = SummaryPrompt.reduce(
@@ -124,7 +126,7 @@ public struct SummaryGenerator: Sendable {
         }
 
         var summary = try await completeAndDecode(
-            prompt: prompt, template: template, language: language, onProgress: onProgress
+            prompt: prompt, template: template, language: language, onProgress: onProgress, onUsage: onUsage
         )
         // Le type retenu est conservé : c'est lui qui pilotera le rendu et la relecture.
         summary.templateID = template.id
@@ -189,7 +191,8 @@ public struct SummaryGenerator: Sendable {
         prompt: String,
         template: MeetingTemplate,
         language: SummaryLanguage,
-        onProgress: @Sendable (SummaryProgress) -> Void
+        onProgress: @Sendable (SummaryProgress) -> Void,
+        onUsage: @Sendable (TokenUsage) -> Void
     ) async throws -> MeetingSummary {
         var currentPrompt = prompt
         var lastError = ""
@@ -199,7 +202,9 @@ public struct SummaryGenerator: Sendable {
 
             let raw: String
             do {
-                raw = try await provider.complete(prompt: currentPrompt)
+                let completion = try await provider.complete(prompt: currentPrompt)
+                if let usage = completion.usage { onUsage(usage) }
+                raw = completion.text
             } catch {
                 lastError = error.localizedDescription
                 // Une panne du provider ne se répare pas en reformulant le prompt.

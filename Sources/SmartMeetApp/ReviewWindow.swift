@@ -563,6 +563,12 @@ struct ReviewWindow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Spacer()
+                if let usage = meeting.tokenUsage {
+                    Label(usage.formatted, systemImage: "number")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .help("Tokens consommés pour générer ce compte rendu")
+                }
             }
 
             HStack {

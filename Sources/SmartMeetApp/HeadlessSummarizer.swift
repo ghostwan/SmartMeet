@@ -42,6 +42,7 @@ enum HeadlessSummarizer {
         )
 
         let summary: MeetingSummary
+        let usageBox = UsageBox()
         do {
             summary = try await generator.generate(
                 transcript: transcript,
@@ -50,6 +51,8 @@ enum HeadlessSummarizer {
                 language: language
             ) { progress in
                 print("  · \(progress)")
+            } onUsage: { usage in
+                usageBox.add(usage)
             }
         } catch {
             print("❌ \(error.localizedDescription)")
@@ -57,6 +60,7 @@ enum HeadlessSummarizer {
         }
 
         print("✅ compte rendu en \(Int(Date().timeIntervalSince(started))) s")
+        if let totalUsage = usageBox.total { print("   tokens : \(totalUsage.formatted)") }
         print("   titre : \(summary.title)")
         for section in template.sections where summary.hasContent(section) {
             let heading = section.displayName(in: language)

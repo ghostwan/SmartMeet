@@ -29,7 +29,7 @@ public struct OllamaProvider: SummaryProvider {
         return http.statusCode == 200
     }
 
-    public func complete(prompt: String) async throws -> String {
+    public func complete(prompt: String) async throws -> SummaryCompletion {
         var request = URLRequest(url: endpoint.appending(path: "api/generate"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -58,6 +58,12 @@ public struct OllamaProvider: SummaryProvider {
         else {
             throw SummaryProviderError.emptyResponse
         }
-        return text
+        // Ollama ne fournit pas de coût (inférence locale) mais renvoie les comptes
+        // de tokens exacts dans la réponse non-streamée.
+        let usage = TokenUsage(
+            input: payload["prompt_eval_count"] as? Int,
+            output: payload["eval_count"] as? Int
+        )
+        return SummaryCompletion(text: text, usage: usage)
     }
 }

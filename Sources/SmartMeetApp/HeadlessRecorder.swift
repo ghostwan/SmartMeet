@@ -154,6 +154,7 @@ enum HeadlessRecorder {
 
         do {
             let template = settings.template(id: meeting.templateID)
+            let usageBox = UsageBox()
             let summary = try await SummaryGenerator(provider: provider).generate(
                 transcript: transcript,
                 context: SummaryContext(
@@ -164,14 +165,19 @@ enum HeadlessRecorder {
                 ),
                 template: template,
                 language: meeting.outputLanguage
-            )
+            ) { _ in
+            } onUsage: { usage in
+                usageBox.add(usage)
+            }
             var updated = meeting
             updated.summary = summary
+            updated.tokenUsage = usageBox.total
             updated.title = summary.title.isEmpty ? meeting.title : summary.title
             try? store.update(updated)
 
             emit("✅ compte rendu : « \(summary.title) »")
             emit("   \(summary.decisions.count) décisions, \(summary.actionItems.count) action items")
+            if let totalUsage = usageBox.total { emit("   tokens : \(totalUsage.formatted)") }
 
             guard publish, settings.canPublish else { return }
             let result = try await PublishService(

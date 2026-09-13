@@ -8,7 +8,7 @@ public protocol SummaryProvider: Sendable {
     /// Vrai si le provider est utilisable sur cette machine (binaire présent,
     /// serveur joignable…).
     func isAvailable() async -> Bool
-    func complete(prompt: String) async throws -> String
+    func complete(prompt: String) async throws -> SummaryCompletion
 }
 
 public enum SummaryProviderKind: String, Codable, Sendable, CaseIterable, Identifiable {

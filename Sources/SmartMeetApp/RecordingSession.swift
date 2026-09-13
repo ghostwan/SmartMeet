@@ -393,6 +393,7 @@ public final class RecordingSession {
         )
 
         do {
+            let usageBox = UsageBox()
             let summary = try await generator.generate(
                 transcript: transcript,
                 context: context,
@@ -402,9 +403,12 @@ public final class RecordingSession {
                 Task { @MainActor [weak self] in
                     self?.summaryState = .running(Self.describe(progress))
                 }
+            } onUsage: { usage in
+                usageBox.add(usage)
             }
             var updated = meeting
             updated.summary = summary
+            updated.tokenUsage = usageBox.total
             if !summary.title.isEmpty { updated.title = summary.title }
             try? store.update(updated, customTemplates: settings.customTemplates)
             meetings = store.loadAll()
