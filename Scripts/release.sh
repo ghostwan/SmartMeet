@@ -43,8 +43,28 @@ codesign --verify --strict build/SmartMeet.app || fail "Signature invalide."
 step "Image disque"
 DMG="build/SmartMeet-${VERSION#v}.dmg"
 rm -f "$DMG"
-hdiutil create -volname "SmartMeet" -srcfolder build/SmartMeet.app -ov -format UDZO "$DMG" \
-	|| fail "Échec de la création du .dmg."
+swift Scripts/make-dmg-background.swift >/dev/null || fail "Échec de la génération du fond du .dmg."
+if command -v create-dmg >/dev/null 2>&1; then
+	# create-dmg renvoie un code non nul même en cas de succès (Finder tarde parfois
+	# à écrire les métadonnées de fenêtre) : on juge du résultat par la présence du
+	# fichier, pas par le code de sortie.
+	create-dmg \
+		--volname "SmartMeet" \
+		--background "build/dmg-background.png" \
+		--window-size 660 400 \
+		--icon-size 128 \
+		--icon "SmartMeet.app" 180 190 \
+		--hide-extension "SmartMeet.app" \
+		--app-drop-link 480 190 \
+		--no-internet-enable \
+		"$DMG" \
+		"build/SmartMeet.app" || true
+	[ -f "$DMG" ] || fail "Échec de la création du .dmg (create-dmg)."
+else
+	echo "create-dmg introuvable (brew install create-dmg) — .dmg basique sans glisser-déposer visuel." >&2
+	hdiutil create -volname "SmartMeet" -srcfolder build/SmartMeet.app -ov -format UDZO "$DMG" \
+		|| fail "Échec de la création du .dmg."
+fi
 echo "✓ $DMG"
 
 step "Tag git"
