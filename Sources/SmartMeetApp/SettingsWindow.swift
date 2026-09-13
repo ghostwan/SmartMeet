@@ -179,10 +179,10 @@ struct SettingsWindow: View {
                 TextField("Site", text: $settings.atlassian.site, prompt: Text("ACME"))
                 TextField("E-mail", text: $settings.atlassian.email)
                 SecureField("Jeton d'API", text: $settings.atlassianToken)
-                Link(
-                    "Générer un jeton sur id.atlassian.com",
-                    destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!
-                )
+                Button("Générer un jeton sur id.atlassian.com") {
+                    openInBrowser(URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
+                }
+                .buttonStyle(.link)
                 .font(.caption)
                 Text("Le jeton est conservé dans le trousseau, jamais dans les préférences.")
                     .font(.caption)
@@ -240,10 +240,10 @@ struct SettingsWindow: View {
         Form {
             Section("Intégration") {
                 SecureField("Jeton d'intégration", text: $settings.notionToken)
-                Link(
-                    "Créer une intégration sur notion.so/my-integrations",
-                    destination: URL(string: "https://www.notion.so/my-integrations")!
-                )
+                Button("Créer une intégration sur notion.so/my-integrations") {
+                    openInBrowser(URL(string: "https://www.notion.so/my-integrations")!)
+                }
+                .buttonStyle(.link)
                 .font(.caption)
                 Text("Crée une intégration interne sur notion.so/my-integrations, copie son jeton ici, puis partage la page parente ci-dessous avec elle (••• sur la page → Connexions → ton intégration). Le jeton est conservé dans le trousseau, jamais dans les préférences.")
                     .font(.caption)
@@ -294,6 +294,23 @@ struct SettingsWindow: View {
         }
         .formStyle(.grouped)
         .padding()
+    }
+
+    /// `NSWorkspace.shared.open(url)` respecte les liens universels : si l'app
+    /// desktop Notion est installée, elle intercepte tout lien `notion.so` — y
+    /// compris `/my-integrations`, une page qui n'existe que sur le web et que
+    /// l'app desktop ne sait pas afficher. On force donc explicitement le
+    /// navigateur par défaut plutôt que de laisser macOS router l'URL.
+    private func openInBrowser(_ url: URL) {
+        guard let browser = NSWorkspace.shared.urlForApplication(
+            toOpen: URL(string: "https://apple.com")!
+        ) else {
+            NSWorkspace.shared.open(url)
+            return
+        }
+        NSWorkspace.shared.open(
+            [url], withApplicationAt: browser, configuration: NSWorkspace.OpenConfiguration()
+        )
     }
 
     private func applyNotionPage() {
