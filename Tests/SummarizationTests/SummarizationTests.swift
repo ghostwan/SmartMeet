@@ -203,7 +203,7 @@ struct AtlassianConfigurationTests {
     @Test("La publication exige site, e-mail et espace")
     func readiness() {
         var configuration = AtlassianConfiguration(
-            site: "ACME", email: "a@b.c", spaceKey: "", jiraProjectKey: "SEC"
+            site: "acme", email: "a@b.c", spaceKey: "", jiraProjectKey: "SEC"
         )
         #expect(!configuration.isConfluenceReady)
         configuration.spaceKey = "SMARTMEET"
@@ -213,7 +213,7 @@ struct AtlassianConfigurationTests {
 
     @Test("L'URL de base est dérivée du site")
     func baseURL() {
-        let configuration = AtlassianConfiguration(site: "ACME", email: "a@b.c")
-        #expect(configuration.baseURL?.absoluteString == "https://ACME.atlassian.net")
+        let configuration = AtlassianConfiguration(site: "acme", email: "a@b.c")
+        #expect(configuration.baseURL?.absoluteString == "https://acme.atlassian.net")
     }
 }

@@ -53,7 +53,7 @@ enum HeadlessRecorder {
 
             let transcriber = MeetingTranscriber(
                 locale: Locale(identifier: "fr-FR"),
-                vocabulary: ["Crowdin", "ACME", "Confluence", "Jira", "SmartMeet"]
+                vocabulary: ["Confluence", "Jira", "SmartMeet"]
             )
             emit("préparation des modèles…")
             let updates = try await transcriber.start()

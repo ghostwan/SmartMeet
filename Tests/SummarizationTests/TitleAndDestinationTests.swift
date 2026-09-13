@@ -87,13 +87,13 @@ struct SprintPageTests {
 
     @Test("L'URL moderne d'une page est reconnue")
     func modernURL() {
-        let url = "https://ACME.atlassian.net/wiki/spaces/SMARTMEET/pages/6707707935/Sprint+42"
+        let url = "https://acme.atlassian.net/wiki/spaces/SMARTMEET/pages/6707707935/Sprint+42"
         #expect(SprintPage.extractPageID(from: url) == "6707707935")
     }
 
     @Test("L'ancienne URL viewpage est reconnue")
     func legacyURL() {
-        let url = "https://ACME.atlassian.net/wiki/pages/viewpage.action?pageId=123456"
+        let url = "https://acme.atlassian.net/wiki/pages/viewpage.action?pageId=123456"
         #expect(SprintPage.extractPageID(from: url) == "123456")
     }
 
@@ -109,7 +109,7 @@ struct SprintPageTests {
 struct DestinationTests {
     private func configuration(sprint: SprintPage?) -> AtlassianConfiguration {
         AtlassianConfiguration(
-            site: "ACME",
+            site: "acme",
             email: "a@b.c",
             spaceKey: "DEFAUT",
             parentPageID: "",

@@ -176,7 +176,7 @@ struct SettingsWindow: View {
     private var atlassianTab: some View {
         Form {
             Section("Compte") {
-                TextField("Site", text: $settings.atlassian.site, prompt: Text("ACME"))
+                TextField("Site", text: $settings.atlassian.site, prompt: Text("acme"))
                 TextField("E-mail", text: $settings.atlassian.email)
                 SecureField("Jeton d'API", text: $settings.atlassianToken)
                 Button("Générer un jeton sur id.atlassian.com") {

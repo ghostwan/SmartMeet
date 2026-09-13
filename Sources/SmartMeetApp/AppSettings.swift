@@ -163,8 +163,7 @@ public final class AppSettings {
         localeIdentifier = defaults.string(forKey: Key.locale) ?? "fr-FR"
         recentTranscriptionLocales = defaults.stringArray(forKey: Key.recentTranscriptionLocales) ?? []
         vocabulary = defaults.stringArray(forKey: Key.vocabulary) ?? [
-            "Crowdin", "ACME", "Confluence", "Jira", "ACME",
-            "SmartMeet", "ACME", "ACME",
+            "Confluence", "Jira", "SmartMeet", "ACME", "ACME",
         ]
         knownPeople = defaults.stringArray(forKey: Key.knownPeople) ?? []
         userName = defaults.string(forKey: Key.userName) ?? NSFullUserName()
