@@ -9,6 +9,7 @@ import Transcription
 struct MenuBarContent: View {
     @Bindable var session: RecordingSession
     @Environment(\.openWindow) private var openWindow
+    @State private var availableLocales: [(id: String, label: String)] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -50,6 +51,16 @@ struct MenuBarContent: View {
         .task {
             await session.refreshCalendarContext()
             await session.startMeetingDetection()
+        }
+        .task {
+            availableLocales = await SupportedTranscriptionLocales.all()
+            if !availableLocales.contains(where: { $0.id == session.selectedTranscriptionLocale }) {
+                if let resolved = await SupportedTranscriptionLocales.resolvedIdentifier(
+                    for: Locale(identifier: session.selectedTranscriptionLocale)
+                ) {
+                    session.selectedTranscriptionLocale = resolved
+                }
+            }
         }
     }
 
@@ -97,45 +108,69 @@ struct MenuBarContent: View {
     /// Le type est choisi avant l'enregistrement : c'est lui qui détermine les
     /// sections demandées au modèle, donc il doit être figé dès le départ.
     private var templatePicker: some View {
-        HStack(spacing: 8) {
-            Picker("Type", selection: $session.selectedTemplateID) {
-                ForEach(session.settings.allTemplates) { template in
-                    Label(template.name, systemImage: template.symbol).tag(template.id)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Picker("Type", selection: $session.selectedTemplateID) {
+                    ForEach(session.settings.allTemplates) { template in
+                        Label(template.name, systemImage: template.symbol).tag(template.id)
+                    }
                 }
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            .frame(maxWidth: 150)
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(maxWidth: 150)
 
-            // La langue du compte rendu se choisit avant d'enregistrer : elle
-            // conditionne le prompt, pas seulement la mise en forme.
-            Picker("Langue", selection: $session.selectedOutputLanguage) {
-                ForEach(SummaryLanguage.allCases) { language in
-                    Text("\(language.flag) \(language.displayName)").tag(language)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(session.selectedTemplate.sections.map(\.displayName).joined(separator: " · "))
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                    // La destination dépend du type choisi : autant la voir maintenant,
+                    // pas au moment de publier.
+                    Text(session.destinationSummary(for: session.selectedTemplate))
+                        .font(.caption2)
+                        .foregroundStyle(
+                            session.selectedTemplate.parent.isSprintPage
+                                && session.settings.sprintPage == nil
+                                ? Color.orange
+                                : Color.secondary.opacity(0.6)
+                        )
+                        .lineLimit(1)
                 }
+                Spacer()
             }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            .frame(width: 110)
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text(session.selectedTemplate.sections.map(\.displayName).joined(separator: " · "))
+            // Langue « source » (celle parlée pendant la réunion, transcrite telle
+            // quelle) et langue de « destination » (celle du compte rendu généré) sont
+            // deux réglages distincts : le moteur de transcription ne gère pas le
+            // changement de langue en cours de réunion, elle doit donc être fixée
+            // avant de démarrer — indépendamment de la langue dans laquelle le
+            // compte rendu sera rédigé.
+            HStack(spacing: 6) {
+                Text("🗣️").font(.caption)
+                Picker("Langue parlée", selection: $session.selectedTranscriptionLocale) {
+                    ForEach(availableLocales, id: \.id) { locale in
+                        Text(locale.label).tag(locale.id)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: 150)
+
+                Image(systemName: "arrow.right")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-                // La destination dépend du type choisi : autant la voir maintenant,
-                // pas au moment de publier.
-                Text(session.destinationSummary(for: session.selectedTemplate))
-                    .font(.caption2)
-                    .foregroundStyle(
-                        session.selectedTemplate.parent.isSprintPage
-                            && session.settings.sprintPage == nil
-                            ? Color.orange
-                            : Color.secondary.opacity(0.6)
-                    )
-                    .lineLimit(1)
+
+                Text("📝").font(.caption)
+                Picker("Compte rendu", selection: $session.selectedOutputLanguage) {
+                    ForEach(SummaryLanguage.allCases) { language in
+                        Text("\(language.flag) \(language.displayName)").tag(language)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: 110)
+                Spacer()
             }
-            Spacer()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)

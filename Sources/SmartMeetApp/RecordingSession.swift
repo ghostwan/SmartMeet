@@ -64,6 +64,11 @@ public final class RecordingSession {
     public var selectedTemplateID: String
     /// Langue du compte rendu du prochain enregistrement.
     public var selectedOutputLanguage: SummaryLanguage
+    /// Langue parlée (source) attendue pour le prochain enregistrement — distincte
+    /// de la langue du compte rendu ci-dessus. Le moteur de transcription ne gère
+    /// pas le changement de langue en cours de réunion : elle doit être fixée avant
+    /// de démarrer.
+    public var selectedTranscriptionLocale: String
 
     public let settings: AppSettings
     private let store: MeetingStore
@@ -85,6 +90,7 @@ public final class RecordingSession {
         self.detector = MeetingDetector()
         self.selectedTemplateID = settings.defaultTemplateID
         self.selectedOutputLanguage = settings.defaultOutputLanguage
+        self.selectedTranscriptionLocale = settings.localeIdentifier
         self.store = MeetingStore()
         meetings = store.loadAll()
 
@@ -278,7 +284,8 @@ public final class RecordingSession {
             let directory = try store.prepareDirectory(for: id)
 
             let transcriber = MeetingTranscriber(
-                locale: settings.locale, vocabulary: settings.contextualVocabulary
+                locale: Locale(identifier: selectedTranscriptionLocale),
+                vocabulary: settings.contextualVocabulary
             )
             let updates = try await transcriber.start()
             self.transcriber = transcriber
@@ -335,7 +342,7 @@ public final class RecordingSession {
                 ?? Self.defaultTitle(for: startedAt),
             startedAt: startedAt,
             duration: result?.duration ?? 0,
-            locale: settings.localeIdentifier,
+            locale: selectedTranscriptionLocale,
             knownAttendees: detectedCalendarMeeting?.attendees ?? [],
             templateID: selectedTemplateID,
             outputLanguage: selectedOutputLanguage
