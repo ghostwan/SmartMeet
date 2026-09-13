@@ -357,7 +357,13 @@ struct MeetingListView: View {
                         }
                     }
                 }
-                .frame(maxHeight: 170)
+                // `maxHeight` seul laisse le ScrollView se rapporter à une hauteur
+                // idéale de 0 dans le popover `MenuBarExtra` (qui dimensionne la
+                // fenêtre sur la taille intrinsèque du contenu) : la liste
+                // disparaissait alors entièrement, même avec des réunions présentes.
+                // Une hauteur explicite, plafonnée au nombre réel de lignes, fixe
+                // un plancher que SwiftUI peut effectivement mesurer.
+                .frame(height: min(CGFloat(session.filteredMeetings.prefix(10).count) * 44, 170))
             }
         }
     }
