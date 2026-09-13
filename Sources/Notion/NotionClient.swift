@@ -40,18 +40,24 @@ public struct NotionClient: Sendable {
     }
 
     /// Crée une page sous la page parente configurée, avec le markdown converti en
-    /// blocs Notion. Notion limite la création initiale à 100 blocs enfants ; le
-    /// reste est ajouté par appels `PATCH` successifs.
+    /// blocs Notion. Sans page parente configurée, la page est créée à la racine de
+    /// l'espace connecté à l'intégration (les « pages privées » du point de vue de
+    /// l'intégration — visibles selon les droits accordés à celle-ci). Notion limite
+    /// la création initiale à 100 blocs enfants ; le reste est ajouté par appels
+    /// `PATCH` successifs.
     public func createPage(title: String, markdown: String) async throws -> NotionPage {
-        guard configuration.isConfigured else { throw NotionError.notConfigured }
         guard !token.isEmpty else { throw NotionError.missingToken }
 
         let allBlocks = MarkdownToNotionBlocks.blocks(from: markdown)
         let firstBatch = Array(allBlocks.prefix(MarkdownToNotionBlocks.maxBlocksPerRequest))
         let remaining = Array(allBlocks.dropFirst(MarkdownToNotionBlocks.maxBlocksPerRequest))
 
+        let parent: [String: Any] = configuration.isConfigured
+            ? ["page_id": configuration.parentPageID]
+            : ["workspace": true]
+
         let body: [String: Any] = [
-            "parent": ["page_id": configuration.parentPageID],
+            "parent": parent,
             "properties": [
                 "title": [
                     "title": [["text": ["content": title]]]
@@ -74,12 +80,17 @@ public struct NotionClient: Sendable {
         return NotionPage(id: id, url: url)
     }
 
-    /// Vérifie que le jeton est valide et que la page parente est accessible à
-    /// l'intégration — sans rien créer. Utilisé pour valider les réglages.
+    /// Vérifie que le jeton est valide — et, si une page parente est configurée,
+    /// qu'elle est bien accessible à l'intégration. Sans page parente, seul le
+    /// jeton est vérifié : la création se fera à la racine de l'espace. Utilisé pour
+    /// valider les réglages sans rien créer.
     public func verifyAccess() async throws {
-        guard configuration.isConfigured else { throw NotionError.notConfigured }
         guard !token.isEmpty else { throw NotionError.missingToken }
-        _ = try await request("GET", "/pages/\(configuration.parentPageID)")
+        if configuration.isConfigured {
+            _ = try await request("GET", "/pages/\(configuration.parentPageID)")
+        } else {
+            _ = try await request("GET", "/users/me")
+        }
     }
 
     private func request(

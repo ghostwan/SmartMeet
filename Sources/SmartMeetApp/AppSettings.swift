@@ -235,7 +235,7 @@ public final class AppSettings {
     }
 
     public var canPublishToNotion: Bool {
-        notion.isConfigured && !notionToken.isEmpty
+        !notionToken.isEmpty
     }
 
     /// Page de sprint courante, parent commun des réunions du sprint.

@@ -260,11 +260,18 @@ struct SettingsWindow: View {
                             notionPageStatus = nil
                         }
                     }
+                } else {
+                    Label(
+                        "Aucune page parente : les comptes rendus seront créés à la racine de l'espace (pages privées de l'intégration).",
+                        systemImage: "tray"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 HStack {
                     TextField(
-                        settings.notion.isConfigured ? "Changer de page" : "URL ou identifiant de la page",
+                        settings.notion.isConfigured ? "Changer de page" : "URL ou identifiant de la page (optionnel)",
                         text: $notionPageInput
                     )
                     .onSubmit { applyNotionPage() }
@@ -277,7 +284,7 @@ struct SettingsWindow: View {
                     Text(notionPageStatus).font(.caption).foregroundStyle(.secondary)
                 }
 
-                Text("Colle l'URL de la page Notion sous laquelle créer les comptes rendus : chaque publication y ajoute une page enfant. La page doit être partagée avec l'intégration ci-dessus.")
+                Text("Colle l'URL d'une page Notion pour y créer les comptes rendus en enfant (la page doit être partagée avec l'intégration ci-dessus). Sans page définie, ils sont créés à la racine de l'espace connecté au jeton.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
