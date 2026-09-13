@@ -3,6 +3,7 @@ import Diarization
 import Notion
 import Summarization
 import SwiftUI
+import Transcription
 
 struct SettingsWindow: View {
     @Bindable var settings: AppSettings
@@ -20,6 +21,7 @@ struct SettingsWindow: View {
     @State private var notionPageStatus: String?
     @State private var notionVerifyStatus: String?
     @State private var isVerifyingNotion = false
+    @State private var availableLocales: [(id: String, label: String)] = []
 
     var body: some View {
         TabView {
@@ -35,6 +37,20 @@ struct SettingsWindow: View {
             vocabularyText = settings.vocabulary.joined(separator: ", ")
             knownPeopleText = settings.knownPeople.joined(separator: ", ")
         }
+        .task { await loadLocales() }
+    }
+
+    /// Construit la liste des langues à partir de ce que le framework `Speech`
+    /// sait effectivement transcrire sur cette machine, plutôt qu'une liste figée.
+    private func loadLocales() async {
+        availableLocales = await SupportedTranscriptionLocales.all()
+        // Ancien format d'identifiant (ex. « fr-FR ») non présent tel quel dans la
+        // liste renvoyée par le framework (ex. « fr_FR ») : on migre silencieusement
+        // vers l'identifiant exact pour que le picker affiche la bonne sélection.
+        guard !availableLocales.contains(where: { $0.id == settings.localeIdentifier }) else { return }
+        if let resolved = await SupportedTranscriptionLocales.resolvedIdentifier(for: settings.locale) {
+            settings.localeIdentifier = resolved
+        }
     }
 
     private var transcriptionTab: some View {
@@ -47,12 +63,14 @@ struct SettingsWindow: View {
             }
 
             Picker("Langue", selection: $settings.localeIdentifier) {
-                Text("Français").tag("fr-FR")
-                Text("English (US)").tag("en-US")
-                Text("English (UK)").tag("en-GB")
-                Text("Deutsch").tag("de-DE")
-                Text("Español").tag("es-ES")
-                Text("Italiano").tag("it-IT")
+                ForEach(availableLocales, id: \.id) { locale in
+                    Text(locale.label).tag(locale.id)
+                }
+            }
+            if availableLocales.isEmpty {
+                Text("Chargement des langues disponibles…")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Vocabulaire métier") {
