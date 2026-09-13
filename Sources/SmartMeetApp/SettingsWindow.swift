@@ -70,6 +70,16 @@ struct SettingsWindow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section("Diarisation (expérimental)") {
+                Toggle(
+                    "Distinguer les voix sur le micro (réunion en présentiel)",
+                    isOn: $settings.diarizeMicrophoneTrack
+                )
+                Text("Pour une réunion où plusieurs personnes parlent dans le même micro. Basé sur la hauteur et le timbre de la voix, pas sur un modèle de reconnaissance vocale : fonctionne surtout quand les voix sont nettement différentes, et jusqu'à \(MicrophoneDiarizer.defaultMaxSpeakers) locuteurs. Une seule voix n'est pas scindée à tort si la séparation n'est pas nette.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .padding()
@@ -112,16 +122,6 @@ struct SettingsWindow: View {
                 Toggle("Créer aussi les tickets Jira", isOn: $settings.autoCreateJiraIssues)
                     .disabled(!settings.autoPublish || !settings.atlassian.isJiraReady)
                 Text("Une notification prévient dès que le compte rendu est prêt, avec le lien vers la page si la publication est automatique. La publication sans relecture reste désactivée par défaut : un compte rendu écrit par un modèle mérite un coup d'œil avant d'atterrir sur un espace d'équipe.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Diarisation (expérimental)") {
-                Toggle(
-                    "Distinguer les voix sur le micro (réunion en présentiel)",
-                    isOn: $settings.diarizeMicrophoneTrack
-                )
-                Text("Pour une réunion où plusieurs personnes parlent dans le même micro. Basé sur la hauteur et le timbre de la voix, pas sur un modèle de reconnaissance vocale : fonctionne surtout quand les voix sont nettement différentes, et jusqu'à \(MicrophoneDiarizer.defaultMaxSpeakers) locuteurs. Une seule voix n'est pas scindée à tort si la séparation n'est pas nette.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
