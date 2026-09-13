@@ -37,7 +37,7 @@ enum HeadlessSummarizer {
         let generator = SummaryGenerator(provider: provider)
         let context = SummaryContext(
             knownAttendees: [],
-            vocabulary: settings.vocabulary,
+            vocabulary: settings.contextualVocabulary,
             userName: settings.userName
         )
 

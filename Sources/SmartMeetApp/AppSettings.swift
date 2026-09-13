@@ -13,6 +13,7 @@ public final class AppSettings {
         static let ollamaModel = "ollamaModel"
         static let locale = "transcriptionLocale"
         static let vocabulary = "vocabulary"
+        static let knownPeople = "knownPeople"
         static let atlassian = "atlassianConfiguration"
         static let autoSummarize = "autoSummarize"
         static let useCalendar = "useCalendar"
@@ -45,6 +46,14 @@ public final class AppSettings {
     }
     public var vocabulary: [String] {
         didSet { defaults.set(vocabulary, forKey: Key.vocabulary) }
+    }
+    /// Prénoms (et noms) des personnes avec qui l'utilisateur interagit régulièrement,
+    /// bien orthographiés. Séparé du vocabulaire métier pour rester lisible, mais
+    /// utilisé exactement pareil : injecté dans la reconnaissance vocale et dans le
+    /// prompt du compte rendu, pour qu'un prénom mal reconnu ou mal orthographié par
+    /// le modèle se corrige de lui-même.
+    public var knownPeople: [String] {
+        didSet { defaults.set(knownPeople, forKey: Key.knownPeople) }
     }
     /// Nom de l'utilisateur : le transcript ne le connaît que sous le libellé « Moi ».
     public var userName: String {
@@ -122,6 +131,7 @@ public final class AppSettings {
             "Crowdin", "ACME", "Confluence", "Jira", "ACME",
             "SmartMeet", "ACME", "ACME",
         ]
+        knownPeople = defaults.stringArray(forKey: Key.knownPeople) ?? []
         userName = defaults.string(forKey: Key.userName) ?? NSFullUserName()
         defaultOutputLanguage = SummaryLanguage(
             rawValue: defaults.string(forKey: Key.outputLanguage) ?? ""
@@ -158,6 +168,10 @@ public final class AppSettings {
     }
 
     public var locale: Locale { Locale(identifier: localeIdentifier) }
+
+    /// Vocabulaire métier et prénoms combinés : c'est ce qui doit être injecté dans
+    /// la reconnaissance vocale et dans le prompt, pas seulement l'un ou l'autre.
+    public var contextualVocabulary: [String] { vocabulary + knownPeople }
 
     public func makeProvider() -> any SummaryProvider {
         switch providerKind {

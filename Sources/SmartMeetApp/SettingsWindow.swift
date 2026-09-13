@@ -11,6 +11,7 @@ struct SettingsWindow: View {
     @State private var issueTypes: [String] = []
     @State private var statusMessage: String?
     @State private var vocabularyText: String = ""
+    @State private var knownPeopleText: String = ""
     @State private var sprintPageInput: String = ""
     @State private var sprintStatus: String?
     @State private var isResolvingSprint = false
@@ -24,7 +25,10 @@ struct SettingsWindow: View {
             atlassianTab.tabItem { Label("Atlassian", systemImage: "cloud") }
         }
         .frame(width: 620, height: 480)
-        .onAppear { vocabularyText = settings.vocabulary.joined(separator: ", ") }
+        .onAppear {
+            vocabularyText = settings.vocabulary.joined(separator: ", ")
+            knownPeopleText = settings.knownPeople.joined(separator: ", ")
+        }
     }
 
     private var transcriptionTab: some View {
@@ -56,6 +60,21 @@ struct SettingsWindow: View {
                             .filter { !$0.isEmpty }
                     }
                 Text("Noms propres et termes métier, séparés par des virgules. Ils sont injectés dans le moteur de reconnaissance et dans le prompt.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Personnes") {
+                TextEditor(text: $knownPeopleText)
+                    .frame(height: 80)
+                    .font(.callout)
+                    .onChange(of: knownPeopleText) {
+                        settings.knownPeople = knownPeopleText
+                            .split(whereSeparator: { $0 == "," || $0 == "\n" })
+                            .map { $0.trimmingCharacters(in: .whitespaces) }
+                            .filter { !$0.isEmpty }
+                    }
+                Text("Prénoms (et noms) des personnes avec qui tu interagis régulièrement, bien orthographiés, séparés par des virgules. Comme le vocabulaire métier, ils sont injectés dans le moteur de reconnaissance et dans le prompt — utile quand la transcription ou le compte rendu déforme un prénom.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

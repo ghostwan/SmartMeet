@@ -269,7 +269,7 @@ public final class RecordingSession {
             let directory = try store.prepareDirectory(for: id)
 
             let transcriber = MeetingTranscriber(
-                locale: settings.locale, vocabulary: settings.vocabulary
+                locale: settings.locale, vocabulary: settings.contextualVocabulary
             )
             let updates = try await transcriber.start()
             self.transcriber = transcriber
@@ -379,7 +379,7 @@ public final class RecordingSession {
         let context = SummaryContext(
             date: meeting.startedAt,
             knownAttendees: meeting.knownAttendees,
-            vocabulary: settings.vocabulary,
+            vocabulary: settings.contextualVocabulary,
             userName: settings.userName
         )
 
