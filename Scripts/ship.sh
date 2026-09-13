@@ -14,14 +14,12 @@ cd "$ROOT"
 
 PUSH=true
 AMEND=false
-SKIP_TESTS=false
 MESSAGE=""
 
 while [ $# -gt 0 ]; do
 	case "$1" in
 	--no-push) PUSH=false ;;
 	--amend) AMEND=true ;;
-	--skip-tests) SKIP_TESTS=true ;;
 	-h | --help)
 		sed -n '2,9p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 		exit 0
@@ -73,16 +71,14 @@ if [ "$WARNINGS" -gt 0 ]; then
 fi
 echo "✓ build sans warning"
 
-if [ "$SKIP_TESTS" = false ]; then
-	step "Tests"
-	TEST_LOG="$(mktemp)"
-	trap 'rm -f "$BUILD_LOG" "$TEST_LOG"' EXIT
-	if ! swift test 2>&1 | tee "$TEST_LOG" | grep -E "✔|✘|Test run"; then
-		fail "Les tests ont échoué."
-	fi
-	grep -q "✘" "$TEST_LOG" && fail "Au moins un test a échoué."
-	echo "✓ $(grep -o 'Test run with [0-9]* tests' "$TEST_LOG" | head -1)"
+step "Tests"
+TEST_LOG="$(mktemp)"
+trap 'rm -f "$BUILD_LOG" "$TEST_LOG"' EXIT
+if ! swift test 2>&1 | tee "$TEST_LOG" | grep -E "✔|✘|Test run"; then
+	fail "Les tests ont échoué."
 fi
+grep -q "✘" "$TEST_LOG" && fail "Au moins un test a échoué."
+echo "✓ $(grep -o 'Test run with [0-9]* tests' "$TEST_LOG" | head -1)"
 
 step "Bundle signé"
 ./Scripts/bundle-app.sh >/dev/null || fail "L'assemblage du bundle a échoué."

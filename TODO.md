@@ -1,13 +1,15 @@
 # Reste à faire
 
-État au commit `07db7f4`. Classé par ce qui coûte le plus cher à ignorer.
+Classé par ce qui coûte le plus cher à ignorer. Voir l'historique git pour la
+progression : les points corrigés sont retirés au fur et à mesure, pas simplement
+cochés ici.
 
 ---
 
 ## 1. En cours — notifications non fonctionnelles
 
 Tout le code est écrit et compile, mais **aucune notification n'a jamais été délivrée
-sur la machine de développement**. `requestAuthorization` échoue avec
+sur une machine de développement**. `requestAuthorization` échoue avec
 `Notifications are not allowed for this application`, et l'application n'apparaît
 jamais dans `~/Library/Preferences/com.apple.ncprefs.plist`.
 
@@ -25,64 +27,38 @@ open build/SmartMeet.app --args --check-notifications /tmp/rapport.txt
   effet sur le résultat ;
 - une politique MDM — le profil `com.apple.notificationsettings` présent ne liste que
   deux bundles Microsoft et ne restreint pas les autres.
+- **le mode agent** (`LSUIElement`) — `MeetingNotifier.prepare()` bascule désormais en
+  `.regular` le temps de `requestAuthorization`, avant de revenir en `.accessory`. Testé
+  sur une machine sans identité de signature stable (signature ad-hoc, qui change à
+  chaque build) : le refus persiste. Soit l'hypothèse était fausse, soit une signature
+  instable interdit toute mémorisation d'autorisation avant même de poser la question —
+  **à revérifier sur la machine de développement habituelle, avec une identité de
+  signature stable**, où le point de départ (bundle minimal en `.regular`) avait
+  fonctionné.
 
-**Fait qui oriente la suite** : un bundle minimal, *sans `LSUIElement` et en politique
-d'activation `.regular`*, lancé depuis `/Applications`, obtient l'autorisation. Deux
-variables ont changé simultanément dans ce test. À départager une par une :
+**Reste à tester** :
 
-1. **le mode agent** (`LSUIElement = true`) empêcherait l'enregistrement auprès de
-   `usernoted`. Ennuyeux : une application menu-bar est agent par nature. Contournement
-   éventuel — `NSApp.setActivationPolicy(.regular)` au moment de la demande, puis retour
-   en `.accessory` ;
-2. **le premier refus est mémorisé** et colle au bundle. Test : changer
-   `CFBundleIdentifier` pour `com.smartmeet.app.test` et relancer le diagnostic. Si ça
-   passe, il suffit de réinitialiser l'état côté système.
+- **le premier refus est mémorisé** et colle au bundle. Test : changer
+  `CFBundleIdentifier` pour `com.smartmeet.app.test` et relancer le diagnostic. Si ça
+  passe, il suffit de réinitialiser l'état côté système.
 
 Tant que ce point n'est pas levé, la réponse à « suis-je prévenu quand le compte rendu
 est prêt ? » reste **non** en pratique.
 
 ---
 
-## 2. Bugs identifiés, non corrigés
+## 2. Bugs identifiés
 
-### Types de réunion personnalisés ignorés par le stockage
+### Recherche à étendre aux nouveaux contenus
 
-`RecordingSession` construit `MeetingStore(customTemplates: settings.customTemplates)`
-**une seule fois, à l'initialisation**. Créer ou modifier un type ensuite ne met pas le
-store à jour : `summary.md` est alors rendu avec le type générique au lieu du type
-retenu. Le compte rendu affiché dans l'application reste correct — seul le fichier
-exporté est faux, ce qui rend le bug discret.
-
-→ Passer les types au moment de l'écriture plutôt qu'à la construction.
-
-### Page de sprint supprimée côté Confluence
-
-Si la page référencée est supprimée, la publication échoue avec un 400 brut peu
-parlant, sans repli vers l'accueil de l'espace. La détection existe déjà pour le cas
-« aucune page définie », il reste à couvrir « page définie mais introuvable ».
-
-### Changement de page de sprint en cours de sprint
-
-Rien ne migre les comptes rendus déjà publiés, ce qui est probablement le comportement
-souhaité, mais l'interface ne le dit pas.
-
-### Recherche limitée aux métadonnées
-
-`Meeting.matches` couvre titre, synthèse, participants et décisions — **pas le contenu
-du transcript**. Chercher une phrase prononcée en réunion ne donne rien.
+`Meeting.matches` couvre désormais titre, synthèse, transcript, participants et
+décisions (le transcript est lu depuis `MeetingStore` au moment de filtrer). Si de
+nouveaux champs texte s'ajoutent au compte rendu, penser à les inclure dans le
+haystack de `RecordingSession.filteredMeetings`.
 
 ---
 
 ## 3. Prévu puis oublié
-
-### Rappel de consentement
-
-Identifié comme risque en phase 1, jamais implémenté. Enregistrer une réunion avec des
-tiers exige leur accord. Il manque un rappel visible au démarrage d'un enregistrement,
-et idéalement une mention dans le compte rendu publié.
-
-C'est le point le plus embarrassant de cette liste : c'est une obligation légale, pas
-un confort.
 
 ### Onboarding du téléchargement des modèles
 
@@ -111,6 +87,9 @@ Par ordre de probabilité de mauvaise surprise :
 | **Rendu Confluence des nouvelles sections** | `sprintWeather` et `fourL` ne sont validés que par tests unitaires. Une seule publication réelle a eu lieu et a été supprimée. |
 | **Détection en conditions réelles** | La primitive Core Audio est prouvée, la logique de décision testée, mais aucune vraie visioconférence n'a déclenché de proposition. |
 | **Changement de périphérique audio** | Brancher un casque en cours de réunion reconstruit le convertisseur et provoque une discontinuité, jamais mesurée. |
+| **Page Confluence supprimée** | Le repli `AtlassianError.pageNotFound` (voir `PublishService.resolveDestination`) n'a été exercé qu'en lecture de code, jamais contre une vraie page supprimée. |
+| **Rappel de consentement** | La bannière affichée pendant l'enregistrement (`MenuBarContent.consentReminder`) n'a jamais été vue par un participant réel ; son emplacement et sa formulation méritent un avis extérieur. |
+| **Édition des types fournis** | Les quatre types de base (`Daily`, `Synchro`, `Rétrospective`, `Générique`) sont désormais éditables directement (stockés comme surcharge dans `customTemplates`, réinitialisables). Jamais testé au-delà de la compilation et des tests unitaires existants — pas de nouveau test dédié à ce mécanisme de surcharge. |
 
 ---
 
@@ -150,14 +129,15 @@ La piste système regroupe tous les participants distants sous un seul libellé.
 viennent uniquement du calendrier, et c'est le modèle qui attribue les propos. Une vraie
 diarisation intra-piste améliorerait nettement les dailys et les rétrospectives.
 
+Ces cinq points ont en commun de ne pouvoir être tranchés que sur du matériel réel
+(vraies voix, vrai réseau, vrai accent) : aucune fixture écrite à la main ne les
+départagera. Ne pas les rouvrir tant qu'une vraie réunion n'a pas été enregistrée
+(voir section 4).
+
 ---
 
 ## 6. Dette et outillage
 
-- `Scripts/ship.sh --skip-tests` contourne la vérification la plus utile. La suite
-  tourne en 10 ms — aucune raison légitime de s'en servir aujourd'hui. À retirer.
-- Les spikes de phase 0 (`Spikes/SpikeTap`, `Spikes/SpikeSTT`) sont conservés comme
-  bancs d'essai mais ne sont plus exercés. À supprimer ou à intégrer aux tests.
 - Aucune intégration continue. Le dépôt est personnel, mais `ship.sh` fait déjà tout ce
   qu'il faudrait exécuter.
 - Pas de gestion de version ni de distribution : ni notarisation, ni mise à jour.
@@ -186,7 +166,7 @@ Ce qui ne vit **pas** dans le dépôt et devra être refait :
 | Identité de signature | Trousseau | Une identité de développement Apple suffit. `bundle-app.sh` prend automatiquement la première trouvée ; sinon `SMARTMEET_SIGN_IDENTITY="…"`. |
 | Jeton d'API Atlassian | Trousseau (`com.smartmeet.atlassian`) | Réglages › Atlassian. Repris de `ATLASSIAN_API_TOKEN` au premier lancement s'il est dans l'environnement. |
 | Espace, projet Jira, epic parent, page de sprint | `defaults` de `com.smartmeet.app` | Réglages › Atlassian. |
-| Types de réunion personnalisés | `defaults` | Réglages › Types de réunion. Les quatre types fournis sont dans le code. |
+| Types de réunion personnalisés, y compris surcharges des types fournis | `defaults` | Réglages › Types de réunion. Les quatre types fournis restent dans le code, mais une édition locale prime tant qu'elle existe (voir `AppSettings.upsert`/`remove`). |
 | Autorisations micro, capture audio, calendrier, notifications | TCC | Redemandées au premier lancement. **Le bundle doit être lancé par LaunchServices** (`open build/SmartMeet.app`), jamais depuis un terminal, sinon la capture audio système renvoie du silence sans erreur. |
 | Modèles de langue `SpeechTranscriber` | Système | Téléchargés au premier enregistrement. |
 | Réunions enregistrées | `~/Library/Application Support/SmartMeet/Meetings/` | Non versionnées. Copier le dossier si besoin. |
@@ -201,3 +181,4 @@ swift test                                   # 100 tests
 ./Scripts/bundle-app.sh && open build/SmartMeet.app
 open build/SmartMeet.app --args --check-notifications /tmp/rapport.txt
 ```
+

@@ -73,33 +73,5 @@ let package = Package(
             dependencies: ["Summarization", "Atlassian"],
             path: "Tests/SummarizationTests"
         ),
-
-        // Spikes de la phase 0, conservés comme bancs d'essai isolés.
-        .executableTarget(
-            name: "SpikeTap",
-            path: "Spikes/SpikeTap",
-            exclude: ["Info.plist", "SpikeTap.entitlements"],
-            linkerSettings: [
-                .unsafeFlags([
-                    "-Xlinker", "-sectcreate",
-                    "-Xlinker", "__TEXT",
-                    "-Xlinker", "__info_plist",
-                    "-Xlinker", "Spikes/SpikeTap/Info.plist",
-                ])
-            ]
-        ),
-        .executableTarget(
-            name: "SpikeSTT",
-            path: "Spikes/SpikeSTT",
-            exclude: ["Info.plist", "SpikeSTT.entitlements"],
-            linkerSettings: [
-                .unsafeFlags([
-                    "-Xlinker", "-sectcreate",
-                    "-Xlinker", "__TEXT",
-                    "-Xlinker", "__info_plist",
-                    "-Xlinker", "Spikes/SpikeSTT/Info.plist",
-                ])
-            ]
-        ),
     ]
 )
