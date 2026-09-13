@@ -19,6 +19,10 @@ struct MenuBarContent: View {
                 errorBanner(message)
             }
 
+            if session.isRecording {
+                consentReminder
+            }
+
             if !session.isRecording {
                 templatePicker
             }
@@ -170,8 +174,23 @@ struct MenuBarContent: View {
         .background(.red.opacity(0.10))
     }
 
-    private func calendarHint(_ meeting: CalendarMeeting) -> some View {
+    /// Rappel visible dès le début d'un enregistrement : enregistrer des tiers exige
+    /// leur accord. C'est une obligation légale, pas un confort — donc affiché en
+    /// permanence pendant l'enregistrement plutôt qu'une seule fois au démarrage.
+    private var consentReminder: some View {
         HStack(spacing: 8) {
+            Image(systemName: "person.2.wave.2").foregroundStyle(.blue)
+            Text("Assure-toi que les participants savent que la réunion est enregistrée.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(.blue.opacity(0.08))
+    }
+
+    private func calendarHint(_ meeting: CalendarMeeting) -> some View {        HStack(spacing: 8) {
             Image(systemName: meeting.hasVideoLink ? "video" : "calendar")
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 1) {
