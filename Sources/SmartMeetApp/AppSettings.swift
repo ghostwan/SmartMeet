@@ -1,5 +1,6 @@
 import Atlassian
 import Foundation
+import Notion
 import Observation
 import Summarization
 
@@ -26,11 +27,15 @@ public final class AppSettings {
         static let autoPublish = "autoPublish"
         static let autoCreateJiraIssues = "autoCreateJiraIssues"
         static let diarizeMicrophoneTrack = "diarizeMicrophoneTrack"
+        static let notion = "notionConfiguration"
+        static let disabledTemplateIDs = "disabledTemplateIDs"
     }
 
     private let defaults = UserDefaults.standard
     private let keychain = KeychainStore()
+    private let notionKeychain = KeychainStore(service: "com.smartmeet.notion")
     static let tokenAccount = "atlassian-api-token"
+    static let notionTokenAccount = "notion-integration-token"
 
     public var providerKind: SummaryProviderKind {
         didSet { defaults.set(providerKind.rawValue, forKey: Key.provider) }
@@ -120,6 +125,28 @@ public final class AppSettings {
         didSet { keychain.write(atlassianToken, account: Self.tokenAccount) }
     }
 
+    public var notion: NotionConfiguration {
+        didSet {
+            guard let data = try? JSONEncoder().encode(notion) else { return }
+            defaults.set(data, forKey: Key.notion)
+        }
+    }
+
+    /// Jeton d'intégration Notion : trousseau, jamais les préférences.
+    public var notionToken: String {
+        didSet { notionKeychain.write(notionToken, account: Self.notionTokenAccount) }
+    }
+
+    /// Types de réunion (fournis ou personnalisés) volontairement masqués de la
+    /// liste de sélection. Pas supprimés — juste absents de `allTemplates` — pour
+    /// rester réversible et ne rien casser dans l'historique des réunions déjà
+    /// enregistrées avec ce type.
+    public var disabledTemplateIDs: Set<String> {
+        didSet {
+            defaults.set(Array(disabledTemplateIDs), forKey: Key.disabledTemplateIDs)
+        }
+    }
+
     public init() {
         providerKind = SummaryProviderKind(
             rawValue: defaults.string(forKey: Key.provider) ?? ""
@@ -160,11 +187,26 @@ public final class AppSettings {
             atlassian = AtlassianConfiguration()
         }
 
+        if let data = defaults.data(forKey: Key.notion),
+           let decoded = try? JSONDecoder().decode(NotionConfiguration.self, from: data) {
+            notion = decoded
+        } else {
+            notion = NotionConfiguration()
+        }
+
+        disabledTemplateIDs = Set(defaults.stringArray(forKey: Key.disabledTemplateIDs) ?? [])
+
         let keychain = KeychainStore()
         keychain.seedFromEnvironmentIfNeeded(
             account: Self.tokenAccount, variable: "ATLASSIAN_API_TOKEN"
         )
         atlassianToken = keychain.read(account: Self.tokenAccount) ?? ""
+
+        let notionKeychain = KeychainStore(service: "com.smartmeet.notion")
+        notionKeychain.seedFromEnvironmentIfNeeded(
+            account: Self.notionTokenAccount, variable: "NOTION_API_TOKEN"
+        )
+        notionToken = notionKeychain.read(account: Self.notionTokenAccount) ?? ""
     }
 
     public var locale: Locale { Locale(identifier: localeIdentifier) }
@@ -184,6 +226,10 @@ public final class AppSettings {
         atlassian.isConfluenceReady && !atlassianToken.isEmpty
     }
 
+    public var canPublishToNotion: Bool {
+        notion.isConfigured && !notionToken.isEmpty
+    }
+
     /// Page de sprint courante, parent commun des réunions du sprint.
     public var sprintPage: SprintPage? {
         get { atlassian.sprintPage }
@@ -198,12 +244,40 @@ public final class AppSettings {
     /// Modèles fournis puis modèles personnalisés, dans l'ordre d'affichage. Un type
     /// fourni édité est représenté par sa version en vigueur (l'éventuelle
     /// surcharge dans `customTemplates`), pas la version d'origine codée en dur.
+    /// Les types masqués (`disabledTemplateIDs`) n'apparaissent pas ici : c'est la
+    /// liste proposée à la sélection, pas l'inventaire complet.
     public var allTemplates: [MeetingTemplate] {
         let effectiveBuiltIns = MeetingTemplate.builtIns.map { template(id: $0.id) }
         let trueCustoms = customTemplates.filter { custom in
             !MeetingTemplate.builtIns.contains { $0.id == custom.id }
         }
+        return (effectiveBuiltIns + trueCustoms).filter { !disabledTemplateIDs.contains($0.id) }
+    }
+
+    /// Tous les types, y compris masqués — pour l'écran de réglages qui doit
+    /// permettre de les réafficher.
+    public var allTemplatesIncludingDisabled: [MeetingTemplate] {
+        let effectiveBuiltIns = MeetingTemplate.builtIns.map { template(id: $0.id) }
+        let trueCustoms = customTemplates.filter { custom in
+            !MeetingTemplate.builtIns.contains { $0.id == custom.id }
+        }
         return effectiveBuiltIns + trueCustoms
+    }
+
+    public func isTemplateEnabled(_ template: MeetingTemplate) -> Bool {
+        !disabledTemplateIDs.contains(template.id)
+    }
+
+    /// Masque ou réaffiche un type dans la liste de sélection. Si le type masqué
+    /// était le type par défaut, on retombe sur le générique pour ne pas proposer un
+    /// type introuvable au prochain démarrage.
+    public func setTemplateEnabled(_ enabled: Bool, for template: MeetingTemplate) {
+        if enabled {
+            disabledTemplateIDs.remove(template.id)
+        } else {
+            disabledTemplateIDs.insert(template.id)
+            if defaultTemplateID == template.id { defaultTemplateID = MeetingTemplate.generic.id }
+        }
     }
 
     public func template(id: String?) -> MeetingTemplate {

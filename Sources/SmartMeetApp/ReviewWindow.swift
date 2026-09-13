@@ -544,6 +544,17 @@ struct ReviewWindow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
+            if case .published(let url) = session.notionPublishState, let pageURL = URL(string: url) {
+                Link("Publié sur Notion", destination: pageURL)
+                    .font(.callout)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if case .failed(let message) = session.notionPublishState {
+                Label("Notion : \(message)", systemImage: "xmark.octagon")
+                    .font(.caption).foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
             HStack(spacing: 8) {
                 // La destination effective dépend du type de réunion et de la page de
                 // sprint : on la montre avant de publier, pas après.
@@ -566,6 +577,21 @@ struct ReviewWindow: View {
                     )
                 }
                 Button("Enregistrer") { session.saveReviewedSummary(draft) }
+                if session.settings.canPublishToNotion {
+                    Button {
+                        session.saveReviewedSummary(draft)
+                        if let updated = session.reviewedMeeting {
+                            Task { await session.publishToNotion(updated) }
+                        }
+                    } label: {
+                        if case .running = session.notionPublishState {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Text("Publier sur Notion")
+                        }
+                    }
+                    .disabled({ if case .running = session.notionPublishState { true } else { false } }())
+                }
                 Button("Publier sur Confluence") {
                     session.saveReviewedSummary(draft)
                     if let updated = session.reviewedMeeting {

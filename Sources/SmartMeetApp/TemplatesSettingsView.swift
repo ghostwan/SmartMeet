@@ -34,13 +34,13 @@ struct TemplatesSettingsView: View {
                 Section("Fournis") {
                     ForEach(MeetingTemplate.builtIns) { builtIn in
                         let current = settings.template(id: builtIn.id)
-                        Label(current.name, systemImage: current.symbol).tag(builtIn.id)
+                        row(for: current)
                     }
                 }
                 if !settings.customTemplates.isEmpty {
                     Section("Personnalisés") {
                         ForEach(settings.customTemplates) { template in
-                            Label(template.name, systemImage: template.symbol).tag(template.id)
+                            row(for: template)
                         }
                     }
                 }
@@ -73,6 +73,15 @@ struct TemplatesSettingsView: View {
         .frame(minWidth: 170, maxWidth: 220)
     }
 
+    /// Un type masqué reste dans cette liste (pour pouvoir le réafficher) mais
+    /// disparaît de la liste de sélection proposée avant un enregistrement.
+    private func row(for template: MeetingTemplate) -> some View {
+        let enabled = settings.isTemplateEnabled(template)
+        return Label(template.name, systemImage: template.symbol)
+            .tag(template.id)
+            .opacity(enabled ? 1 : 0.4)
+    }
+
     private var detail: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -99,6 +108,17 @@ struct TemplatesSettingsView: View {
                         set: { settings.defaultTemplateID = $0 ? selected.id : MeetingTemplate.generic.id }
                     )
                 )
+
+                Toggle(
+                    "Afficher dans la liste des types",
+                    isOn: Binding(
+                        get: { settings.isTemplateEnabled(selected) },
+                        set: { settings.setTemplateEnabled($0, for: selected) }
+                    )
+                )
+                Text("Masqué, ce type reste ici (réactivable) mais n'apparaît plus dans le sélecteur avant un enregistrement.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             .padding()
         }

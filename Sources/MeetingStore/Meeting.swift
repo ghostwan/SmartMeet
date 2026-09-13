@@ -26,6 +26,8 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
     /// Renseignés après publication.
     public var confluencePageURL: String?
     public var jiraIssueKeys: [String]
+    /// Renseigné après publication sur Notion.
+    public var notionPageURL: String?
 
     public init(
         id: UUID = UUID(),
@@ -39,7 +41,8 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         outputLanguage: SummaryLanguage = .french,
         summary: MeetingSummary? = nil,
         confluencePageURL: String? = nil,
-        jiraIssueKeys: [String] = []
+        jiraIssueKeys: [String] = [],
+        notionPageURL: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -53,12 +56,13 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         self.summary = summary
         self.confluencePageURL = confluencePageURL
         self.jiraIssueKeys = jiraIssueKeys
+        self.notionPageURL = notionPageURL
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, title, startedAt, duration, locale, trackStartOffsets
         case knownAttendees, templateID, outputLanguage
-        case summary, confluencePageURL, jiraIssueKeys
+        case summary, confluencePageURL, jiraIssueKeys, notionPageURL
     }
 
     // Décodage tolérant : les réunions enregistrées avant l'ajout du compte rendu
@@ -82,6 +86,7 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         summary = try container.decodeIfPresent(MeetingSummary.self, forKey: .summary)
         confluencePageURL = try container.decodeIfPresent(String.self, forKey: .confluencePageURL)
         jiraIssueKeys = try container.decodeIfPresent([String].self, forKey: .jiraIssueKeys) ?? []
+        notionPageURL = try container.decodeIfPresent(String.self, forKey: .notionPageURL)
     }
 
     public var formattedDuration: String {
@@ -93,6 +98,7 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
     }
 
     public var isPublished: Bool { confluencePageURL != nil }
+    public var isPublishedToNotion: Bool { notionPageURL != nil }
     public var hasSummary: Bool { summary != nil }
 
     /// Utilisé par la recherche dans l'historique. `transcript` est optionnel et

@@ -1,5 +1,6 @@
 import Atlassian
 import Diarization
+import Notion
 import Summarization
 import SwiftUI
 
@@ -15,6 +16,10 @@ struct SettingsWindow: View {
     @State private var sprintPageInput: String = ""
     @State private var sprintStatus: String?
     @State private var isResolvingSprint = false
+    @State private var notionPageInput: String = ""
+    @State private var notionPageStatus: String?
+    @State private var notionVerifyStatus: String?
+    @State private var isVerifyingNotion = false
 
     var body: some View {
         TabView {
@@ -23,8 +28,9 @@ struct SettingsWindow: View {
             TemplatesSettingsView(settings: settings, session: session)
                 .tabItem { Label("Types de réunion", systemImage: "square.stack") }
             atlassianTab.tabItem { Label("Atlassian", systemImage: "cloud") }
+            notionTab.tabItem { Label("Notion", systemImage: "doc.text.image") }
         }
-        .frame(width: 620, height: 480)
+        .frame(width: 760, height: 480)
         .onAppear {
             vocabularyText = settings.vocabulary.joined(separator: ", ")
             knownPeopleText = settings.knownPeople.joined(separator: ", ")
@@ -205,6 +211,84 @@ struct SettingsWindow: View {
         }
         .formStyle(.grouped)
         .padding()
+    }
+
+    private var notionTab: some View {
+        Form {
+            Section("Intégration") {
+                SecureField("Jeton d'intégration", text: $settings.notionToken)
+                Text("Crée une intégration interne sur notion.so/my-integrations, copie son jeton ici, puis partage la page parente ci-dessous avec elle (••• sur la page → Connexions → ton intégration). Le jeton est conservé dans le trousseau, jamais dans les préférences.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Page parente") {
+                if settings.notion.isConfigured {
+                    HStack {
+                        Text(settings.notion.parentPageID).font(.callout).lineLimit(1)
+                        Spacer()
+                        Button("Retirer") {
+                            settings.notion = NotionConfiguration()
+                            notionPageStatus = nil
+                        }
+                    }
+                }
+
+                HStack {
+                    TextField(
+                        settings.notion.isConfigured ? "Changer de page" : "URL ou identifiant de la page",
+                        text: $notionPageInput
+                    )
+                    .onSubmit { applyNotionPage() }
+
+                    Button("Définir") { applyNotionPage() }
+                        .disabled(notionPageInput.isEmpty)
+                }
+
+                if let notionPageStatus {
+                    Text(notionPageStatus).font(.caption).foregroundStyle(.secondary)
+                }
+
+                Text("Colle l'URL de la page Notion sous laquelle créer les comptes rendus : chaque publication y ajoute une page enfant. La page doit être partagée avec l'intégration ci-dessus.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack {
+                Button(isVerifyingNotion ? "…" : "Tester la connexion") {
+                    Task { await verifyNotionAccess() }
+                }
+                .disabled(isVerifyingNotion || !settings.canPublishToNotion)
+                if let notionVerifyStatus {
+                    Text(notionVerifyStatus).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+
+    private func applyNotionPage() {
+        guard let id = NotionConfiguration.extractPageID(from: notionPageInput) else {
+            notionPageStatus = "❌ Identifiant ou URL de page non reconnu."
+            return
+        }
+        settings.notion.parentPageID = id
+        notionPageStatus = "✅ Page enregistrée."
+        notionPageInput = ""
+    }
+
+    private func verifyNotionAccess() async {
+        isVerifyingNotion = true
+        notionVerifyStatus = "Connexion…"
+        let client = NotionClient(configuration: settings.notion, token: settings.notionToken)
+        do {
+            try await client.verifyAccess()
+            notionVerifyStatus = "✅ Connexion réussie."
+        } catch {
+            notionVerifyStatus = "❌ \(error.localizedDescription)"
+        }
+        isVerifyingNotion = false
     }
 
     /// La page de sprint se fixe une fois en début de sprint ; tous les types de

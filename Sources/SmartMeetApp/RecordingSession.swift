@@ -3,6 +3,7 @@ import Atlassian
 import Diarization
 import Foundation
 import MeetingStore
+import Notion
 import Observation
 import SmartMeetCalendar
 import Summarization
@@ -35,6 +36,13 @@ public final class RecordingSession {
         case failed(String)
     }
 
+    public enum NotionPublishState: Equatable {
+        case none
+        case running
+        case published(url: String)
+        case failed(String)
+    }
+
     public private(set) var state: State = .idle
     public private(set) var segments: [TranscriptSegment] = []
     public private(set) var volatileText: [AudioTrack: String] = [:]
@@ -42,6 +50,7 @@ public final class RecordingSession {
 
     public private(set) var summaryState: SummaryState = .none
     public private(set) var publishState: PublishState = .none
+    public private(set) var notionPublishState: NotionPublishState = .none
     /// Réunion actuellement ouverte dans la fenêtre de relecture.
     public var reviewedMeeting: Meeting?
     public var detectedCalendarMeeting: CalendarMeeting?
@@ -546,6 +555,39 @@ public final class RecordingSession {
         case .creatingIssue(let index, let total): "Création du ticket \(index)/\(total)…"
         case .linkingIssues: "Mise à jour de la page avec les clés Jira…"
         case .done: "Terminé"
+        }
+    }
+
+    /// Publie le compte rendu (sections seules, pas le transcript) comme page
+    /// Notion, enfant de la page configurée dans les réglages.
+    public func publishToNotion(_ meeting: Meeting) async {
+        guard let summary = meeting.summary else {
+            notionPublishState = .failed("Aucun compte rendu à publier.")
+            return
+        }
+        guard settings.canPublishToNotion else {
+            notionPublishState = .failed("Configuration Notion incomplète (page parente, jeton).")
+            return
+        }
+
+        notionPublishState = .running
+        let client = NotionClient(configuration: settings.notion, token: settings.notionToken)
+        let template = settings.template(id: meeting.templateID)
+        let title = template.pageTitle(
+            summaryTitle: summary.title, date: meeting.startedAt, language: meeting.outputLanguage
+        )
+        let markdown = summary.markdown(template: template, language: meeting.outputLanguage)
+
+        do {
+            let page = try await client.createPage(title: title, markdown: markdown)
+            var updated = meeting
+            updated.notionPageURL = page.url?.absoluteString
+            try? store.update(updated, customTemplates: settings.customTemplates)
+            meetings = store.loadAll()
+            reviewedMeeting = updated
+            notionPublishState = .published(url: page.url?.absoluteString ?? "")
+        } catch {
+            notionPublishState = .failed(error.localizedDescription)
         }
     }
 

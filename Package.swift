@@ -42,6 +42,9 @@ let package = Package(
             path: "Sources/Atlassian"
         ),
 
+        // Publication Notion (page enfant d'une page déjà partagée avec l'intégration).
+        .target(name: "Notion", path: "Sources/Notion"),
+
         // Détection de la réunion en cours : calendrier et applications de visio.
         .target(
             name: "SmartMeetCalendar",
@@ -54,7 +57,7 @@ let package = Package(
             name: "SmartMeet",
             dependencies: [
                 "AudioCapture", "Transcription", "MeetingStore",
-                "Summarization", "Atlassian", "SmartMeetCalendar", "Diarization",
+                "Summarization", "Atlassian", "SmartMeetCalendar", "Diarization", "Notion",
             ],
             path: "Sources/SmartMeetApp",
             exclude: ["Info.plist", "SmartMeet.entitlements"],
@@ -87,6 +90,11 @@ let package = Package(
             name: "SummarizationTests",
             dependencies: ["Summarization", "Atlassian"],
             path: "Tests/SummarizationTests"
+        ),
+        .testTarget(
+            name: "NotionTests",
+            dependencies: ["Notion"],
+            path: "Tests/NotionTests"
         ),
     ]
 )
