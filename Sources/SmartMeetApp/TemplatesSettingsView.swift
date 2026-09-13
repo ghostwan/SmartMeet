@@ -2,8 +2,10 @@ import Atlassian
 import Summarization
 import SwiftUI
 
-/// Éditeur des types de réunion. Les modèles fournis sont en lecture seule et se
-/// dupliquent ; les modèles personnalisés se modifient librement.
+/// Éditeur des types de réunion. Les modèles fournis restent toujours proposés mais
+/// peuvent être édités : l'édition est stockée comme une surcharge, réinitialisable
+/// via le bouton ↺. Les modèles personnalisés se modifient et se suppriment
+/// librement.
 struct TemplatesSettingsView: View {
     @Bindable var settings: AppSettings
     @Bindable var session: RecordingSession
@@ -11,6 +13,12 @@ struct TemplatesSettingsView: View {
 
     private var selected: MeetingTemplate {
         settings.template(id: selectedID)
+    }
+
+    /// Vrai si le type fourni sélectionné a été édité (surcharge stockée dans les
+    /// types personnalisés, sous le même identifiant).
+    private var hasOverride: Bool {
+        settings.customTemplates.contains { $0.id == selectedID }
     }
 
     var body: some View {
@@ -24,8 +32,9 @@ struct TemplatesSettingsView: View {
         VStack(spacing: 0) {
             List(selection: $selectedID) {
                 Section("Fournis") {
-                    ForEach(MeetingTemplate.builtIns) { template in
-                        Label(template.name, systemImage: template.symbol).tag(template.id)
+                    ForEach(MeetingTemplate.builtIns) { builtIn in
+                        let current = settings.template(id: builtIn.id)
+                        Label(current.name, systemImage: current.symbol).tag(builtIn.id)
                     }
                 }
                 if !settings.customTemplates.isEmpty {
@@ -51,10 +60,10 @@ struct TemplatesSettingsView: View {
                     settings.remove(selected)
                     selectedID = MeetingTemplate.generic.id
                 } label: {
-                    Image(systemName: "minus")
+                    Image(systemName: selected.isBuiltIn ? "arrow.uturn.backward" : "minus")
                 }
-                .disabled(selected.isBuiltIn)
-                .help("Supprimer")
+                .disabled(selected.isBuiltIn && !hasOverride)
+                .help(selected.isBuiltIn ? "Réinitialiser au modèle d'origine" : "Supprimer")
 
                 Spacer()
             }
@@ -69,8 +78,9 @@ struct TemplatesSettingsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 if selected.isBuiltIn {
                     Label(
-                        "Type fourni, non modifiable. Duplique-le pour l'adapter.",
-                        systemImage: "lock"
+                        "Type fourni, modifiable : le bouton ↺ efface tes changements et "
+                            + "revient à la version d'origine.",
+                        systemImage: "pencil"
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -91,9 +101,6 @@ struct TemplatesSettingsView: View {
                 )
             }
             .padding()
-            .disabled(selected.isBuiltIn)
-            // Les modèles fournis restent lisibles malgré `disabled`.
-            .opacity(selected.isBuiltIn ? 0.75 : 1)
         }
         .frame(minWidth: 330)
     }

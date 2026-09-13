@@ -351,8 +351,11 @@ public extension MeetingTemplate {
     static let builtIns: [MeetingTemplate] = [generic, daily, synchro, retrospective]
 
     /// Retrouve un modèle par identifiant, avec repli sur le modèle générique.
+    /// Un modèle personnalisé prime sur un modèle fourni de même identifiant : c'est
+    /// ainsi qu'une édition d'un type fourni (voir `AppSettings.upsert`) est prise en
+    /// compte plutôt que la version d'origine codée en dur.
     static func resolve(id: String?, in custom: [MeetingTemplate]) -> MeetingTemplate {
         guard let id else { return .generic }
-        return (builtIns + custom).first { $0.id == id } ?? .generic
+        return custom.first { $0.id == id } ?? builtIns.first { $0.id == id } ?? .generic
     }
 }

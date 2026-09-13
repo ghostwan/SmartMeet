@@ -171,16 +171,23 @@ public final class AppSettings {
         allTemplates.contains { $0.parent.isSprintPage }
     }
 
-    /// Modèles fournis puis modèles personnalisés, dans l'ordre d'affichage.
+    /// Modèles fournis puis modèles personnalisés, dans l'ordre d'affichage. Un type
+    /// fourni édité est représenté par sa version en vigueur (l'éventuelle
+    /// surcharge dans `customTemplates`), pas la version d'origine codée en dur.
     public var allTemplates: [MeetingTemplate] {
-        MeetingTemplate.builtIns + customTemplates
+        let effectiveBuiltIns = MeetingTemplate.builtIns.map { template(id: $0.id) }
+        let trueCustoms = customTemplates.filter { custom in
+            !MeetingTemplate.builtIns.contains { $0.id == custom.id }
+        }
+        return effectiveBuiltIns + trueCustoms
     }
 
     public func template(id: String?) -> MeetingTemplate {
         MeetingTemplate.resolve(id: id, in: customTemplates)
     }
 
-    /// Duplique un modèle fourni pour le rendre modifiable.
+    /// Duplique un modèle pour créer une variante indépendante, avec un nouvel
+    /// identifiant.
     public func duplicate(_ template: MeetingTemplate) -> MeetingTemplate {
         var copy = template
         copy.id = UUID().uuidString
@@ -190,8 +197,9 @@ public final class AppSettings {
         return copy
     }
 
+    /// Enregistre un modèle, qu'il soit personnalisé ou une édition d'un type fourni :
+    /// dans les deux cas c'est une surcharge stockée par identifiant.
     public func upsert(_ template: MeetingTemplate) {
-        guard !template.isBuiltIn else { return }
         if let index = customTemplates.firstIndex(where: { $0.id == template.id }) {
             customTemplates[index] = template
         } else {
@@ -199,8 +207,9 @@ public final class AppSettings {
         }
     }
 
+    /// Pour un type personnalisé, suppression définitive. Pour un type fourni édité,
+    /// retire la surcharge et fait donc revenir à la version d'origine.
     public func remove(_ template: MeetingTemplate) {
-        guard !template.isBuiltIn else { return }
         customTemplates.removeAll { $0.id == template.id }
         if defaultTemplateID == template.id { defaultTemplateID = MeetingTemplate.generic.id }
     }
