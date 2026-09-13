@@ -38,8 +38,8 @@ open build/SmartMeet.app --args --check-notifications /tmp/rapport.txt
 
 **Point d'attention pour la suite** : le script de rebuild habituel de ce projet
 utilise `codesign --sign -` (ad-hoc). Si les notifications recommencent à échouer,
-vérifier en premier que le build a bien été signé avec l'identité `Apple
-Development: votre-email@exemple.com (3FCL3V4MNF)` et pas en ad-hoc.
+vérifier en premier que le build a bien été signé avec une identité stable (`Apple
+Development: <ton adresse Apple ID> (<TEAMID>)`) et pas en ad-hoc.
 
 ---
 
