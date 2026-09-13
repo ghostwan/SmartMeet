@@ -1,55 +1,44 @@
 import Foundation
 
-/// Regroupe des points en 2 classes (k-means, k fixé), avec un score de séparation
-/// permettant de refuser la scission quand elle n'est pas justifiée.
+/// Regroupe des points en `k` classes (k-means), avec un score de silhouette
+/// permettant de comparer différentes valeurs de `k` entre elles et de refuser la
+/// scission quand elle n'est pas justifiée.
 ///
-/// Fixer k=2 est une limite assumée du premier jet : il suppose au plus deux
-/// locuteurs sur la piste micro. Une réunion à trois personnes autour d'un micro
-/// serait mal servie (l'un des deux groupes mélangerait deux voix). Voir le README
-/// du module pour la suite envisagée.
+/// Le score de silhouette (Rousseeuw, 1987) est le choix standard ici précisément
+/// parce qu'il reste comparable d'un `k` à l'autre — contrairement à un simple
+/// rapport distance inter/intra-cluster, dont l'échelle dépend du nombre de
+/// classes. C'est ce qui permet à `MicrophoneDiarizer` d'essayer plusieurs `k` et de
+/// garder le meilleur, plutôt que de figer arbitrairement un nombre de locuteurs.
 enum SpeakerClusterer {
     struct Result {
-        /// Index de cluster (0 ou 1) pour chaque point, dans l'ordre d'entrée.
+        /// Index de cluster pour chaque point, dans l'ordre d'entrée.
         let assignments: [Int]
-        /// Rapport distance inter-clusters / dispersion intra-cluster. Plus c'est
-        /// grand, plus la scission est franche.
-        let separationScore: Double
+        let clusterCount: Int
+        /// Moyenne des scores de silhouette par point, dans `[-1, 1]`. Proche de 1 :
+        /// classes nettement séparées. Proche de 0 ou négatif : la scission n'est
+        /// pas justifiée par les données.
+        let silhouetteScore: Double
     }
 
-    /// - Parameter points: vecteurs déjà normalisés (voir `normalize`).
-    static func cluster(points: [[Double]]) -> Result? {
-        guard points.count >= 2, let dimensions = points.first?.count, dimensions > 0 else {
-            return nil
-        }
+    /// - Parameters:
+    ///   - points: vecteurs déjà normalisés (voir `normalize`).
+    ///   - k: nombre de classes à former.
+    static func cluster(points: [[Double]], k: Int) -> Result? {
+        guard k >= 2, points.count >= k, let dimensions = points.first?.count, dimensions > 0
+        else { return nil }
 
-        // Initialisation déterministe : les deux points les plus éloignés l'un de
-        // l'autre, pour ne pas dépendre d'un tirage aléatoire (reproductible en test).
-        var farthestPair = (0, 1)
-        var farthestDistance = -1.0
-        for i in 0..<points.count {
-            for j in (i + 1)..<points.count {
-                let distance = squaredDistance(points[i], points[j])
-                if distance > farthestDistance {
-                    farthestDistance = distance
-                    farthestPair = (i, j)
-                }
-            }
-        }
-
-        var centroids = [points[farthestPair.0], points[farthestPair.1]]
+        var centroids = farthestFirstCentroids(points: points, k: k)
         var assignments = [Int](repeating: 0, count: points.count)
 
         for _ in 0..<10 {
             var changed = false
             for (index, point) in points.enumerated() {
-                let d0 = squaredDistance(point, centroids[0])
-                let d1 = squaredDistance(point, centroids[1])
-                let assignment = d0 <= d1 ? 0 : 1
+                let assignment = nearestCentroid(point, among: centroids)
                 if assignments[index] != assignment { changed = true }
                 assignments[index] = assignment
             }
 
-            for cluster in 0...1 {
+            for cluster in 0..<k {
                 let members = points.indices.filter { assignments[$0] == cluster }
                 guard !members.isEmpty else { continue }
                 centroids[cluster] = average(members.map { points[$0] })
@@ -57,19 +46,77 @@ enum SpeakerClusterer {
             if !changed { break }
         }
 
-        // Sans les deux classes effectivement peuplées, il n'y a rien à séparer.
-        guard assignments.contains(0), assignments.contains(1) else { return nil }
+        // Un cluster vide signale un `k` trop grand pour ces données : pas de
+        // résultat exploitable plutôt qu'une classe fantôme.
+        guard Set(assignments).count == k else { return nil }
 
-        let interClusterDistance = squaredDistance(centroids[0], centroids[1]).squareRoot()
-        let intraClusterSpread = (0...1).map { cluster -> Double in
-            let members = points.indices.filter { assignments[$0] == cluster }
-            let distances = members.map { squaredDistance(points[$0], centroids[cluster]).squareRoot() }
-            return distances.reduce(0, +) / Double(max(distances.count, 1))
+        let silhouette = silhouetteScore(points: points, assignments: assignments, k: k)
+        return Result(assignments: assignments, clusterCount: k, silhouetteScore: silhouette)
+    }
+
+    /// Initialisation déterministe (« farthest-first ») : le premier centroïde est le
+    /// point le plus excentré, les suivants maximisent la distance minimale aux
+    /// centroïdes déjà choisis. Reproductible, contrairement à un tirage aléatoire.
+    private static func farthestFirstCentroids(points: [[Double]], k: Int) -> [[Double]] {
+        var centroids = [points[0]]
+        while centroids.count < k {
+            var farthestPoint = points[0]
+            var farthestDistance = -1.0
+            for point in points {
+                let nearest = centroids.map { squaredDistance(point, $0) }.min() ?? 0
+                if nearest > farthestDistance {
+                    farthestDistance = nearest
+                    farthestPoint = point
+                }
+            }
+            centroids.append(farthestPoint)
         }
-        let averageSpread = (intraClusterSpread[0] + intraClusterSpread[1]) / 2
-        let separationScore = averageSpread > 0.0001 ? interClusterDistance / averageSpread : 0
+        return centroids
+    }
 
-        return Result(assignments: assignments, separationScore: separationScore)
+    private static func nearestCentroid(_ point: [Double], among centroids: [[Double]]) -> Int {
+        var best = 0
+        var bestDistance = Double.infinity
+        for (index, centroid) in centroids.enumerated() {
+            let distance = squaredDistance(point, centroid)
+            if distance < bestDistance {
+                bestDistance = distance
+                best = index
+            }
+        }
+        return best
+    }
+
+    private static func silhouetteScore(points: [[Double]], assignments: [Int], k: Int) -> Double {
+        guard points.count > k else { return 0 }
+        let distances = points.map { point in points.map { squaredDistance(point, $0).squareRoot() } }
+
+        var scores: [Double] = []
+        for i in points.indices {
+            let ownCluster = assignments[i]
+            let sameCluster = points.indices.filter { $0 != i && assignments[$0] == ownCluster }
+            guard !sameCluster.isEmpty else {
+                scores.append(0)
+                continue
+            }
+            let a = sameCluster.map { distances[i][$0] }.reduce(0, +) / Double(sameCluster.count)
+
+            let b = (0..<k)
+                .filter { $0 != ownCluster }
+                .compactMap { other -> Double? in
+                    let members = points.indices.filter { assignments[$0] == other }
+                    guard !members.isEmpty else { return nil }
+                    return members.map { distances[i][$0] }.reduce(0, +) / Double(members.count)
+                }
+                .min()
+
+            guard let b else {
+                scores.append(0)
+                continue
+            }
+            scores.append((b - a) / max(a, b))
+        }
+        return scores.reduce(0, +) / Double(scores.count)
     }
 
     /// Centre-réduit chaque dimension sur l'ensemble des points, pour que la hauteur

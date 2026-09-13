@@ -1,4 +1,5 @@
 import Atlassian
+import Diarization
 import Summarization
 import SwiftUI
 
@@ -117,10 +118,10 @@ struct SettingsWindow: View {
 
             Section("Diarisation (expérimental)") {
                 Toggle(
-                    "Distinguer deux voix sur le micro (réunion en présentiel)",
+                    "Distinguer les voix sur le micro (réunion en présentiel)",
                     isOn: $settings.diarizeMicrophoneTrack
                 )
-                Text("Pour une réunion où plusieurs personnes parlent dans le même micro. Basé sur la hauteur et le timbre de la voix, pas sur un modèle de reconnaissance vocale : fonctionne surtout quand les deux voix sont nettement différentes, et se limite à deux locuteurs sur la piste micro. Une seule voix n'est pas scindée à tort si la séparation n'est pas nette.")
+                Text("Pour une réunion où plusieurs personnes parlent dans le même micro. Basé sur la hauteur et le timbre de la voix, pas sur un modèle de reconnaissance vocale : fonctionne surtout quand les voix sont nettement différentes, et jusqu'à \(MicrophoneDiarizer.defaultMaxSpeakers) locuteurs. Une seule voix n'est pas scindée à tort si la séparation n'est pas nette.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

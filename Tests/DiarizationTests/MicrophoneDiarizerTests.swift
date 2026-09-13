@@ -74,6 +74,29 @@ struct MicrophoneDiarizerTests {
         #expect(lowLabels != highLabels)
     }
 
+    @Test("Trois tons nettement différents sont séparés en trois locuteurs")
+    func splitsThreeDistinctVoices() throws {
+        let segmentDuration = 0.6
+        // Trois hauteurs bien espacées, comme trois personnes qui se relaient.
+        let frequencies = [100.0, 180.0, 300.0, 100.0, 180.0, 300.0, 100.0, 180.0, 300.0]
+        let url = try writeAudio(segmentDuration: segmentDuration, frequencies: frequencies)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let segs = segments(count: frequencies.count, segmentDuration: segmentDuration)
+        let mapping = try MicrophoneDiarizer.diarize(
+            segments: segs, audioFileURL: url, fileTimeOffset: 0
+        )
+
+        let labels = try #require(mapping)
+        let distinctLabels = Set(labels.values)
+        #expect(distinctLabels.count == 3)
+        // Chaque hauteur doit se retrouver seule dans son groupe.
+        for group in [[0, 3, 6], [1, 4, 7], [2, 5, 8]] {
+            let groupLabels = Set(group.map { labels[segs[$0].id] })
+            #expect(groupLabels.count == 1)
+        }
+    }
+
     @Test("Une seule voix ne se scinde pas artificiellement")
     func doesNotSplitSingleVoice() throws {
         let segmentDuration = 0.6
@@ -110,12 +133,25 @@ struct SpeakerClustererTests {
             [100, 500], [105, 520], [98, 490],
             [300, 1500], [310, 1520], [295, 1480],
         ])
-        let result = try #require(SpeakerClusterer.cluster(points: points))
+        let result = try #require(SpeakerClusterer.cluster(points: points, k: 2))
         let groupA = Set([0, 1, 2].map { result.assignments[$0] })
         let groupB = Set([3, 4, 5].map { result.assignments[$0] })
         #expect(groupA.count == 1)
         #expect(groupB.count == 1)
         #expect(groupA != groupB)
-        #expect(result.separationScore > 1.4)
+        #expect(result.silhouetteScore > 0.45)
+    }
+
+    @Test("k=3 sépare trois groupes nettement distincts")
+    func separatesThreeGroups() throws {
+        let points = SpeakerClusterer.normalize([
+            [100, 500], [105, 520], [98, 490],
+            [300, 1500], [310, 1520], [295, 1480],
+            [600, 3000], [610, 3020], [595, 2980],
+        ])
+        let result = try #require(SpeakerClusterer.cluster(points: points, k: 3))
+        #expect(result.clusterCount == 3)
+        #expect(Set(result.assignments).count == 3)
+        #expect(result.silhouetteScore > 0.45)
     }
 }
