@@ -18,9 +18,15 @@ import UserNotifications
 ///
 /// Fait notable : un bundle minimal, **sans `LSUIElement` et en politique
 /// d'activation `.regular`**, lancé depuis `/Applications`, obtient l'autorisation.
-/// Deux pistes restent donc à départager :
+/// Deux pistes ont été identifiées :
 /// 1. le mode agent (`LSUIElement`) empêcherait l'enregistrement auprès de
-///    `usernoted` ;
+///    `usernoted` — **testé** : `MeetingNotifier.prepare()` bascule désormais en
+///    `.regular` pour la seule durée de `requestAuthorization`, avant de revenir en
+///    `.accessory`. Sur une machine sans identité de signature stable (signature
+///    ad-hoc, qui change à chaque build), le refus persiste malgré tout — donc soit
+///    l'hypothèse est fausse, soit la signature instable invalide toute mémorisation
+///    d'autorisation avant même de poser la question. À revérifier sur la machine
+///    de développement avec une identité stable ;
 /// 2. le premier refus pour `com.smartmeet.app` est mémorisé et colle au bundle,
 ///    auquel cas il faut réinitialiser l'état ou changer d'identifiant pour tester.
 ///

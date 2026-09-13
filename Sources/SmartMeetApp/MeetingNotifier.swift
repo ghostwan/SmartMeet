@@ -89,6 +89,18 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
         ])
 
         do {
+            // Piste non tranchée du TODO : en mode agent (`LSUIElement`/`.accessory`),
+            // `usernoted` refuserait l'enregistrement de l'application auprès du centre
+            // de notifications. On bascule temporairement en `.regular` pour la seule
+            // durée de la demande d'autorisation, avant de revenir en `.accessory` — ce
+            // sera visible un court instant dans le Dock. Si l'échec persiste malgré
+            // cela, la seconde piste (premier refus mémorisé par le bundle identifier)
+            // reste à tester en changeant `CFBundleIdentifier`.
+            let application = NSApplication.shared
+            let previousPolicy = application.activationPolicy()
+            application.setActivationPolicy(.regular)
+            defer { application.setActivationPolicy(previousPolicy) }
+
             isAuthorized = try await center.requestAuthorization(options: [.alert, .sound])
             authorizationError = nil
         } catch {
