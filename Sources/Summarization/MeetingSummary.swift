@@ -334,6 +334,102 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
         }
     }
 
+    /// Nature du ticket qu'un action item deviendra dans Jira.
+    ///
+    /// Le modèle la propose à partir du contenu du compte rendu ; elle reste
+    /// modifiable dans la fenêtre de relecture avant publication.
+    public enum IssueType: String, Codable, Sendable, CaseIterable, Identifiable {
+        case bug
+        case task
+        case story
+        case epic
+        case initiative
+        case risk
+
+        public var id: String { rawValue }
+
+        public var symbol: String {
+            switch self {
+            case .bug: "ladybug.fill"
+            case .task: "checkmark.circle"
+            case .story: "book.closed"
+            case .epic: "flag.fill"
+            case .initiative: "target"
+            case .risk: "exclamationmark.triangle.fill"
+            }
+        }
+
+        public func displayName(in language: SummaryLanguage) -> String {
+            switch self {
+            case .bug: language.pick(fr: "Bug", en: "Bug")
+            case .task: language.pick(fr: "Tâche", en: "Task")
+            case .story: language.pick(fr: "Story", en: "Story")
+            case .epic: language.pick(fr: "Epic", en: "Epic")
+            case .initiative: language.pick(fr: "Initiative", en: "Initiative")
+            case .risk: language.pick(fr: "Risque", en: "Risk")
+            }
+        }
+
+        /// Nom du type d'issue Jira correspondant, tel qu'attendu par l'API.
+        /// Les projets Jira n'ont pas tous un type « Risk » : reste modifiable dans
+        /// les réglages ou directement dans la fenêtre de relecture si le projet
+        /// cible utilise un autre vocabulaire.
+        public var defaultJiraIssueTypeName: String {
+            switch self {
+            case .bug: "Bug"
+            case .task: "Task"
+            case .story: "Story"
+            case .epic: "Epic"
+            case .initiative: "Initiative"
+            case .risk: "Risk"
+            }
+        }
+
+        /// Reconnaît une valeur libre renvoyée par le modèle, en français ou en
+        /// anglais, avec quelques variantes orthographiques courantes.
+        public static func parse(_ raw: String?) -> IssueType? {
+            guard let normalized = raw?
+                .lowercased()
+                .folding(options: .diacriticInsensitive, locale: nil)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            else { return nil }
+            switch normalized {
+            case "bug", "anomalie", "defaut", "défaut": return .bug
+            case "task", "tache", "tâche": return .task
+            case "story", "histoire", "user story": return .story
+            case "epic", "epopee", "épopée": return .epic
+            case "initiative": return .initiative
+            case "risk", "risque": return .risk
+            default: return nil
+            }
+        }
+
+        /// Classement de repli quand le modèle omet `issueType` ou renvoie une
+        /// valeur non reconnue : quelques mots-clés suffisent à orienter les cas
+        /// les plus fréquents, un `task` générique couvre le reste.
+        public static func detect(from description: String) -> IssueType {
+            let text = description
+                .lowercased()
+                .folding(options: .diacriticInsensitive, locale: nil)
+
+            let bugWords = [
+                "bug", "erreur", "crash", "plante", "casse", "cassé", "ne fonctionne pas",
+                "ne marche pas", "regression", "défaut", "defaut", "anomalie",
+            ]
+            let riskWords = ["risque", "risk", "menace", "danger"]
+            let epicWords = ["epic", "chantier", "gros chantier"]
+            let initiativeWords = ["initiative", "programme", "objectif strategique", "objectif stratégique"]
+            let storyWords = ["story", "user story", "fonctionnalite", "fonctionnalité", "feature"]
+
+            if bugWords.contains(where: text.contains) { return .bug }
+            if riskWords.contains(where: text.contains) { return .risk }
+            if epicWords.contains(where: text.contains) { return .epic }
+            if initiativeWords.contains(where: text.contains) { return .initiative }
+            if storyWords.contains(where: text.contains) { return .story }
+            return .task
+        }
+    }
+
     public struct ActionItem: Codable, Sendable, Equatable, Identifiable {
         public var id: UUID
         public var owner: String?
@@ -341,6 +437,9 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
         public var dueDate: String?
         /// Coché dans la fenêtre de relecture : seuls ces items deviennent des tickets.
         public var isSelected: Bool
+        /// Nature du ticket à créer, proposée par le modèle et modifiable avant
+        /// publication.
+        public var issueType: IssueType
         /// Renseigné après publication.
         public var jiraKey: String?
 
@@ -350,6 +449,7 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
             description: String,
             dueDate: String? = nil,
             isSelected: Bool = true,
+            issueType: IssueType = .task,
             jiraKey: String? = nil
         ) {
             self.id = id
@@ -357,11 +457,12 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
             self.description = description
             self.dueDate = dueDate
             self.isSelected = isSelected
+            self.issueType = issueType
             self.jiraKey = jiraKey
         }
 
         private enum CodingKeys: String, CodingKey {
-            case owner, description, dueDate, isSelected, jiraKey
+            case owner, description, dueDate, isSelected, issueType, jiraKey
         }
 
         public init(from decoder: any Decoder) throws {
@@ -371,6 +472,8 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
             description = try container.decodeIfPresent(String.self, forKey: .description) ?? ""
             dueDate = try container.decodeIfPresent(String.self, forKey: .dueDate)
             isSelected = try container.decodeIfPresent(Bool.self, forKey: .isSelected) ?? true
+            let rawIssueType = try container.decodeIfPresent(String.self, forKey: .issueType)
+            issueType = IssueType.parse(rawIssueType) ?? IssueType.detect(from: description)
             jiraKey = try container.decodeIfPresent(String.self, forKey: .jiraKey)
         }
     }
@@ -511,7 +614,8 @@ public extension MeetingSummary {
                     let owner = item.owner.map { "**\($0)** — " } ?? ""
                     let due = item.dueDate.map { " _(échéance \($0))_" } ?? ""
                     let key = item.jiraKey.map { " [\($0)]" } ?? ""
-                    output += "- \(owner)\(item.description)\(due)\(key)\n"
+                    let type = "_[\(item.issueType.displayName(in: language))]_ "
+                    output += "- \(type)\(owner)\(item.description)\(due)\(key)\n"
                 }
                 output += "\n"
 

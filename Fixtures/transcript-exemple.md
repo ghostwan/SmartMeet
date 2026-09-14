@@ -1,36 +1,37 @@
-# Transcript — Réunion hebdo Home + Security
-Date : 11/09/2026 — Durée : 32 min
+# Transcript — Home + Security weekly meeting
+Date: 09/11/2026 — Duration: 32 min
 
-**[00:00] Moi :** Bonjour à tous. On a trois sujets aujourd'hui : la migration Crowdin, le retard sur l'API de la caméra intérieure, et la préparation de la bêta iOS.
+**[00:00] Moi:** Hi everyone. We have three topics today: the Crowdin migration, the delay on the indoor camera API, and the iOS beta preparation.
 
-**[00:18] Participants :** Salut Alex. Sur Crowdin, j'ai terminé l'intégration de l'API côté build. Il reste la validation des traductions allemandes et italiennes, c'est Sandra qui doit passer dessus.
+**[00:18] Participants:** Hey Alex. On Crowdin, I've finished the API integration on the build side. What's left is validating the German and Italian translations, Sandra needs to pick that up.
 
-**[00:41] Moi :** Sandra, tu penses pouvoir boucler ça pour vendredi ?
+**[00:41] Moi:** Sandra, do you think you can wrap that up by Friday?
 
-**[00:47] Participants :** Vendredi c'est trop juste, j'ai une revue de specs client en parallèle. Je peux m'engager sur mardi prochain si personne ne rajoute de clés d'ici là.
+**[00:47] Participants:** Friday's too tight, I have a client spec review in parallel. I can commit to next Tuesday if nobody adds new keys before then.
 
-**[01:05] Moi :** OK, on gèle les nouvelles clés Crowdin jusqu'à mardi alors. Je préviens l'équipe produit.
+**[01:05] Moi:** OK, we freeze new Crowdin keys until Tuesday then. I'll tell the product team.
 
-**[01:20] Participants :** Sur l'API caméra, on a deux semaines de retard. Le firmware ne renvoie pas les événements de détection de mouvement dans le bon format, l'équipe embarquée dit que c'est un problème de sérialisation protobuf.
+**[01:20] Participants:** On the camera API, we're two weeks behind. The firmware isn't returning motion detection events in the right format, the embedded team says it's a protobuf serialization issue.
 
-**[01:48] Moi :** Deux semaines, ça impacte la bêta ?
+**[01:48] Moi:** Two weeks, does that impact the beta?
 
-**[01:52] Participants :** Oui. Si on ne débloque pas avant le 25, la bêta iOS glisse d'un sprint. Martin propose un contournement côté cloud : on normalise le payload dans le gateway plutôt que d'attendre le fix firmware.
+**[01:52] Participants:** Yes. If we don't unblock it before the 25th, the iOS beta slips by a sprint. Martin is proposing a cloud-side workaround: we normalize the payload in the gateway instead of waiting for the firmware fix.
 
-**[02:20] Moi :** Le contournement, c'est combien de jours ?
+**[02:20] Moi:** The workaround, how many days is that?
 
-**[02:24] Participants :** Trois jours de dev, plus un jour de tests. Mais ça crée de la dette : il faudra le retirer quand le firmware sera corrigé.
+**[02:24] Participants:** Three days of dev, plus a day of testing. But it creates debt: we'll need to remove it once the firmware is fixed.
 
-**[02:40] Moi :** On y va. C'est mieux qu'un sprint de retard. Martin, tu ouvres un ticket pour le contournement et un autre pour le retrait de la dette, qu'on ne l'oublie pas.
+**[02:40] Moi:** Let's go with it. It's better than a sprint of delay. Martin, open a ticket for the workaround and another one for removing the debt, so we don't forget it.
 
-**[02:58] Participants :** Noté. Je les crée aujourd'hui.
+**[02:58] Participants:** Noted. I'll create them today.
 
-**[03:05] Moi :** Dernier point, la bêta iOS. On en est où sur le recrutement des testeurs ?
+**[03:05] Moi:** Last point, the iOS beta. Where are we on tester recruitment?
 
-**[03:14] Participants :** 340 inscrits sur les 500 visés. Le recrutement via la newsletter a mieux marché que prévu. On peut ouvrir à d'autres pays si besoin.
+**[03:14] Participants:** 340 signed up out of the 500 we're targeting. Recruitment through the newsletter worked better than expected. We can open it up to other countries if needed.
 
-**[03:32] Moi :** Ouvre l'Allemagne et l'Espagne. On décide du go/no-go bêta au comité du 18.
+**[03:32] Moi:** Open it up to Germany and Spain. We'll decide on the beta go/no-go at the committee on the 18th.
 
-**[03:45] Participants :** Une question : est-ce qu'on communique sur le retard caméra aux testeurs ?
+**[03:45] Participants:** One question: do we communicate the camera delay to testers?
 
-**[03:52] Moi :** Non, pas tant que le contournement n'est pas validé en test. On réévalue le 18.
+**[03:52] Moi:** No, not until the workaround is validated in testing. We'll re-assess on the 18th.
+</content>

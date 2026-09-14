@@ -31,6 +31,8 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
     /// Consommation cumulée de tokens pour la génération du compte rendu (tous
     /// appels confondus : découpage éventuel + réparations de JSON invalide).
     public var tokenUsage: TokenUsage?
+    /// Lien Jira listant tous les tickets créés lors de la dernière publication.
+    public var jiraSearchURL: String?
 
     public init(
         id: UUID = UUID(),
@@ -46,7 +48,8 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         confluencePageURL: String? = nil,
         jiraIssueKeys: [String] = [],
         notionPageURL: String? = nil,
-        tokenUsage: TokenUsage? = nil
+        tokenUsage: TokenUsage? = nil,
+        jiraSearchURL: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -62,12 +65,14 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         self.jiraIssueKeys = jiraIssueKeys
         self.notionPageURL = notionPageURL
         self.tokenUsage = tokenUsage
+        self.jiraSearchURL = jiraSearchURL
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, title, startedAt, duration, locale, trackStartOffsets
         case knownAttendees, templateID, outputLanguage
         case summary, confluencePageURL, jiraIssueKeys, notionPageURL, tokenUsage
+        case jiraSearchURL
     }
 
     // Décodage tolérant : les réunions enregistrées avant l'ajout du compte rendu
@@ -93,6 +98,7 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         jiraIssueKeys = try container.decodeIfPresent([String].self, forKey: .jiraIssueKeys) ?? []
         notionPageURL = try container.decodeIfPresent(String.self, forKey: .notionPageURL)
         tokenUsage = try container.decodeIfPresent(TokenUsage.self, forKey: .tokenUsage)
+        jiraSearchURL = try container.decodeIfPresent(String.self, forKey: .jiraSearchURL)
     }
 
     public var formattedDuration: String {

@@ -65,7 +65,7 @@ public enum SummarySection: String, Codable, Sendable, CaseIterable, Identifiabl
         case .decisions:
             #""decisions": ["string"]"#
         case .actionItems:
-            #""actionItems": [{ "owner": "string|null", "description": "string", "dueDate": "string|null" }]"#
+            #""actionItems": [{ "owner": "string|null", "description": "string", "dueDate": "string|null", "issueType": "bug|task|story|epic|initiative|risk" }]"#
         case .openQuestions:
             #""openQuestions": ["string"]"#
         case .nextSteps:
@@ -171,8 +171,32 @@ public enum SummarySection: String, Codable, Sendable, CaseIterable, Identifiabl
                 """
             )
 
-        case .tldr, .topics, .decisions, .actionItems, .openQuestions, .nextSteps:
+        case .tldr, .topics, .decisions, .openQuestions, .nextSteps:
             nil
+
+        case .actionItems:
+            language.pick(
+                fr: """
+                Dans `actionItems`, `issueType` classe la nature du futur ticket Jira \
+                parmi : `bug` (anomalie ou dysfonctionnement à corriger), `task` \
+                (tâche technique ou opérationnelle ponctuelle), `story` (fonctionnalité \
+                utilisateur à livrer), `epic` (chantier important regroupant plusieurs \
+                tâches sur plusieurs sprints), `initiative` (objectif stratégique \
+                regroupant plusieurs epics) ou `risk` (risque identifié qui n'est pas \
+                encore un blocage mais mérite d'être suivi). Choisis la valeur la plus \
+                précise possible à partir du contenu réellement discuté ; à défaut, \
+                utilise `task`.
+                """,
+                en: """
+                In `actionItems`, `issueType` classifies the future Jira ticket among: \
+                `bug` (a defect or malfunction to fix), `task` (a one-off technical or \
+                operational chore), `story` (a user-facing feature to deliver), `epic` \
+                (a large body of work spanning several sprints), `initiative` (a \
+                strategic goal grouping several epics), or `risk` (an identified risk \
+                that is not yet a blocker but should be tracked). Pick the most precise \
+                value based on what was actually discussed; default to `task` otherwise.
+                """
+            )
         }
     }
 }

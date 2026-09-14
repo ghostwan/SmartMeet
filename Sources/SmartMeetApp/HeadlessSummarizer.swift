@@ -119,6 +119,13 @@ enum HeadlessSummarizer {
         let service = PublishService(
             configuration: settings.atlassian, token: settings.atlassianToken
         )
+        let translateForJira: (@Sendable (String) async throws -> String)?
+        if settings.atlassian.isJiraReady, language != .english {
+            let provider = settings.makeProvider()
+            translateForJira = { text in try await Translator.toEnglish(text, using: provider) }
+        } else {
+            translateForJira = nil
+        }
         do {
             let result = try await service.publish(
                 summary: summary,
@@ -126,12 +133,16 @@ enum HeadlessSummarizer {
                 audioNote: "test headless",
                 createJiraIssues: settings.atlassian.isJiraReady,
                 template: template,
-                language: language
+                language: language,
+                translateForJira: translateForJira
             ) { step in print("  · \(step)") }
 
             print("✅ page : \(result.pageURL?.absoluteString ?? result.pageID)")
             if !result.issues.isEmpty {
                 print("   tickets : \(result.issues.values.sorted().joined(separator: ", "))")
+            }
+            if let searchURL = result.jiraSearchURL {
+                print("   tickets Jira : \(searchURL.absoluteString)")
             }
             for failure in result.failures { print("   ⚠️ \(failure)") }
         } catch {

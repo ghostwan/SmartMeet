@@ -180,6 +180,12 @@ enum HeadlessRecorder {
             if let totalUsage = usageBox.total { emit("   tokens : \(totalUsage.formatted)") }
 
             guard publish, settings.canPublish else { return }
+            let translateForJira: (@Sendable (String) async throws -> String)?
+            if settings.atlassian.isJiraReady, meeting.outputLanguage != .english {
+                translateForJira = { text in try await Translator.toEnglish(text, using: provider) }
+            } else {
+                translateForJira = nil
+            }
             let result = try await PublishService(
                 configuration: settings.atlassian, token: settings.atlassianToken
             ).publish(
@@ -188,9 +194,13 @@ enum HeadlessRecorder {
                 audioNote: "durée \(meeting.formattedDuration)",
                 createJiraIssues: settings.atlassian.isJiraReady,
                 template: template,
-                language: meeting.outputLanguage
+                language: meeting.outputLanguage,
+                translateForJira: translateForJira
             )
             emit("✅ publié : \(result.pageURL?.absoluteString ?? result.pageID)")
+            if let searchURL = result.jiraSearchURL {
+                emit("   tickets Jira : \(searchURL.absoluteString)")
+            }
         } catch {
             emit("⚠️ compte rendu impossible — \(error.localizedDescription)")
         }

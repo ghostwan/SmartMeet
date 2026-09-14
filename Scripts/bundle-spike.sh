@@ -10,7 +10,11 @@ set -euo pipefail
 TARGET="${1:-SpikeTap}"
 # TCC lie les autorisations à la signature du bundle : l'identité doit rester stable
 # d'un build à l'autre, sinon macOS redemande micro et capture audio à chaque fois.
+# « ghostwan » est l'identité retenue pour ce dépôt ; repli sur la première identité
+# du trousseau si elle est absente.
 IDENTITY="${SMARTMEET_SIGN_IDENTITY:-$(security find-identity -v -p codesigning |
+	grep -i ghostwan | awk -F'"' '{print $2; exit}')}"
+IDENTITY="${IDENTITY:-$(security find-identity -v -p codesigning |
 	awk -F'"' '/[0-9]+\)/ {print $2; exit}')}"
 if [ -z "$IDENTITY" ]; then
 	echo "Aucune identité de signature trouvée. Définis SMARTMEET_SIGN_IDENTITY." >&2

@@ -30,34 +30,51 @@ public struct JiraClient: Sendable {
         }
     }
 
+    /// Crée le ticket Jira correspondant à un action item.
+    ///
+    /// Les tickets sont toujours rédigés en anglais, quelle que soit la langue du
+    /// compte rendu : `summaryText` et `meetingTitle` sont donc attendus déjà
+    /// traduits par l'appelant. `projectKey` et `parentKey` permettent de choisir la
+    /// destination au moment de la création plutôt que de dépendre uniquement des
+    /// réglages globaux.
     public func createIssue(
         for item: MeetingSummary.ActionItem,
+        summaryText: String,
         meetingTitle: String,
-        pageURL: URL?
+        pageURL: URL?,
+        projectKey: String? = nil,
+        issueTypeName: String? = nil,
+        parentKey: String? = nil
     ) async throws -> JiraIssue {
         var paragraphs: [[String: Any]] = [
             textParagraph(
-                "Action item issu de la réunion « \(meetingTitle) »"
-                    + (item.owner.map { ", responsable désigné : \($0)" } ?? "")
+                "Action item from meeting \"\(meetingTitle)\""
+                    + (item.owner.map { ", assigned to: \($0)" } ?? "")
                     + "."
             )
         ]
         if let pageURL {
-            paragraphs.append(linkParagraph(text: "Compte rendu complet", url: pageURL))
+            paragraphs.append(linkParagraph(text: "Full meeting minutes", url: pageURL))
         }
 
+        let resolvedProjectKey = projectKey?.isEmpty == false ? projectKey! : configuration.jiraProjectKey
+        let resolvedIssueType = issueTypeName?.isEmpty == false
+            ? issueTypeName!
+            : item.issueType.defaultJiraIssueTypeName
+        let resolvedParentKey = parentKey?.isEmpty == false ? parentKey! : configuration.jiraParentKey
+
         var fields: [String: Any] = [
-            "project": ["key": configuration.jiraProjectKey],
-            "issuetype": ["name": configuration.jiraIssueType],
+            "project": ["key": resolvedProjectKey],
+            "issuetype": ["name": resolvedIssueType],
             // Jira refuse un résumé multi-ligne ou trop long.
-            "summary": String(item.description.replacingOccurrences(of: "\n", with: " ").prefix(250)),
+            "summary": String(summaryText.replacingOccurrences(of: "\n", with: " ").prefix(250)),
             "description": ["type": "doc", "version": 1, "content": paragraphs],
         ]
         if let dueDate = item.dueDate, !dueDate.isEmpty {
             fields["duedate"] = dueDate
         }
-        if !configuration.jiraParentKey.isEmpty {
-            fields["parent"] = ["key": configuration.jiraParentKey]
+        if !resolvedParentKey.isEmpty {
+            fields["parent"] = ["key": resolvedParentKey]
         }
 
         let payload = try await client.request("POST", "/rest/api/3/issue", body: ["fields": fields])
@@ -65,6 +82,7 @@ public struct JiraClient: Sendable {
         let url = configuration.baseURL.map { $0.appending(path: "browse/\(key)") }
         return JiraIssue(key: key, url: url)
     }
+
 
     public func deleteIssue(key: String) async throws {
         _ = try await client.request("DELETE", "/rest/api/3/issue/\(key)")

@@ -1,180 +1,184 @@
-# Reste à faire
+# Remaining work
 
-Classé par ce qui coûte le plus cher à ignorer. Voir l'historique git pour la
-progression : les points corrigés sont retirés au fur et à mesure, pas simplement
-cochés ici.
+Sorted by what's most expensive to ignore. See the git history for progress:
+fixed points are removed as they go, not just checked off here.
 
 ---
 
-## 1. Résolu — notifications non fonctionnelles
+## 1. Resolved — notifications not working
 
-**Cause racine identifiée et corrigée le 13/09** : trois problèmes empilés.
+**Root cause identified and fixed on 09/13**: three stacked problems.
 
-1. Le certificat intermédiaire Apple (WWDR G3) présent dans le trousseau de la
-   machine de développement avait **expiré en 2023**. Résultat : même un certificat
-   « Apple Development » fraîchement généré via Xcode (Accounts → Manage
-   Certificates) restait `CSSMERR_TP_NOT_TRUSTED` (`security find-identity -v -p
-   codesigning` renvoyait 0 identité valide malgré un certificat présent). Corrigé en
-   réinstallant le WWDR G3 à jour (valide jusqu'en 2030) :
+1. The Apple intermediate certificate (WWDR G3) present in the development
+   machine's keychain had **expired in 2023**. Result: even a freshly
+   generated "Apple Development" certificate via Xcode (Accounts → Manage
+   Certificates) stayed `CSSMERR_TP_NOT_TRUSTED` (`security find-identity -v -p
+   codesigning` returned 0 valid identities despite a certificate being
+   present). Fixed by reinstalling an up-to-date WWDR G3 (valid until 2030):
    `curl -sL -o AppleWWDRCAG3.cer https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer`
-   puis `security add-certificates -k ~/Library/Keychains/login.keychain-db AppleWWDRCAG3.cer`.
-2. **L'app doit être signée avec cette identité réelle**, pas en ad-hoc :
+   then `security add-certificates -k ~/Library/Keychains/login.keychain-db AppleWWDRCAG3.cer`.
+2. **The app must be signed with that real identity**, not ad hoc:
    `codesign --force --sign "Apple Development: <email> (<TEAMID>)" --options runtime
    --entitlements Sources/SmartMeetApp/SmartMeet.entitlements --timestamp=none
-   build/SmartMeet.app`. Une identité ad-hoc (`--sign -`), instable d'un build à
-   l'autre, semble empêcher macOS de mémoriser durablement une autorisation.
-3. **Le refus initial reste mémorisé par bundle ID** même après correction des deux
-   points ci-dessus : `requestAuthorization` échouait encore pour `com.smartmeet.app`
-   après tous ces changements. Il a fallu l'autoriser une fois manuellement dans
-   Réglages Système → Notifications → SmartMeet → activer le bouton. Une fois fait,
-   `requestAuthorization` fonctionne normalement et les notifications sont délivrées.
+   build/SmartMeet.app`. An ad hoc identity (`--sign -`), unstable from one
+   build to the next, seems to prevent macOS from durably remembering a
+   permission grant.
+3. **The initial refusal stays remembered per bundle ID** even after fixing
+   the two points above: `requestAuthorization` still failed for
+   `com.smartmeet.app` after all these changes. It had to be authorized once
+   manually in System Settings → Notifications → SmartMeet → turn the toggle
+   on. Once done, `requestAuthorization` works normally and notifications are
+   delivered.
 
-Diagnostic (à relancer si un doute revient — **toujours via `open`, jamais en
-exécutant le binaire directement**, sinon LaunchServices n'enregistre pas l'app) :
+Diagnostic (rerun it if any doubt comes back — **always via `open`, never by
+running the binary directly**, otherwise LaunchServices doesn't register the
+app):
 
 ```sh
-open build/SmartMeet.app --args --check-notifications /tmp/rapport.txt
+open build/SmartMeet.app --args --check-notifications /tmp/report.txt
 ```
 
-**Point d'attention pour la suite** : le script de rebuild habituel de ce projet
-utilise `codesign --sign -` (ad-hoc). Si les notifications recommencent à échouer,
-vérifier en premier que le build a bien été signé avec une identité stable (`Apple
-Development: <ton adresse Apple ID> (<TEAMID>)`) et pas en ad-hoc.
+**Point to watch going forward**: this project's usual rebuild script uses
+`codesign --sign -` (ad hoc). If notifications start failing again, check
+first that the build was actually signed with a stable identity (`Apple
+Development: <your Apple ID email> (<TEAMID>)`) and not ad hoc.
 
 ---
 
-## 2. Bugs identifiés
+## 2. Identified bugs
 
-### Recherche à étendre aux nouveaux contenus
+### Search to extend to new content
 
-`Meeting.matches` couvre désormais titre, synthèse, transcript, participants et
-décisions (le transcript est lu depuis `MeetingStore` au moment de filtrer). Si de
-nouveaux champs texte s'ajoutent au compte rendu, penser à les inclure dans le
-haystack de `RecordingSession.filteredMeetings`.
-
----
-
-## 3. Prévu puis oublié
-
-### Onboarding du téléchargement des modèles
-
-Le téléchargement des assets de langue se fait silencieusement dans
-`TrackTranscriber.start()`, derrière un simple « Préparation des modèles… ». Au premier
-lancement, sur une connexion lente, l'utilisateur ne voit aucune progression et peut
-croire à un blocage. Un écran d'accueil avec barre de progression était prévu.
-
-### Re-transcription depuis l'audio conservé
-
-`Meeting.trackStartOffsets` est persisté **exactement pour ça** — réaligner un
-transcript recalculé a posteriori — mais rien ne l'utilise. Les deux pistes `.caf` sont
-pourtant conservées. Permettrait de re-transcrire avec un meilleur modèle, une autre
-langue, ou après correction du vocabulaire métier.
+`Meeting.matches` now covers title, summary, transcript, attendees and
+decisions (the transcript is read from `MeetingStore` at filtering time). If
+new text fields are added to the minutes, remember to include them in
+`RecordingSession.filteredMeetings`'s haystack.
 
 ---
 
-## 4. Non vérifié — risques ouverts
+## 3. Planned then forgotten
 
-Par ordre de probabilité de mauvaise surprise :
+### Model download onboarding
 
-| Zone | Ce qui n'a jamais été exercé |
+Language asset downloads happen silently in `TrackTranscriber.start()`,
+behind a simple "Preparing models…". On first launch, over a slow
+connection, the user sees no progress and may think it's stuck. A welcome
+screen with a progress bar was planned.
+
+### Re-transcription from the retained audio
+
+`Meeting.trackStartOffsets` is persisted **exactly for this** — realigning a
+transcript recomputed after the fact — but nothing uses it yet. Both `.caf`
+tracks are kept regardless. Would allow re-transcribing with a better model,
+another language, or after fixing domain vocabulary.
+
+---
+
+## 4. Unverified — open risks
+
+In decreasing order of likely bad surprises:
+
+| Area | What has never been exercised |
 |---|---|
-| **Vraie réunion** | Aucun enregistrement réel avec plusieurs humains. Tout est validé sur synthèse vocale et fixtures écrites à la main, donc trop propres et trop bien structurées. |
-| **Réunion longue** | Le chemin map-reduce (> 48 000 caractères) est testé unitairement, jamais exercé de bout en bout. |
-| **Rendu Confluence des nouvelles sections** | `sprintWeather` et `fourL` ne sont validés que par tests unitaires. Une seule publication réelle a eu lieu et a été supprimée. |
-| **Détection en conditions réelles** | La primitive Core Audio est prouvée, la logique de décision testée, mais aucune vraie visioconférence n'a déclenché de proposition. |
-| **Changement de périphérique audio** | Brancher un casque en cours de réunion reconstruit le convertisseur et provoque une discontinuité, jamais mesurée. |
-| **Page Confluence supprimée** | Le repli `AtlassianError.pageNotFound` (voir `PublishService.resolveDestination`) n'a été exercé qu'en lecture de code, jamais contre une vraie page supprimée. |
-| **Rappel de consentement** | La bannière affichée pendant l'enregistrement (`MenuBarContent.consentReminder`) n'a jamais été vue par un participant réel ; son emplacement et sa formulation méritent un avis extérieur. |
-| **Édition des types fournis** | Les quatre types de base (`Daily`, `Synchro`, `Rétrospective`, `Générique`) sont désormais éditables directement (stockés comme surcharge dans `customTemplates`, réinitialisables). Jamais testé au-delà de la compilation et des tests unitaires existants — pas de nouveau test dédié à ce mécanisme de surcharge. |
+| **Real meeting** | No real recording with several humans. Everything is validated against text-to-speech and hand-written fixtures, so too clean and too well structured. |
+| **Long meeting** | The map-reduce path (> 48,000 characters) is unit-tested, never exercised end to end. |
+| **Confluence rendering of new sections** | `sprintWeather` and `fourL` are only validated by unit tests. A single real publication happened and was deleted. |
+| **Detection under real conditions** | The Core Audio primitive is proven, the decision logic tested, but no real video call has ever triggered a suggestion. |
+| **Audio device change** | Plugging in headphones mid-meeting rebuilds the converter and causes a discontinuity, never measured. |
+| **Deleted Confluence page** | The `AtlassianError.pageNotFound` fallback (see `PublishService.resolveDestination`) has only been exercised by reading the code, never against an actually deleted page. |
+| **Consent reminder** | The banner shown while recording (`MenuBarContent.consentReminder`) has never been seen by a real participant; its placement and wording deserve an outside opinion. |
+| **Editing built-in types** | The four base types (`Daily`, `Sync`, `Retrospective`, `Generic`) are now directly editable (stored as an override in `customTemplates`, resettable). Never tested beyond compilation and existing unit tests — no test dedicated to this override mechanism. |
 
 ---
 
-## 5. Qualité connue, à améliorer
+## 5. Known quality issues, to improve
 
-### Diaphonie
+### Cross-talk
 
-`CrossTalkFilter` repose sur des seuils empiriques (3 s de tolérance, 50 % de
-recouvrement) calibrés sur des cas de test, pas sur de vraies réunions. À régler sur du
-matériel réel.
+`CrossTalkFilter` relies on empirical thresholds (3 s tolerance, 50 % overlap)
+calibrated on test cases, not on real meetings. To be tuned on real
+hardware.
 
-L'annulation d'écho matérielle reste inutilisable : `setVoiceProcessingEnabled(true)`
-prive le tap système de sa source. Une annulation d'écho logicielle — la piste système
-est connue, donc soustractible de la piste micro — n'a pas été explorée et serait la
-vraie solution.
+Hardware echo cancellation remains unusable: `setVoiceProcessingEnabled(true)`
+deprives the system tap of its source. Software echo cancellation — the
+system track is known, hence subtractable from the microphone track — hasn't
+been explored and would be the real solution.
 
-### Noms propres métier
+### Domain proper nouns
 
-« migration Crowdin » ressort en « migration coronale » malgré l'injection de
-vocabulaire dans `AnalysisContext.contextualStrings`. À rejuger sur voix humaine avant
-d'investir : la synthèse vocale prononce mal les noms propres, le problème est
-peut-être surestimé.
+"Crowdin migration" comes out as "coronal migration" despite vocabulary
+injection into `AnalysisContext.contextualStrings`. To be re-assessed on a
+human voice before investing further: text-to-speech mispronounces proper
+nouns, the problem might be overestimated.
 
-### Icône météo
+### Weather icon
 
-L'icône retenue est une interprétation du modèle : « éclaircie » est ressorti en
-arc-en-ciel sur un essai. Corrigeable en un clic dans la relecture, mais pas fiable.
+The icon picked by the model is an interpretation: "clearing up" came out as
+a rainbow in one trial. Fixable in one click during review, but not
+reliable.
 
-### Modèles locaux
+### Local models
 
-`ollama` résout moins fiablement les dates relatives — « mardi prochain » tombé un
-mercredi. Acceptable pour un repli, pas pour un usage principal.
+`ollama` resolves relative dates less reliably — "next Tuesday" landed on a
+Wednesday. Acceptable as a fallback, not for primary use.
 
-### Identification des locuteurs
+### Speaker identification
 
-La piste système regroupe tous les participants distants sous un seul libellé. Les noms
-viennent uniquement du calendrier, et c'est le modèle qui attribue les propos. Une vraie
-diarisation intra-piste améliorerait nettement les dailys et les rétrospectives.
+The system track groups every remote participant under a single label.
+Names come only from the calendar, and it's the model that attributes
+statements. Real intra-track diarization would noticeably improve dailies
+and retrospectives.
 
-Ces cinq points ont en commun de ne pouvoir être tranchés que sur du matériel réel
-(vraies voix, vrai réseau, vrai accent) : aucune fixture écrite à la main ne les
-départagera. Ne pas les rouvrir tant qu'une vraie réunion n'a pas été enregistrée
-(voir section 4).
-
----
-
-## 6. Dette et outillage
-
-- Aucune intégration continue. Le dépôt est personnel, mais `ship.sh` fait déjà tout ce
-  qu'il faudrait exécuter.
-- Pas de gestion de version ni de distribution : ni notarisation, ni mise à jour.
+These five points share the trait of only being settleable on real hardware
+(real voices, real network, real accent): no hand-written fixture will
+settle them. Don't reopen them until a real meeting has been recorded (see
+section 4).
 
 ---
 
-## 7. Idées non engagées
+## 6. Debt and tooling
 
-- Choisir la langue du compte rendu **après coup** et régénérer, plutôt qu'avant
-  l'enregistrement seulement.
-- Générer les deux langues d'un coup pour les réunions à audience mixte.
-- Détecter la fin de réunion — l'application de visio libère le micro — et proposer
-  d'arrêter l'enregistrement.
-- Rattacher automatiquement un compte rendu à la page de sprint *de la date de la
-  réunion* plutôt qu'à la page courante, utile en cas de publication différée.
-- Rechercher une page parente par titre dans les réglages, au lieu de coller une URL.
+- No continuous integration. The repository is personal, but `ship.sh`
+  already runs everything that would need to.
+- No version management or distribution: no notarization, no updates.
 
 ---
 
-## 8. Reprendre sur une autre machine
+## 7. Ideas not committed to
 
-Ce qui ne vit **pas** dans le dépôt et devra être refait :
+- Choosing the minutes' language **after the fact** and regenerating, rather
+  than only before recording.
+- Generating both languages at once for mixed-audience meetings.
+- Detecting the end of a meeting — the video app releases the microphone —
+  and offering to stop recording.
+- Automatically attaching minutes to the sprint page *matching the meeting's
+  date* rather than the current page, useful for delayed publication.
+- Searching for a parent page by title in settings, instead of pasting a URL.
 
-| Élément | Où il est | À refaire |
+---
+
+## 8. Picking this up on another machine
+
+What does **not** live in the repository and will need to be redone:
+
+| Item | Where it lives | To redo |
 |---|---|---|
-| Identité de signature | Trousseau | Une identité de développement Apple suffit. `bundle-app.sh` prend automatiquement la première trouvée ; sinon `SMARTMEET_SIGN_IDENTITY="…"`. |
-| Jeton d'API Atlassian | Trousseau (`com.smartmeet.atlassian`) | Réglages › Atlassian. Repris de `ATLASSIAN_API_TOKEN` au premier lancement s'il est dans l'environnement. |
-| Espace, projet Jira, epic parent, page de sprint | `defaults` de `com.smartmeet.app` | Réglages › Atlassian. |
-| Types de réunion personnalisés, y compris surcharges des types fournis | `defaults` | Réglages › Types de réunion. Les quatre types fournis restent dans le code, mais une édition locale prime tant qu'elle existe (voir `AppSettings.upsert`/`remove`). |
-| Autorisations micro, capture audio, calendrier, notifications | TCC | Redemandées au premier lancement. **Le bundle doit être lancé par LaunchServices** (`open build/SmartMeet.app`), jamais depuis un terminal, sinon la capture audio système renvoie du silence sans erreur. |
-| Modèles de langue `SpeechTranscriber` | Système | Téléchargés au premier enregistrement. |
-| Réunions enregistrées | `~/Library/Application Support/SmartMeet/Meetings/` | Non versionnées. Copier le dossier si besoin. |
+| Signing identity | Keychain | An Apple development identity is enough. `bundle-app.sh` automatically picks the first one found; otherwise `SMARTMEET_SIGN_IDENTITY="…"`. |
+| Atlassian API token | Keychain (`com.smartmeet.atlassian`) | Settings › Atlassian. Picked up from `ATLASSIAN_API_TOKEN` on first launch if present in the environment. |
+| Space, Jira project, epic parent, sprint page | `defaults` of `com.smartmeet.app` | Settings › Atlassian. |
+| Custom meeting types, including overrides of built-in types | `defaults` | Settings › Meeting Types. The four built-in types stay in the code, but a local edit takes priority as long as it exists (see `AppSettings.upsert`/`remove`). |
+| Microphone, audio capture, calendar, notification permissions | TCC | Requested again on first launch. **The bundle must be launched through LaunchServices** (`open build/SmartMeet.app`), never from a terminal, otherwise system audio capture silently returns silence. |
+| `SpeechTranscriber` language models | System | Downloaded on first recording. |
+| Recorded meetings | `~/Library/Application Support/SmartMeet/Meetings/` | Not versioned. Copy the folder if needed. |
 
-Prérequis : macOS 26, Apple Silicon, Xcode 26. Puis `opencode` ou `ollama` pour la
-génération du compte rendu.
+Requirements: macOS 26, Apple Silicon, Xcode 26. Then `opencode` or `ollama`
+for generating the minutes.
 
-Vérification que tout est en place :
+Checking everything is in place:
 
 ```sh
-swift test                                   # 100 tests
+swift test                                   # 101 tests
 ./Scripts/bundle-app.sh && open build/SmartMeet.app
-open build/SmartMeet.app --args --check-notifications /tmp/rapport.txt
+open build/SmartMeet.app --args --check-notifications /tmp/report.txt
 ```
-
+</content>

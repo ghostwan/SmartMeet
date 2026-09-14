@@ -8,6 +8,9 @@ public struct PublicationResult: Sendable, Equatable {
     public let spaceKey: String
     public let issues: [String: String]
     public let failures: [String]
+    /// Lien Jira listant tous les tickets créés lors de cette publication, une fois
+    /// qu'il y en a au moins un.
+    public let jiraSearchURL: URL?
 }
 
 /// Espace et page parente effectivement retenus, une fois le type de réunion et les
@@ -116,6 +119,15 @@ public struct PublishService: Sendable {
         template: MeetingTemplate = .generic,
         meetingDate: Date = .now,
         language: SummaryLanguage = .french,
+        /// Destination choisie pour cette publication précise (typiquement demandée
+        /// à l'utilisateur juste avant de créer les tickets). `nil` retombe sur les
+        /// réglages globaux.
+        jiraProjectKey: String? = nil,
+        jiraParentKey: String? = nil,
+        /// Traduit un texte vers l'anglais avant de créer un ticket : les tickets
+        /// Jira sont toujours en anglais, indépendamment de la langue du compte
+        /// rendu. `nil` laisse le texte tel quel.
+        translateForJira: (@Sendable (String) async throws -> String)? = nil,
         onStep: @Sendable (PublishStep) -> Void = { _ in }
     ) async throws -> PublicationResult {
         guard configuration.isConfluenceReady || !template.spaceKeyOverride.isEmpty else {
@@ -147,12 +159,30 @@ public struct PublishService: Sendable {
         var failures: [String] = []
 
         if createJiraIssues, configuration.isJiraReady {
+            let englishTitle: String
+            if let translateForJira {
+                englishTitle = (try? await translateForJira(title)) ?? title
+            } else {
+                englishTitle = title
+            }
+
             let selected = summary.actionItems.enumerated().filter { $0.element.isSelected }
             for (position, (index, item)) in selected.enumerated() {
                 onStep(.creatingIssue(index: position + 1, total: selected.count))
                 do {
+                    let summaryText: String
+                    if let translateForJira {
+                        summaryText = (try? await translateForJira(item.description)) ?? item.description
+                    } else {
+                        summaryText = item.description
+                    }
                     let issue = try await jira.createIssue(
-                        for: item, meetingTitle: title, pageURL: page.url
+                        for: item,
+                        summaryText: summaryText,
+                        meetingTitle: englishTitle,
+                        pageURL: page.url,
+                        projectKey: jiraProjectKey,
+                        parentKey: jiraParentKey
                     )
                     enriched.actionItems[index].jiraKey = issue.key
                     createdKeys[item.id.uuidString] = issue.key
@@ -185,8 +215,21 @@ public struct PublishService: Sendable {
             pageTitle: title,
             spaceKey: destination.spaceKey,
             issues: createdKeys,
-            failures: failures
+            failures: failures,
+            jiraSearchURL: Self.searchURL(for: createdKeys.values, baseURL: configuration.baseURL)
         )
+    }
+
+    /// Lien Jira listant tous les tickets créés, affichable et partageable tel quel.
+    private static func searchURL<S: Sequence>(for keys: S, baseURL: URL?) -> URL? where S.Element == String {
+        let keys = Array(keys)
+        guard !keys.isEmpty, let baseURL else { return nil }
+        let jql = "key in (\(keys.joined(separator: ",")))"
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("issues"), resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [URLQueryItem(name: "jql", value: jql)]
+        return components?.url
     }
 
     /// Confluence refuse deux pages de même titre dans un espace.

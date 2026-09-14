@@ -74,26 +74,67 @@ git push origin "$VERSION"
 step "Release GitHub"
 NOTES="$(mktemp)"
 trap 'rm -f "$NOTES"' EXIT
-cat >"$NOTES" <<EOF
-## SmartMeet ${VERSION#v}
+{
+	echo "## SmartMeet ${VERSION#v}"
+	echo
 
+	# Le contenu accumulé dans RELEASE_NOTES.md (Added/Changed/Fixed) précède
+	# l'avertissement Gatekeeper, générique lui, d'une release à l'autre.
+	if [ -f RELEASE_NOTES.md ]; then
+		sed -n '/^## Unreleased/,$p' RELEASE_NOTES.md | tail -n +2
+		echo
+	fi
+
+	cat <<'EOF'
 ⚠️ **Cette build n'est pas notariée par Apple** (nécessite un compte développeur
 payant). macOS affichera un avertissement à la première ouverture — c'est normal
 pour un logiciel distribué hors App Store, pas un signe de danger.
 
 Pour l'ouvrir malgré l'avertissement :
-1. Décompresse le \`.dmg\` et glisse \`SmartMeet.app\` dans \`/Applications\`.
+1. Décompresse le `.dmg` et glisse `SmartMeet.app` dans `/Applications`.
 2. **Clic droit sur l'app → Ouvrir**, puis confirme dans la popup (une seule fois).
 
 Si macOS refuse même cette option (« App is damaged » sur certaines versions),
 lève la quarantaine en ligne de commande :
-\`\`\`sh
+```sh
 xattr -cr /Applications/SmartMeet.app
-\`\`\`
+```
 EOF
+} >"$NOTES"
 
 GH_ARGS=(release create "$VERSION" "$DMG" --title "SmartMeet ${VERSION#v}" --notes-file "$NOTES")
 [ "$DRAFT" = true ] && GH_ARGS+=(--draft)
 gh "${GH_ARGS[@]}"
 
 printf '\n\033[32m✓ Release %s publiée\033[0m\n' "$VERSION"
+
+# --- Réinitialisation des notes de release ------------------------------------
+#
+# RELEASE_NOTES.md s'accumule entre deux releases (voir AGENTS.md) ; une fois
+# celle-ci publiée, son contenu est repris ci-dessus et le fichier repart vide
+# pour la suivante. Rien n'est fait en mode brouillon : une release --draft n'est
+# pas encore réellement publiée.
+if [ "$DRAFT" = false ] && [ -f RELEASE_NOTES.md ]; then
+	step "Réinitialisation de RELEASE_NOTES.md"
+	cat >RELEASE_NOTES.md <<'EOF'
+<!--
+Release notes being accumulated — do NOT clear or restart this between two
+releases: every shipped feature is added here as it lands (see AGENTS.md).
+
+`Scripts/release.sh` reuses this file's content to compose the GitHub release
+notes, then resets it to this template once the release is published.
+-->
+
+## Unreleased
+
+### Added
+
+### Changed
+
+### Fixed
+EOF
+	git add RELEASE_NOTES.md
+	git commit -m "Réinitialise RELEASE_NOTES.md après la release ${VERSION}"
+	git push
+	echo "✓ RELEASE_NOTES.md réinitialisé et poussé"
+fi

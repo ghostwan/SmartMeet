@@ -32,7 +32,7 @@ public final class RecordingSession {
     public enum PublishState: Equatable {
         case none
         case running(String)
-        case published(url: String, title: String, issues: [String], failures: [String])
+        case published(url: String, title: String, issues: [String], failures: [String], jiraSearchURL: String?)
         case failed(String)
     }
 
@@ -496,7 +496,12 @@ public final class RecordingSession {
 
     // MARK: - Publication
 
-    public func publish(_ meeting: Meeting, createJiraIssues: Bool) async {
+    public func publish(
+        _ meeting: Meeting,
+        createJiraIssues: Bool,
+        jiraProjectKey: String? = nil,
+        jiraParentKey: String? = nil
+    ) async {
         guard let summary = meeting.summary else {
             publishState = .failed("Aucun compte rendu à publier.")
             return
@@ -514,6 +519,17 @@ public final class RecordingSession {
         let audioNote = "durée \(meeting.formattedDuration), transcription on-device — "
             + "participants informés de l'enregistrement"
 
+        // Les tickets Jira sont toujours en anglais, quelle que soit la langue du
+        // compte rendu : on ne traduit que si nécessaire, pour éviter un appel LLM
+        // inutile quand le compte rendu est déjà en anglais.
+        let translateForJira: (@Sendable (String) async throws -> String)?
+        if createJiraIssues, meeting.outputLanguage != .english {
+            let provider = settings.makeProvider()
+            translateForJira = { text in try await Translator.toEnglish(text, using: provider) }
+        } else {
+            translateForJira = nil
+        }
+
         do {
             let result = try await service.publish(
                 summary: summary,
@@ -522,7 +538,10 @@ public final class RecordingSession {
                 createJiraIssues: createJiraIssues,
                 template: settings.template(id: meeting.templateID),
                 meetingDate: meeting.startedAt,
-                language: meeting.outputLanguage
+                language: meeting.outputLanguage,
+                jiraProjectKey: jiraProjectKey,
+                jiraParentKey: jiraParentKey,
+                translateForJira: translateForJira
             ) { step in
                 Task { @MainActor [weak self] in
                     self?.publishState = .running(Self.describe(step))
@@ -532,6 +551,7 @@ public final class RecordingSession {
             var updated = meeting
             updated.confluencePageURL = result.pageURL?.absoluteString
             updated.jiraIssueKeys = Array(result.issues.values).sorted()
+            updated.jiraSearchURL = result.jiraSearchURL?.absoluteString
             if var summary = updated.summary {
                 for (identifier, key) in result.issues {
                     if let index = summary.actionItems.firstIndex(where: {
@@ -555,7 +575,8 @@ public final class RecordingSession {
                 url: result.pageURL?.absoluteString ?? "",
                 title: result.pageTitle,
                 issues: updated.jiraIssueKeys,
-                failures: result.failures
+                failures: result.failures,
+                jiraSearchURL: result.jiraSearchURL?.absoluteString
             )
             notifier.announcePublication(
                 meetingID: updated.id,
@@ -716,7 +737,8 @@ public final class RecordingSession {
                 url: meeting.confluencePageURL ?? "",
                 title: meeting.title,
                 issues: meeting.jiraIssueKeys,
-                failures: []
+                failures: [],
+                jiraSearchURL: meeting.jiraSearchURL
             )
             : .none
     }

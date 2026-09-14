@@ -91,6 +91,23 @@ struct MeetingSummaryDecodingTests {
         #expect(summary.actionItems.allSatisfy { $0.isSelected })
     }
 
+    @Test("issueType est repris du modèle quand fourni, sinon détecté depuis la description")
+    func actionItemsIssueTypeIsParsedOrDetected() throws {
+        let json = """
+        {"title":"T","tldr":"S","actionItems":[
+          {"description":"Corriger le bug d'affichage","issueType":"bug"},
+          {"description":"Le paiement plante en production"},
+          {"description":"Suivre le risque de dérive du planning"},
+          {"description":"Préparer la démo","issueType":"valeur-inconnue"}
+        ]}
+        """
+        let summary = try JSONDecoder().decode(MeetingSummary.self, from: Data(json.utf8))
+        #expect(summary.actionItems[0].issueType == .bug)
+        #expect(summary.actionItems[1].issueType == .bug)
+        #expect(summary.actionItems[2].issueType == .risk)
+        #expect(summary.actionItems[3].issueType == .task)
+    }
+
     @Test("Le rendu markdown contient les sections renseignées")
     func markdownRendering() {
         let summary = MeetingSummary(

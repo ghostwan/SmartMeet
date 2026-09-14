@@ -1,44 +1,47 @@
 # SmartMeet
 
-Enregistre une réunion sur macOS, la transcrit sur l'appareil, en génère le compte
-rendu, et le publie sur Confluence avec les action items en tickets Jira.
+Records a meeting on macOS, transcribes it on-device, generates the meeting
+minutes, and publishes them to Confluence with action items turned into Jira
+tickets.
 
-Application menu-bar native. Aucun audio ne quitte la machine : la capture et la
-transcription sont entièrement locales.
+Native menu-bar app. No audio ever leaves the machine: capture and
+transcription are entirely local.
 
-## Ce qui le distingue
+## What sets it apart
 
-**Diarisation par séparation physique.** Le micro et l'audio système sont capturés sur
-deux pistes distinctes, via un *process tap* Core Audio — pas de pilote virtuel type
-BlackHole. Ce qui vient du micro est vous, ce qui vient du système est un participant
-distant. Aucun modèle de diarisation n'est nécessaire.
+**Diarization by physical separation.** The microphone and system audio are
+captured on two distinct tracks, via a Core Audio *process tap* — no virtual
+driver like BlackHole. Whatever comes from the microphone is you, whatever
+comes from the system is a remote participant. No diarization model is
+needed.
 
-**Types de réunion.** Le compte rendu n'a pas un format unique. Un daily ouvre sur les
-points bloquants et détaille le point de chaque personne ; une rétrospective ouvre sur
-le ressenti nominatif de l'équipe puis regroupe les échanges par sujet, sans attribuer
-aucun propos. Le type choisi pilote le schéma demandé au modèle, l'ordre de rendu, le
-titre de la page et sa destination.
+**Meeting types.** The minutes don't follow a single format. A daily opens
+with blockers and details each person's update; a retrospective opens with
+the team's nominative mood, then groups the discussion by topic without
+attributing any statement. The chosen type drives the schema requested from
+the model, the rendering order, the page title, and its destination.
 
-**Page de sprint.** On la fixe une fois en début de sprint ; tous les comptes rendus de
-réunions du sprint s'y rattachent ensuite, sans rien reconfigurer.
+**Sprint page.** Set it once at the start of a sprint; every sprint meeting's
+minutes then attach to it automatically, with nothing left to reconfigure.
 
-**Langue de sortie.** Le compte rendu se produit en français ou en anglais,
-indépendamment de la langue parlée. Le choix se fait avant l'enregistrement : il
-conditionne le prompt, pas seulement la mise en forme.
+**Output language.** The minutes are produced in French or English,
+independently of the language spoken. The choice is made before recording: it
+drives the prompt, not just the formatting.
 
-**Détection des réunions.** Quand une réunion démarre, SmartMeet propose de
-l'enregistrer par une notification actionnable. La détection croise deux signaux : le
-calendrier, qui dit ce qui *devrait* avoir lieu, et l'application de visioconférence
-qui capte le micro, qui dit ce qui a *réellement* commencé.
+**Meeting detection.** When a meeting starts, SmartMeet offers to record it
+through an actionable notification. Detection cross-references two signals:
+the calendar, which says what *should* be happening, and the video
+conferencing app capturing the microphone, which says what has *actually*
+started.
 
-## Prérequis
+## Requirements
 
-macOS 26 ou supérieur, Apple Silicon, Xcode 26.
+macOS 26 or later, Apple Silicon, Xcode 26.
 
-Pour la génération du compte rendu, au choix :
+For generating the minutes, pick one:
 
-- [`opencode`](https://opencode.ai) — utilise un abonnement GitHub Copilot ;
-- [`ollama`](https://ollama.com) — entièrement local, aucune donnée ne sort.
+- [`opencode`](https://opencode.ai) — uses a GitHub Copilot subscription;
+- [`ollama`](https://ollama.com) — fully local, no data ever leaves.
 
 ## Installation
 
@@ -47,133 +50,137 @@ Pour la génération du compte rendu, au choix :
 open build/SmartMeet.app
 ```
 
-Le bundle est signé avec la première identité de développement trouvée dans le
-trousseau. Pour en imposer une autre :
+The bundle is signed with the first development identity found in the
+keychain. To force another one:
 
 ```sh
 SMARTMEET_SIGN_IDENTITY="Apple Development: …" ./Scripts/bundle-app.sh
 ```
 
-> Le bundle **doit** être lancé par LaunchServices (`open`), pas depuis un terminal.
-> Exécuté directement, le processus responsable est le terminal : TCC n'attribue pas
-> la permission de capture audio et le tap renvoie du silence, sans la moindre erreur.
+> The bundle **must** be launched through LaunchServices (`open`), not from a
+> terminal. Run directly, the responsible process is the terminal: TCC does
+> not grant the audio capture permission and the tap silently returns
+> silence, with no error at all.
 
-## Utilisation
+## Usage
 
-Quand une réunion est détectée, une notification propose de l'enregistrer : *Enregistrer*
-ou *Pas maintenant*. Le titre et les participants sont repris du calendrier. Sinon,
-choisissez un type de réunion dans le menu et cliquez **Enregistrer**.
+When a meeting is detected, a notification offers to record it: *Record* or
+*Not now*. Title and attendees are picked up from the calendar. Otherwise,
+pick a meeting type from the menu and click **Record**.
 
-### Détection
+### Detection
 
-Deux signaux, délibérément croisés :
+Two signals, deliberately cross-referenced:
 
-| Signal | Ce qu'il apporte | Ce qui lui manque |
+| Signal | What it brings | What it's missing |
 |---|---|---|
-| Calendrier (EventKit) | titre, participants | déclenche sur des réunions annulées ou décalées |
-| Micro capté par une app de visio (Core Audio) | preuve que la réunion a commencé | ne connaît ni titre ni participants |
+| Calendar (EventKit) | title, attendees | fires on cancelled or rescheduled meetings |
+| Microphone captured by a video conferencing app (Core Audio) | proof the meeting actually started | knows neither title nor attendees |
 
-Règles retenues :
+Rules applied:
 
-- une application dédiée (Teams, Zoom, Webex, Slack, Meet…) qui capte le micro suffit,
-  même sans événement au calendrier ;
-- un **navigateur** qui capte le micro est trop ambigu — test de micro, vidéo, dictée —
-  et n'est retenu que si le calendrier confirme ;
-- un événement seul ne déclenche que s'il porte un lien de visioconférence, sinon toute
-  réunion physique ou tout créneau bloqué donnerait une proposition.
+- a dedicated app (Teams, Zoom, Webex, Slack, Meet…) capturing the microphone
+  is enough on its own, even without a calendar event;
+- a **browser** capturing the microphone is too ambiguous — mic test, video,
+  dictation — and is only retained if the calendar confirms it;
+- an event alone only triggers if it carries a video conferencing link,
+  otherwise any physical meeting or blocked time slot would produce a
+  suggestion.
 
-Une proposition écartée ne revient pas pour la même réunion, et les propositions se
-réarment à la fin d'un enregistrement.
+A dismissed suggestion doesn't come back for the same meeting, and
+suggestions re-arm once a recording ends.
 
-Le démarrage automatique sans confirmation existe dans les réglages mais reste
-**désactivé par défaut** : enregistrer des personnes sans les prévenir n'est pas un
-comportement à activer à leur place.
+Automatic start without confirmation exists in the settings but stays
+**disabled by default**: recording people without warning them is not a
+behaviour to turn on on their behalf.
 
-Le reste du temps : choisissez un type de réunion dans le menu, cliquez **Enregistrer**. Le transcript
-s'affiche au fil de l'eau. À l'arrêt, le compte rendu est généré, puis relisible et
-modifiable avant publication.
+The rest of the time: pick a meeting type from the menu, click **Record**.
+The transcript streams live. On stop, the minutes are generated, then
+reviewable and editable before publication.
 
-Chaque réunion est un dossier autonome :
+Each meeting is a self-contained folder:
 
 ```
 ~/Library/Application Support/SmartMeet/Meetings/<uuid>/
-    meeting.json     métadonnées et compte rendu
-    segments.json    transcript structuré
-    transcript.md    transcript lisible
-    summary.md       compte rendu au format du type de réunion
-    microphone.caf   piste utilisateur
-    system.caf       piste participants
+    meeting.json     metadata and minutes
+    segments.json    structured transcript
+    transcript.md    readable transcript
+    summary.md       minutes formatted per meeting type
+    microphone.caf   user's track
+    system.caf       participants' track
 ```
 
-### Types fournis
+### Built-in types
 
-| Type | Sections, dans l'ordre | Titre | Destination |
+| Type | Sections, in order | Title | Destination |
 |---|---|---|---|
-| Réunion générique | synthèse, décisions, action items, sujets, questions ouvertes, prochaines étapes | `{summary} — {date}` | espace par défaut |
-| Daily | **points bloquants**, point par personne, action items, synthèse | `Daily {Weekday} {date}` | page de sprint |
-| Synchro | synthèse, décisions, action items, sujets, questions ouvertes, prochaines étapes | `{summary} — {Weekday} {date}` | page de sprint |
-| Rétrospective | **météo du sprint**, 4L dépersonnalisés, action items, décisions | `{type} — {date}` | page de sprint |
+| Generic meeting | summary, decisions, action items, topics, open questions, next steps | `{summary} — {date}` | default space |
+| Daily | **blockers**, per-person update, action items, summary | `Daily {Weekday} {date}` | sprint page |
+| Sync | summary, decisions, action items, topics, open questions, next steps | `{summary} — {Weekday} {date}` | sprint page |
+| Retrospective | **sprint weather**, depersonalized 4L, action items, decisions | `{type} — {date}` | sprint page |
 
-Ils se dupliquent et se modifient dans *Réglages › Types de réunion* : sections, ordre,
-consignes de rédaction, format de titre et destination.
+They're duplicated and edited in *Settings › Meeting Types*: sections,
+order, writing guidance, title format, and destination.
 
-### Rétrospective : météo du sprint et 4L
+### Retrospective: sprint weather and 4L
 
-La rétrospective produit deux parties de nature opposée.
+The retrospective produces two parts of opposite nature.
 
-**Météo du sprint** — nominative, destinée à être transmise aux managers. Chaque
-membre choisit une ou plusieurs images météo (☀️ 🌤️ ☁️ 🌧️ ⛈️ 🌫️ ❄️ 🌈 💨 🔥) pour
-illustrer son sprint, explique son choix, puis raconte son sprint. Le compte rendu
-restitue ses propos avec leurs nuances plutôt que de les lisser — c'est le seul moyen
-qu'un manager y trouve autre chose qu'un résumé aseptisé. Seul l'oral est pris en
-compte : les post-its et le tableau ne sont pas dans le transcript.
+**Sprint weather** — nominative, meant to be shared with managers. Each
+member picks one or more weather icons (☀️ 🌤️ ☁️ 🌧️ ⛈️ 🌫️ ❄️ 🌈 💨 🔥) to
+illustrate their sprint, explains their choice, then talks about their
+sprint. The minutes restitute their words with their nuances rather than
+smoothing them out — it's the only way a manager gets something other than a
+sanitized summary out of it. Only what's said out loud counts: sticky notes
+and the board are not in the transcript.
 
-**4L** — dépersonnalisés. *Ce qui a plu*, *Ce qu'on a appris*, *Ce qui a manqué*, *Ce
-qu'on aurait voulu*. Les remarques sont regroupées par thème et aucun propos n'est
-attribué, ce qui permet d'aborder les sujets sensibles sans mettre personne en cause.
+**4L** — depersonalized. *Liked*, *Learned*, *Lacked*, *Longed for*. Remarks
+are grouped by theme and no statement is attributed to anyone, which allows
+sensitive topics to be raised without putting anyone on the spot.
 
-### Titre des pages
+### Page titles
 
-Le titre produit par le modèle varie d'une réunion à l'autre, ce qui rend
-l'arborescence Confluence illisible. Le format reprend la main dessus :
+The title produced by the model varies from one meeting to the next, which
+makes the Confluence tree unreadable. The format takes over from there:
 
-| Jeton | Rendu |
+| Token | Rendered as |
 |---|---|
-| `{summary}` | titre proposé par le modèle |
-| `{type}` | nom du type de réunion |
-| `{Weekday}` / `{weekday}` | `Lundi` / `lundi` |
-| `{date}` | `7 septembre 2026` |
-| `{shortDate}` | `07/09/2026` |
+| `{summary}` | title proposed by the model |
+| `{type}` | meeting type name |
+| `{Weekday}` / `{weekday}` | `Monday` / `monday` |
+| `{date}` | `September 7, 2026` |
+| `{shortDate}` | `09/07/2026` |
 | `{isoDate}` | `2026-09-07` |
 | `{time}` | `14:30` |
 
-Confluence refusant deux pages de même titre dans un espace, une collision est
-résolue par un suffixe `(2)`, `(3)`…
+Since Confluence refuses two pages with the same title in a space, a
+collision is resolved with a `(2)`, `(3)`… suffix.
 
-Les parties littérales du format ne sont pas traduites : c'est une convention de
-nommage, pas du contenu. Seuls les jetons de date suivent la langue du compte rendu.
+The literal parts of the format are not translated: it's a naming
+convention, not content. Only the date tokens follow the language of the
+minutes.
 
 ### Destination
 
-Chaque type publie vers l'une de ces cibles :
+Each type publishes to one of these targets:
 
-- **page de sprint courante** — définie dans *Réglages › Atlassian*, en collant l'URL
-  de la page. L'espace est déduit de la page. Tant qu'aucune page n'est définie, les
-  comptes rendus vont à l'accueil de l'espace plutôt que d'échouer ;
-- **page fixe** — identifiant ou URL Confluence ;
-- **accueil de l'espace**.
+- **current sprint page** — set in *Settings › Atlassian*, by pasting the
+  page's URL. The space is inferred from the page. As long as no page is
+  set, the minutes go to the space's home page instead of failing;
+- **fixed page** — Confluence identifier or URL;
+- **space home page**.
 
-La destination effective est affichée dans le menu et avant publication.
+The effective destination is shown in the menu and before publishing.
 
-### Mode headless
+### Headless mode
 
-Utile pour le diagnostic et les tests bout en bout.
+Useful for diagnostics and end-to-end testing.
 
 ```sh
-# enregistre 30 s, transcrit, génère le compte rendu
-open -W build/SmartMeet.app --args --headless 30 /tmp/rapport --summarize
+# record 30 s, transcribe, generate the minutes
+open -W build/SmartMeet.app --args --headless 30 /tmp/report --summarize
 
-# génère un compte rendu à partir d'un transcript existant
+# generate minutes from an existing transcript
 ./build/SmartMeet.app/Contents/MacOS/SmartMeet \
     --summarize-file Fixtures/transcript-daily.md \
     --template builtin.daily --publish
@@ -181,59 +188,62 @@ open -W build/SmartMeet.app --args --headless 30 /tmp/rapport --summarize
 
 ## Configuration
 
-*Réglages › Atlassian* : site, e-mail, jeton d'API, espace Confluence, projet Jira.
-Le jeton est conservé dans le trousseau. Au premier lancement, il est repris depuis
-`ATLASSIAN_API_TOKEN` s'il est présent dans l'environnement.
+*Settings › Atlassian*: site, e-mail, API token, Confluence space, Jira
+project. The token is kept in the keychain. On first launch, it is picked up
+from `ATLASSIAN_API_TOKEN` if present in the environment.
 
-Certains projets Jira imposent un epic parent via un validateur de workflow, que
-l'API `createmeta` ne déclare pas. Le champ *Epic parent* couvre ce cas.
+Some Jira projects require an epic parent through a workflow validator that
+the `createmeta` API doesn't declare. The *Epic parent* field covers that
+case.
 
 ## Architecture
 
 ```
 Sources/
-├── AudioCapture/     process tap Core Audio, micro, horloge commune
-├── Transcription/    SpeechAnalyzer, fusion des pistes, filtre de diaphonie
-├── Summarization/    types de réunion, prompts, providers LLM
-├── Atlassian/        Confluence, Jira, rendu storage
-├── Calendar/         détection : calendrier et applications de visio
-├── MeetingStore/     persistance sur disque
-└── SmartMeetApp/     interface menu-bar
-Spikes/               bancs d'essai de validation technique
+├── AudioCapture/     Core Audio process tap, microphone, shared clock
+├── Transcription/    SpeechAnalyzer, track fusion, cross-talk filter
+├── Summarization/    meeting types, prompts, LLM providers
+├── Atlassian/        Confluence, Jira, storage rendering
+├── Calendar/         detection: calendar and video conferencing apps
+├── MeetingStore/     on-disk persistence
+└── SmartMeetApp/     menu-bar interface
+Spikes/               technical validation test benches
 ```
 
-## Limites connues
+## Known limitations
 
-- **Diaphonie.** Sans casque, les haut-parleurs reviennent dans le micro et les deux
-  pistes transcrivent la même parole. L'annulation d'écho matérielle
-  (`setVoiceProcessingEnabled`) est inutilisable ici : le traitement de voix d'Apple
-  s'approprie le périphérique de sortie et prive le tap système de sa source. La
-  correction se fait donc sur le texte (`CrossTalkFilter`), avec des seuils empiriques.
-- Les noms propres métier sont approximés par la transcription, malgré l'injection de
-  vocabulaire. Un casque améliore nettement le résultat.
-- Le changement de périphérique audio en cours de réunion provoque une discontinuité.
-- Les modèles locaux (`ollama`) résolvent moins fiablement les dates relatives.
-- L'icône météo retenue par le modèle est une interprétation : « éclaircie » peut
-  ressortir en arc-en-ciel. Elle se corrige en un clic dans la fenêtre de relecture.
+- **Cross-talk.** Without headphones, the speakers feed back into the
+  microphone and both tracks transcribe the same speech. Hardware echo
+  cancellation (`setVoiceProcessingEnabled`) is unusable here: Apple's voice
+  processing takes over the output device and deprives the system tap of its
+  source. The fix therefore happens on the text (`CrossTalkFilter`), with
+  empirical thresholds.
+- Domain-specific proper nouns are approximated by transcription, despite
+  vocabulary injection. Headphones noticeably improve the result.
+- Switching audio device mid-meeting causes a discontinuity.
+- Local models (`ollama`) resolve relative dates less reliably.
+- The weather icon picked by the model is an interpretation: "clearing up"
+  can come out as a rainbow. It's fixed with one click in the review window.
 
-## Développement
+## Development
 
 ```sh
 swift build
 swift test
 ```
 
-Pour livrer — vérifie, commite et pousse d'un coup :
+To ship — checks, commits and pushes in one go:
 
 ```sh
-Scripts/ship.sh "Message de commit"
-Scripts/ship.sh --no-push "Message"   # commit local seulement
-Scripts/ship.sh --amend               # corrige le dernier commit non publié
+Scripts/ship.sh "Commit message"
+Scripts/ship.sh --no-push "Message"   # local commit only
+Scripts/ship.sh --amend               # fixes the last unpublished commit
 ```
 
-Le commit est refusé si le build échoue, s'il reste un warning de compilation, si
-un test échoue, ou si un jeton d'API apparaît dans les modifications.
+The commit is rejected if the build fails, if a compiler warning remains, if
+a test fails, or if an API token shows up in the changes.
 
-L'icône est dessinée en code (`Scripts/make-icon.swift`) et régénérée à chaque
-assemblage du bundle : elle reste modifiable et lisible en diff, plutôt que d'être
-un binaire opaque dans le dépôt.
+The icon is drawn in code (`Scripts/make-icon.swift`) and regenerated on
+every bundle assembly: it stays editable and readable in diffs, rather than
+being an opaque binary in the repository.
+</content>

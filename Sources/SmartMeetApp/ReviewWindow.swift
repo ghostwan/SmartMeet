@@ -15,6 +15,10 @@ struct ReviewWindow: View {
     @State private var showDeleteRawConfirmation = false
     @State private var showTranscript = false
     @State private var templateSelection: String = ""
+    @State private var showJiraDestinationSheet = false
+    @State private var jiraProjectKeyInput = ""
+    @State private var jiraParentKeyInput = ""
+    @State private var pendingPublishMeeting: Meeting?
 
     var body: some View {
         Group {
@@ -52,6 +56,61 @@ struct ReviewWindow: View {
             templateSelection = meeting.templateID
         }
         .onChange(of: session.summaryState) { load(session.reviewedMeeting ?? meeting) }
+        .sheet(isPresented: $showJiraDestinationSheet) {
+            jiraDestinationSheet
+        }
+    }
+
+    /// Demande toujours où créer les tickets, plutôt que de dépendre uniquement du
+    /// projet configuré dans les réglages : un compte rendu peut concerner un projet
+    /// différent de celui utilisé par défaut.
+    private var jiraDestinationSheet: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Où créer les tickets Jira ?")
+                .font(.title3.weight(.semibold))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Projet Jira").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                TextField("Ex. PROJ", text: $jiraProjectKeyInput)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Epic parent (optionnel)").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                TextField("Ex. PROJ-123", text: $jiraParentKeyInput)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            Text("Les tickets seront créés en anglais, quelle que soit la langue du compte rendu.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack {
+                Spacer()
+                Button("Annuler") {
+                    showJiraDestinationSheet = false
+                    pendingPublishMeeting = nil
+                }
+                Button("Créer les tickets") {
+                    showJiraDestinationSheet = false
+                    if let meeting = pendingPublishMeeting {
+                        Task {
+                            await session.publish(
+                                meeting,
+                                createJiraIssues: true,
+                                jiraProjectKey: jiraProjectKeyInput,
+                                jiraParentKey: jiraParentKeyInput
+                            )
+                        }
+                    }
+                    pendingPublishMeeting = nil
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(jiraProjectKeyInput.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(width: 380)
     }
 
     private func load(_ meeting: Meeting?) {
@@ -510,6 +569,16 @@ struct ReviewWindow: View {
                         TextField("Action", text: $item.description, axis: .vertical)
                             .textFieldStyle(.roundedBorder)
                         HStack {
+                            Picker("", selection: $item.issueType) {
+                                ForEach(MeetingSummary.IssueType.allCases) { type in
+                                    Label(type.displayName(in: .french), systemImage: type.symbol)
+                                        .tag(type)
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(width: 130)
+                            .help("Type de ticket Jira détecté — modifiable")
+
                             TextField(
                                 "Responsable",
                                 text: Binding(
@@ -556,7 +625,7 @@ struct ReviewWindow: View {
                     Text(message).font(.caption).foregroundStyle(.secondary)
                 }
             }
-            if case .published(let url, let pageTitle, let issues, let failures) = session.publishState {
+            if case .published(let url, let pageTitle, let issues, let failures, let jiraSearchURL) = session.publishState {
                 VStack(alignment: .leading, spacing: 4) {
                     if let pageURL = URL(string: url) {
                         Link("« \(pageTitle) »", destination: pageURL).font(.callout)
@@ -564,6 +633,10 @@ struct ReviewWindow: View {
                     if !issues.isEmpty {
                         Text("Tickets créés : \(issues.joined(separator: ", "))")
                             .font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let jiraSearchURL, let searchURL = URL(string: jiraSearchURL) {
+                        Link("Voir les tickets dans Jira", destination: searchURL)
+                            .font(.caption)
                     }
                     ForEach(failures, id: \.self) { failure in
                         Label(failure, systemImage: "exclamationmark.triangle")
@@ -634,8 +707,18 @@ struct ReviewWindow: View {
                 }
                 Button("Publier sur Confluence") {
                     session.saveReviewedSummary(draft)
-                    if let updated = session.reviewedMeeting {
-                        Task { await session.publish(updated, createJiraIssues: createJiraIssues) }
+                    guard let updated = session.reviewedMeeting else { return }
+                    let hasSelectedItems = draft.actionItems.contains { $0.isSelected }
+                    if createJiraIssues, session.settings.atlassian.isJiraReady, hasSelectedItems {
+                        // Toujours demander où créer les tickets, préremplis avec les
+                        // réglages par défaut : le projet cible peut varier d'une
+                        // réunion à l'autre.
+                        jiraProjectKeyInput = session.settings.atlassian.jiraProjectKey
+                        jiraParentKeyInput = session.settings.atlassian.jiraParentKey
+                        pendingPublishMeeting = updated
+                        showJiraDestinationSheet = true
+                    } else {
+                        Task { await session.publish(updated, createJiraIssues: false) }
                     }
                 }
                 .buttonStyle(.borderedProminent)
