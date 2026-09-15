@@ -165,9 +165,10 @@ What does **not** live in the repository and will need to be redone:
 | Item | Where it lives | To redo |
 |---|---|---|
 | Signing identity | Keychain | An Apple development identity is enough. `bundle-app.sh` automatically picks the first one found; otherwise `SMARTMEET_SIGN_IDENTITY="…"`. |
-| Atlassian API token | Keychain (`com.smartmeet.atlassian`) | Settings › Atlassian. Picked up from `ATLASSIAN_API_TOKEN` on first launch if present in the environment. |
-| Space, Jira project, epic parent, sprint page | `defaults` of `com.smartmeet.app` | Settings › Atlassian. |
-| Custom meeting types, including overrides of built-in types | `defaults` | Settings › Meeting Types. The four built-in types stay in the code, but a local edit takes priority as long as it exists (see `AppSettings.upsert`/`remove`). |
+| Atlassian/Notion API tokens | Keychain (`com.smartmeet.atlassian`/`com.smartmeet.notion`), one account per profile ID | Settings › Services, under the active profile. Atlassian is picked up from `ATLASSIAN_API_TOKEN` on first launch if present in the environment. |
+| Space, Jira project, epic parent, sprint page, Notion workspace | `defaults` of `com.smartmeet.app`, keyed by profile ID | Settings › Services, under the active profile. |
+| Profiles (Work, Personal…), each with its own vocabulary, meeting types, behavior toggles and default service | `defaults` of `com.smartmeet.app` (`profiles` key) | Settings › Profiles. |
+| Custom meeting types, including overrides of built-in types | `defaults`, scoped per profile | Settings › Meeting Types. The built-in types stay in the code, but a local edit takes priority as long as it exists (see `AppSettings.upsert`/`remove`). |
 | Microphone, audio capture, calendar, notification permissions | TCC | Requested again on first launch. **The bundle must be launched through LaunchServices** (`open build/SmartMeet.app`), never from a terminal, otherwise system audio capture silently returns silence. |
 | `SpeechTranscriber` language models | System | Downloaded on first recording. |
 | Recorded meetings | `~/Library/Application Support/SmartMeet/Meetings/` | Not versioned. Copy the folder if needed. |
@@ -178,7 +179,7 @@ for generating the minutes.
 Checking everything is in place:
 
 ```sh
-swift test                                   # 101 tests
+swift test                                   # 154 tests
 ./Scripts/bundle-app.sh && open build/SmartMeet.app
 open build/SmartMeet.app --args --check-notifications /tmp/report.txt
 ```

@@ -141,6 +141,25 @@ public final class RecordingSession {
         }
     }
 
+    /// Switches every session-level selection and background behavior to the
+    /// chosen profile in one operation. Those values are intentionally copied
+    /// out of `AppSettings` while the user prepares a recording, so changing
+    /// only `activeProfileID` would otherwise leave the meeting type and both
+    /// languages pointing at the previous profile until the app is relaunched.
+    public func selectProfile(_ id: String) {
+        guard !isRecording,
+              settings.profiles.contains(where: { $0.id == id })
+        else { return }
+
+        stopMeetingDetection()
+        settings.activeProfileID = id
+        selectedTemplateID = settings.defaultTemplateID
+        selectedOutputLanguage = settings.defaultOutputLanguage
+        selectedTranscriptionLocale = settings.localeIdentifier
+
+        Task { await startMeetingDetection() }
+    }
+
     /// Starts meeting surveillance. Called at app launch.
     public func startMeetingDetection() async {
         guard settings.detectMeetings else { return }

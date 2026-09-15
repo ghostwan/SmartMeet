@@ -71,6 +71,9 @@
    ============================================================ */
 "Compte rendu" = "Ata";
 "Types de réunion" = "Tipos de reunião";
+"Profils" = "Perfis";
+"Services" = "Serviços";
+"Profil : %@" = "Perfil: %@";
 "Identité" = "Identidade";
 "Votre nom" = "O teu nome";
 "Le transcript ne vous désigne que par « Moi ». Ce nom permet de vous attribuer correctement décisions et action items." = "A transcrição designa-te apenas como «Moi». Este nome permite atribuir-te corretamente decisões e tarefas.";
@@ -90,7 +93,10 @@
 "Provider" = "Fornecedor";
 "Modèle" = "Modelo";
 "Passe par le binaire `opencode`, client Copilot authentifié. Aucune API publique ne permet d'utiliser un abonnement Copilot directement depuis une application tierce." = "Passa pelo binário `opencode`, cliente Copilot autenticado. Nenhuma API pública permite usar uma subscrição Copilot diretamente a partir de uma aplicação externa.";
+"Passe par le binaire `copilot --acp` (GitHub Copilot CLI), en protocole ACP plutôt qu'en sortie texte parsée : compte de tokens exact, sans dépendre d'`opencode`." = "Passa pelo binário `copilot --acp` (GitHub Copilot CLI), usando ACP em vez de analisar a saída de texto: contagem exata de tokens, sem depender do `opencode`.";
+"Modèle embarqué d'Apple Intelligence : entièrement local, aucune donnée ne quitte la machine, aucune installation. Fenêtre de contexte réduite (~4096 tokens) : convient aux réunions courtes, moins bien aux réunions longues même découpées." = "Modelo integrado do Apple Intelligence: totalmente local, nenhum dado sai da máquina e não requer instalação. A janela de contexto reduzida (~4096 tokens) adapta-se melhor a reuniões curtas do que longas, mesmo divididas.";
 "Entièrement local : aucune donnée ne quitte la machine. Qualité inférieure sur la résolution des dates relatives." = "Totalmente local: nenhum dado sai da máquina. Qualidade inferior na resolução de datas relativas.";
+"Passe par le binaire `claude` (Claude Code CLI) en mode non interactif (`claude -p --output-format json`), abonnement Claude authentifié via le CLI." = "Passa pelo binário `claude` (Claude Code CLI) em modo não interativo (`claude -p --output-format json`), usando a subscrição Claude autenticada no CLI.";
 "Langue par défaut du compte rendu" = "Idioma predefinido da ata";
 "Modifiable avant chaque enregistrement. Indépendante de la langue parlée en réunion : une équipe francophone peut livrer un compte rendu en anglais." = "Editável antes de cada gravação. Independente do idioma falado na reunião: uma equipa francófona pode entregar uma ata em inglês.";
 "À l'arrêt de l'enregistrement" = "Ao parar a gravação";
@@ -128,6 +134,18 @@
 "URL ou identifiant de la page" = "URL ou identificador da página";
 "Colle l'URL de la page qui agrège le sprint. Les types de réunion réglés sur « page de sprint » y publieront leurs comptes rendus, dans l'espace de cette page." = "Cola o URL da página que agrega o sprint. Os tipos de reunião definidos como «página de sprint» publicarão aí as suas atas, no espaço dessa página.";
 "Changer de page ne migre pas les comptes rendus déjà publiés : ils restent sur l'ancienne page de sprint." = "Mudar de página não migra as atas já publicadas: permanecem na antiga página de sprint.";
+"Nouveau profil" = "Novo perfil";
+"Supprimer le profil actif" = "Eliminar o perfil ativo";
+"Nom" = "Nome";
+"Icône" = "Ícone";
+"Publication" = "Publicação";
+"Service par défaut" = "Serviço predefinido";
+"Service mis en avant pour ce profil au moment de publier un compte rendu. Ajoute d'abord un service dans l'onglet « Services » pour pouvoir le choisir ici." = "Serviço destacado para este perfil ao publicar uma ata. Adiciona primeiro um serviço no separador Serviços para o poderes escolher aqui.";
+"Le vocabulaire métier, les types de réunion activés, les services de publication (avec leurs identifiants) et les préférences de comportement (transcription, détection, publication automatique…) s'appliquent tous au profil actif ci-dessus, pas globalement." = "O vocabulário do setor, os tipos de reunião ativos, os serviços de publicação (incluindo as credenciais) e as preferências de comportamento (transcrição, deteção, publicação automática…) aplicam-se ao perfil ativo, não globalmente.";
+"Ajouter un service" = "Adicionar um serviço";
+"Retirer ce service (sa configuration est conservée)" = "Remover este serviço (a configuração é mantida)";
+"Aucun service configuré" = "Nenhum serviço configurado";
+"Ajoute Notion ou Atlassian avec le bouton + pour publier tes comptes rendus." = "Adiciona o Notion ou o Atlassian com o botão + para publicar as atas.";
 
 /* ============================================================
    MenuBarContent.swift

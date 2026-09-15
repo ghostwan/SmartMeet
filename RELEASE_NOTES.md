@@ -21,6 +21,10 @@ notes, then resets it to this template once the release is published.
   JSON-RPC over stdio) instead of the `opencode` client. Gives an exact
   token count per completion without depending on `opencode`'s NDJSON
   output format.
+- New summary provider: `Claude Code`, using the official `claude` CLI in
+  non-interactive JSON mode (`claude -p --output-format json`). It reuses the
+  Claude subscription authenticated by Claude Code and reports Anthropic's
+  input, output and prompt-cache token counts back to SmartMeet.
 - The app UI (menu bar, settings, review window, notifications) and all
   user-facing error messages are now localized in French, English, Spanish,
   Portuguese and Italian, following the system language. macOS permission
@@ -47,7 +51,25 @@ notes, then resets it to this template once the release is published.
   muting the app on purpose) so a short cut doesn't end the recording on
   your behalf; dismissing the suggestion snoozes it for 5 minutes. New
   setting to disable it (on by default): *Settings › Meeting detection*.
+- New **Profiles** (*Settings › Profiles*): switch between usage contexts
+  (e.g. "Work" and "Personal") from the menu bar. Each profile has its own
+  vocabulary, its own set of visible/default meeting types, its own default
+  publication service, its own behavior preferences (auto-record, auto-
+  publish, meeting detection, spoken/output language, microphone-track
+  diarization…), and its own publication services with independent
+  credentials (a different Confluence site or Notion workspace per
+  profile). Publication services (Notion, Confluence) are now a dynamic,
+  addable list per profile (*Settings › Services*) instead of two tabs
+  always shown regardless of configuration. Upgrading from an earlier
+  version migrates all existing settings into a single seed "Work" profile
+  automatically — nothing is reset.
 
 ### Changed
+
+- The generic, no-frills meeting type (used as the universal fallback) is
+  now named "Réunion générique" and is the sole meeting type a freshly
+  created profile starts with; the former "Réunion générique" (the
+  work-oriented default template) is now named "Réunion de travail" and,
+  like every other built-in type, is opt-in per profile.
 
 ### Fixed

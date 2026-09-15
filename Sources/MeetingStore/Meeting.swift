@@ -50,7 +50,7 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         locale: String,
         trackStartOffsets: [String: TimeInterval] = [:],
         knownAttendees: [String] = [],
-        templateID: String = MeetingTemplate.generic.id,
+        templateID: String = MeetingTemplate.personal.id,
         outputLanguage: SummaryLanguage = .french,
         summary: MeetingSummary? = nil,
         confluencePageURL: String? = nil,
@@ -101,7 +101,7 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         ) ?? [:]
         knownAttendees = try container.decodeIfPresent([String].self, forKey: .knownAttendees) ?? []
         templateID = try container.decodeIfPresent(String.self, forKey: .templateID)
-            ?? MeetingTemplate.generic.id
+            ?? MeetingTemplate.personal.id
         outputLanguage = try container.decodeIfPresent(
             SummaryLanguage.self, forKey: .outputLanguage
         ) ?? .french

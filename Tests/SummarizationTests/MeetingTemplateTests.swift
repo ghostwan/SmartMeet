@@ -71,8 +71,8 @@ struct MeetingTemplateTests {
 
     @Test("Un identifiant inconnu retombe sur le type générique")
     func resolveFallsBack() {
-        #expect(MeetingTemplate.resolve(id: "n'existe pas", in: []) == .generic)
-        #expect(MeetingTemplate.resolve(id: nil, in: []) == .generic)
+        #expect(MeetingTemplate.resolve(id: "n'existe pas", in: []) == .personal)
+        #expect(MeetingTemplate.resolve(id: nil, in: []) == .personal)
         #expect(MeetingTemplate.resolve(id: MeetingTemplate.daily.id, in: []) == .daily)
     }
 

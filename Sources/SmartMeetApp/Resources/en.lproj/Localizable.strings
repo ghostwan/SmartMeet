@@ -71,6 +71,9 @@
    ============================================================ */
 "Compte rendu" = "Minutes";
 "Types de réunion" = "Meeting types";
+"Profils" = "Profiles";
+"Services" = "Services";
+"Profil : %@" = "Profile: %@";
 "Identité" = "Identity";
 "Votre nom" = "Your name";
 "Le transcript ne vous désigne que par « Moi ». Ce nom permet de vous attribuer correctement décisions et action items." = "The transcript only refers to you as \"Moi\". This name lets decisions and action items be correctly attributed to you.";
@@ -90,7 +93,10 @@
 "Provider" = "Provider";
 "Modèle" = "Model";
 "Passe par le binaire `opencode`, client Copilot authentifié. Aucune API publique ne permet d'utiliser un abonnement Copilot directement depuis une application tierce." = "Goes through the `opencode` binary, an authenticated Copilot client. No public API allows using a Copilot subscription directly from a third-party application.";
+"Passe par le binaire `copilot --acp` (GitHub Copilot CLI), en protocole ACP plutôt qu'en sortie texte parsée : compte de tokens exact, sans dépendre d'`opencode`." = "Goes through the `copilot --acp` binary (GitHub Copilot CLI), using ACP instead of parsed text output: exact token counts, without depending on `opencode`.";
+"Modèle embarqué d'Apple Intelligence : entièrement local, aucune donnée ne quitte la machine, aucune installation. Fenêtre de contexte réduite (~4096 tokens) : convient aux réunions courtes, moins bien aux réunions longues même découpées." = "Built-in Apple Intelligence model: fully local, no data leaves the machine, and no installation required. Its smaller context window (~4096 tokens) suits short meetings better than long ones, even when chunked.";
 "Entièrement local : aucune donnée ne quitte la machine. Qualité inférieure sur la résolution des dates relatives." = "Fully local: no data ever leaves the machine. Lower quality when resolving relative dates.";
+"Passe par le binaire `claude` (Claude Code CLI) en mode non interactif (`claude -p --output-format json`), abonnement Claude authentifié via le CLI." = "Goes through the `claude` binary (Claude Code CLI) in non-interactive mode (`claude -p --output-format json`), using the Claude subscription authenticated in the CLI.";
 "Langue par défaut du compte rendu" = "Default minutes language";
 "Modifiable avant chaque enregistrement. Indépendante de la langue parlée en réunion : une équipe francophone peut livrer un compte rendu en anglais." = "Editable before each recording. Independent from the language spoken in the meeting: a French-speaking team can produce minutes in English.";
 "À l'arrêt de l'enregistrement" = "When recording stops";
@@ -128,6 +134,18 @@
 "URL ou identifiant de la page" = "Page URL or ID";
 "Colle l'URL de la page qui agrège le sprint. Les types de réunion réglés sur « page de sprint » y publieront leurs comptes rendus, dans l'espace de cette page." = "Paste the URL of the page that aggregates the sprint. Meeting types set to \"sprint page\" will publish their minutes there, in that page's space.";
 "Changer de page ne migre pas les comptes rendus déjà publiés : ils restent sur l'ancienne page de sprint." = "Changing the page doesn't migrate already-published minutes: they stay on the old sprint page.";
+"Nouveau profil" = "New profile";
+"Supprimer le profil actif" = "Delete the active profile";
+"Nom" = "Name";
+"Icône" = "Icon";
+"Publication" = "Publication";
+"Service par défaut" = "Default service";
+"Service mis en avant pour ce profil au moment de publier un compte rendu. Ajoute d'abord un service dans l'onglet « Services » pour pouvoir le choisir ici." = "Service highlighted for this profile when publishing minutes. Add a service in the Services tab before selecting it here.";
+"Le vocabulaire métier, les types de réunion activés, les services de publication (avec leurs identifiants) et les préférences de comportement (transcription, détection, publication automatique…) s'appliquent tous au profil actif ci-dessus, pas globalement." = "Domain vocabulary, enabled meeting types, publication services (including their credentials), and behavior preferences (transcription, detection, automatic publication…) all apply to the active profile above, not globally.";
+"Ajouter un service" = "Add a service";
+"Retirer ce service (sa configuration est conservée)" = "Remove this service (its configuration is kept)";
+"Aucun service configuré" = "No service configured";
+"Ajoute Notion ou Atlassian avec le bouton + pour publier tes comptes rendus." = "Add Notion or Atlassian with the + button to publish your minutes.";
 
 /* ============================================================
    MenuBarContent.swift

@@ -726,41 +726,65 @@ struct ReviewWindow: View {
                 }
                 Button(L("Enregistrer les modifications")) { session.saveReviewedSummary(draft) }
                 if session.settings.canPublishToNotion {
-                    Button {
-                        session.saveReviewedSummary(draft)
-                        if let updated = session.reviewedMeeting {
-                            Task { await session.publishToNotion(updated) }
-                        }
-                    } label: {
+                    Group {
                         if case .running = session.notionPublishState {
-                            ProgressView().controlSize(.small)
+                            Button {
+                            } label: {
+                                ProgressView().controlSize(.small)
+                            }
+                            .disabled(true)
+                        } else if session.settings.activeProfile.defaultServiceKind == .notion {
+                            Button("Publier sur Notion") {
+                                session.saveReviewedSummary(draft)
+                                if let updated = session.reviewedMeeting {
+                                    Task { await session.publishToNotion(updated) }
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
                         } else {
-                            Text("Publier sur Notion")
+                            Button("Publier sur Notion") {
+                                session.saveReviewedSummary(draft)
+                                if let updated = session.reviewedMeeting {
+                                    Task { await session.publishToNotion(updated) }
+                                }
+                            }
                         }
                     }
-                    .disabled({ if case .running = session.notionPublishState { true } else { false } }())
                 }
-                Button("Publier sur Confluence") {
-                    session.saveReviewedSummary(draft)
-                    guard let updated = session.reviewedMeeting else { return }
-                    let hasSelectedItems = draft.actionItems.contains { $0.isSelected }
-                    if createJiraIssues, session.settings.atlassian.isJiraReady, hasSelectedItems {
-                        // Always ask where to create the tickets, pre-filled with
-                        // the default settings: the target project can vary
-                        // from one meeting to another.
-                        jiraProjectKeyInput = session.settings.atlassian.jiraProjectKey
-                        jiraParentKeyInput = session.settings.atlassian.jiraParentKey
-                        pendingPublishMeeting = updated
-                        showJiraDestinationSheet = true
+                Group {
+                    if session.settings.activeProfile.defaultServiceKind == .atlassian
+                        || session.settings.activeProfile.defaultServiceKind == nil {
+                        Button("Publier sur Confluence") {
+                            confluencePublishAction()
+                        }
+                        .buttonStyle(.borderedProminent)
                     } else {
-                        Task { await session.publish(updated, createJiraIssues: false) }
+                        Button("Publier sur Confluence") {
+                            confluencePublishAction()
+                        }
                     }
                 }
-                .buttonStyle(.borderedProminent)
                 .disabled(!session.settings.canPublish)
             }
         }
         .padding()
+    }
+
+    private func confluencePublishAction() {
+        session.saveReviewedSummary(draft)
+        guard let updated = session.reviewedMeeting else { return }
+        let hasSelectedItems = draft.actionItems.contains { $0.isSelected }
+        if createJiraIssues, session.settings.atlassian.isJiraReady, hasSelectedItems {
+            // Always ask where to create the tickets, pre-filled with
+            // the default settings: the target project can vary
+            // from one meeting to another.
+            jiraProjectKeyInput = session.settings.atlassian.jiraProjectKey
+            jiraParentKeyInput = session.settings.atlassian.jiraParentKey
+            pendingPublishMeeting = updated
+            showJiraDestinationSheet = true
+        } else {
+            Task { await session.publish(updated, createJiraIssues: false) }
+        }
     }
 
     private func field(_ title: String, text: Binding<String>) -> some View {

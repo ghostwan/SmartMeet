@@ -41,6 +41,12 @@ macOS 26 or later, Apple Silicon, Xcode 26.
 For generating the minutes, pick one:
 
 - [`opencode`](https://opencode.ai) — uses a GitHub Copilot subscription;
+- [GitHub Copilot CLI](https://github.com/features/copilot/cli) — exposed through
+  its structured ACP interface;
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) — uses the
+  subscription authenticated in the official `claude` CLI;
+- Apple Intelligence — built into macOS, fully local, best suited to shorter
+  meetings because of its smaller context window;
 - [`ollama`](https://ollama.com) — fully local, no data ever leaves.
 
 ## Installation
@@ -164,7 +170,7 @@ minutes.
 
 Each type publishes to one of these targets:
 
-- **current sprint page** — set in *Settings › Atlassian*, by pasting the
+- **current sprint page** — set in *Settings › Services*, by pasting the
   page's URL. The space is inferred from the page. As long as no page is
   set, the minutes go to the space's home page instead of failing;
 - **fixed page** — Confluence identifier or URL;
@@ -186,11 +192,28 @@ open -W build/SmartMeet.app --args --headless 30 /tmp/report --summarize
     --template builtin.daily --publish
 ```
 
+## Profiles
+
+*Settings › Profiles* switches between usage contexts (e.g. "Work" and
+"Personal") from the menu bar. Everything else in Settings — vocabulary,
+which meeting types are visible and which is the default, publication
+services and their credentials (a different Confluence site or Notion
+workspace per profile), behavior toggles (auto-record, auto-publish, meeting
+detection, spoken/output language, microphone-track diarization…) — is scoped
+to the active profile. A fresh profile starts blank: no service configured,
+only the generic meeting type enabled. Upgrading from a version without
+profiles migrates every existing setting into a single seed "Work" profile
+automatically.
+
 ## Configuration
 
-*Settings › Atlassian*: site, e-mail, API token, Confluence space, Jira
-project. The token is kept in the keychain. On first launch, it is picked up
-from `ATLASSIAN_API_TOKEN` if present in the environment.
+*Settings › Services* lists publication services as a dynamic, addable list
+(rather than fixed tabs always shown) — add Notion and/or Confluence per
+profile, each with its own credentials:
+
+*Confluence*: site, e-mail, API token, Confluence space, Jira project. The
+token is kept in the keychain. On first launch, it is picked up from
+`ATLASSIAN_API_TOKEN` if present in the environment.
 
 Some Jira projects require an epic parent through a workflow validator that
 the `createmeta` API doesn't declare. The *Epic parent* field covers that

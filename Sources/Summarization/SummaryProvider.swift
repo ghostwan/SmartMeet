@@ -25,6 +25,7 @@ public enum SummaryProviderKind: String, Codable, Sendable, CaseIterable, Identi
     case copilotACP
     case appleOnDevice
     case ollama
+    case claudeCode
 
     public var id: String { rawValue }
 
@@ -34,6 +35,7 @@ public enum SummaryProviderKind: String, Codable, Sendable, CaseIterable, Identi
         case .copilotACP: "copilot (ACP)"
         case .appleOnDevice: "Apple Intelligence (local)"
         case .ollama: "ollama (local)"
+        case .claudeCode: "Claude Code"
         }
     }
 }

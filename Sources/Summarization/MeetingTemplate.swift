@@ -298,7 +298,7 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
 public extension MeetingTemplate {
     static let generic = MeetingTemplate(
         id: "builtin.generic",
-        name: "Réunion générique",
+        name: "Réunion de travail",
         symbol: "doc.text",
         sections: [.tldr, .decisions, .actionItems, .topics, .openQuestions, .nextSteps],
         instructions: "",
@@ -383,11 +383,12 @@ public extension MeetingTemplate {
     )
 
     /// For an exchange unrelated to work (personal, family, friends,
-    /// administrative…): same sections as the generic type, but without the
-    /// vocabulary or professional framing imposed by the prompt.
+    /// administrative…): same sections as the work type, but without the
+    /// vocabulary or professional framing imposed by the prompt. This is the
+    /// neutral baseline every new profile starts with.
     static let personal = MeetingTemplate(
         id: "builtin.personal",
-        name: "Conversation personnelle",
+        name: "Réunion générique",
         symbol: "bubble.left.and.bubble.right",
         sections: [.tldr, .decisions, .actionItems, .topics, .openQuestions, .nextSteps],
         instructions: """
@@ -429,13 +430,14 @@ public extension MeetingTemplate {
 
     static let builtIns: [MeetingTemplate] = [generic, daily, synchro, retrospective, personal, oneToOne]
 
-    /// Looks up a template by identifier, falling back to the generic template.
+    /// Looks up a template by identifier, falling back to the generic template
+    /// (the neutral "Réunion générique" baseline, not the work-oriented one).
     /// A custom template takes priority over a built-in template with the same
     /// identifier: this is how editing a built-in type (see `AppSettings.upsert`)
     /// is honored rather than the original hardcoded version.
     static func resolve(id: String?, in custom: [MeetingTemplate]) -> MeetingTemplate {
-        guard let id else { return .generic }
-        return custom.first { $0.id == id } ?? builtIns.first { $0.id == id } ?? .generic
+        guard let id else { return .personal }
+        return custom.first { $0.id == id } ?? builtIns.first { $0.id == id } ?? .personal
     }
 
     /// Guesses the meeting type from its title — useful as soon as a meeting is

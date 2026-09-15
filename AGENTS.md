@@ -91,6 +91,9 @@ sorted into **Added** / **Changed** / **Fixed** sections.
   accumulates between two releases; `Scripts/release.sh` uses it to compose the
   GitHub release notes and resets it itself once the release is published — the
   agent must never do this by hand.
+- **Before committing and pushing, update `README.md`** if the change affects
+  architecture, setup, or user-facing behaviour it documents — don't let it
+  drift out of sync with the codebase.
 
 ## Secrets
 
@@ -110,6 +113,9 @@ macOS keychain (`Sources/Atlassian/KeychainStore.swift`) or in the environment
   value, out-of-vocabulary value) in addition to the nominal case.
 - Before considering a task done: `swift build` with no warnings and
   `swift test` fully green.
+- Once a task is done, rebuild the app (`./Scripts/bundle-app.sh`) and relaunch
+  it (`open build/SmartMeet.app`) to verify the change for real, not just in
+  the test suite.
 
 ## Structural things to know
 

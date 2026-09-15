@@ -8,7 +8,7 @@ import SwiftUI
 struct TemplatesSettingsView: View {
     @Bindable var settings: AppSettings
     @Bindable var session: RecordingSession
-    @State private var selectedID: String = MeetingTemplate.generic.id
+    @State private var selectedID: String = MeetingTemplate.personal.id
 
     private var selected: MeetingTemplate {
         settings.template(id: selectedID)
@@ -57,7 +57,7 @@ struct TemplatesSettingsView: View {
 
                 Button {
                     settings.remove(selected)
-                    selectedID = MeetingTemplate.generic.id
+                    selectedID = MeetingTemplate.personal.id
                 } label: {
                     Image(systemName: selected.isBuiltIn ? "arrow.uturn.backward" : "minus")
                 }
@@ -103,7 +103,7 @@ struct TemplatesSettingsView: View {
                     "Type par défaut au démarrage",
                     isOn: Binding(
                         get: { settings.defaultTemplateID == selected.id },
-                        set: { settings.defaultTemplateID = $0 ? selected.id : MeetingTemplate.generic.id }
+                        set: { settings.defaultTemplateID = $0 ? selected.id : MeetingTemplate.personal.id }
                     )
                 )
 

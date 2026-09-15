@@ -94,6 +94,24 @@ struct MenuBarContent: View {
             }
             Spacer()
 
+            if session.settings.profiles.count > 1 {
+                Menu {
+                    ForEach(session.settings.profiles) { profile in
+                        Button {
+                            session.selectProfile(profile.id)
+                        } label: {
+                            Label(profile.name, systemImage: profile.symbol)
+                        }
+                    }
+                } label: {
+                    Image(systemName: session.settings.activeProfile.symbol)
+                }
+                .menuStyle(.borderlessButton)
+                .frame(width: 24)
+                .disabled(session.isRecording)
+                .help(L("Profil : %@", session.settings.activeProfile.name))
+            }
+
             Button {
                 Task { await session.toggle() }
             } label: {
