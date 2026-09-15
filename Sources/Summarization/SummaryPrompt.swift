@@ -64,6 +64,10 @@ enum SummaryPrompt {
             """
         )
 
+        if language != .french, language != .english {
+            text += "\n\nWrite every natural-language value in the final JSON in \(language.promptName). Keep JSON keys and controlled schema values exactly as specified."
+        }
+
         text += "\n\n" + language.pick(
             fr: "Type de réunion : \(template.name).\nDate de la réunion : \(context.dateDescription(in: language)).",
             en: "Meeting type: \(template.name).\nMeeting date: \(context.dateDescription(in: language))."

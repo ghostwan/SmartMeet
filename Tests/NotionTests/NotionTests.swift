@@ -5,6 +5,15 @@ import Testing
 
 @Suite("Extraction de l'identifiant de page Notion")
 struct NotionConfigurationTests {
+    @Test("Une ancienne configuration reste lisible sans base de tâches")
+    func legacyConfigurationDecodes() throws {
+        let data = Data(#"{"parentPageID":"abc","parentPageTitle":"Réunions"}"#.utf8)
+        let configuration = try JSONDecoder().decode(NotionConfiguration.self, from: data)
+        #expect(configuration.parentPageID == "abc")
+        #expect(configuration.taskDataSourceID.isEmpty)
+        #expect(!configuration.isTaskDataSourceConfigured)
+    }
+
     @Test("Un identifiant nu avec tirets est accepté")
     func plainDashedID() {
         let id = "2ac1f5c4-a1b3-4e6c-9a9d-8f6f6f6f6f6f"
@@ -28,6 +37,19 @@ struct NotionConfigurationTests {
         #expect(NotionConfiguration.extractPageID(from: "") == nil)
         #expect(NotionConfiguration.extractPageID(from: "pas un identifiant") == nil)
         #expect(NotionConfiguration.extractPageID(from: "https://example.com/rien") == nil)
+    }
+}
+
+@Suite("Bases de tâches Notion")
+struct NotionTaskDataSourceTests {
+    @Test("Une source trouvée est convertie en option sélectionnable")
+    func parsesSearchResult() throws {
+        let summary = try #require(NotionClient.dataSourceSummary(from: [
+            "id": "source-id",
+            "title": [["plain_text": "Tâches produit"]],
+        ]))
+        #expect(summary.id == "source-id")
+        #expect(summary.title == "Tâches produit")
     }
 }
 
@@ -79,5 +101,21 @@ struct MarkdownToNotionBlocksTests {
         let blocks = MarkdownToNotionBlocks.blocks(from: markdown)
         #expect(blocks.count == 150)
         #expect(blocks.count > MarkdownToNotionBlocks.maxBlocksPerRequest)
+    }
+
+    @Test("La transcription devient un accordéon Notion natif")
+    func transcriptBecomesNativeToggle() throws {
+        let children = MarkdownToNotionBlocks.blocks(
+            from: "# Transcript\n\n**Alice** Bonjour"
+        )
+        let block = MarkdownToNotionBlocks.toggle(
+            title: "Transcript intégral",
+            children: children
+        )
+        #expect(block["type"] as? String == "toggle")
+        let toggle = try #require(block["toggle"] as? [String: Any])
+        let nested = try #require(toggle["children"] as? [[String: Any]])
+        #expect(nested.count == 1)
+        #expect(nested[0]["type"] as? String == "paragraph")
     }
 }

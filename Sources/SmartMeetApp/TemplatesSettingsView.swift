@@ -2,9 +2,10 @@ import Atlassian
 import Summarization
 import SwiftUI
 
-/// Meeting-type editor. Built-in templates are always offered but can be
-/// edited: the edit is stored as an override, resettable via the ↺ button.
-/// Custom templates can be modified and deleted freely.
+/// Meeting-type editor for the active profile. The sidebar is the profile's
+/// actual list, not a global inventory with hidden rows: built-ins are added
+/// from the `+` menu and remain editable, while a blank custom type can be
+/// created from scratch.
 struct TemplatesSettingsView: View {
     @Bindable var settings: AppSettings
     @Bindable var session: RecordingSession
@@ -20,49 +21,64 @@ struct TemplatesSettingsView: View {
         settings.customTemplates.contains { $0.id == selectedID }
     }
 
+    private var activeTemplates: [MeetingTemplate] { settings.allTemplates }
+
     var body: some View {
         HSplitView {
             list
             detail
         }
+        .onAppear(perform: normalizeSelection)
+        .onChange(of: settings.activeProfileID) { normalizeSelection() }
     }
 
     private var list: some View {
         VStack(spacing: 0) {
             List(selection: $selectedID) {
-                Section("Fournis") {
-                    ForEach(MeetingTemplate.builtIns) { builtIn in
-                        let current = settings.template(id: builtIn.id)
-                        row(for: current)
-                    }
-                }
-                if !settings.customTemplates.isEmpty {
-                    Section("Personnalisés") {
-                        ForEach(settings.customTemplates) { template in
-                            row(for: template)
-                        }
-                    }
+                ForEach(activeTemplates) { template in
+                    row(for: template)
                 }
             }
             .listStyle(.sidebar)
 
             HStack(spacing: 4) {
-                Button {
-                    let copy = settings.duplicate(selected)
-                    selectedID = copy.id
+                Menu {
+                    if !settings.availableBuiltInTemplates.isEmpty {
+                        Section("Modèles fournis") {
+                            ForEach(settings.availableBuiltInTemplates) { template in
+                                Button {
+                                    settings.addBuiltInTemplate(template)
+                                    selectedID = template.id
+                                    session.selectedTemplateID = settings.defaultTemplateID
+                                } label: {
+                                    Label(template.localizedName, systemImage: template.symbol)
+                                }
+                            }
+                        }
+                    }
+                    Button {
+                        let template = settings.createCustomTemplate()
+                        selectedID = template.id
+                    } label: {
+                        Label("Nouveau type personnalisé", systemImage: "doc.badge.plus")
+                    }
                 } label: {
                     Image(systemName: "plus")
                 }
-                .help("Dupliquer ce type")
+                .help("Ajouter un type de réunion")
 
                 Button {
-                    settings.remove(selected)
-                    selectedID = MeetingTemplate.personal.id
+                    let removedID = selected.id
+                    settings.removeTemplateFromActiveProfile(selected)
+                    normalizeSelection()
+                    if session.selectedTemplateID == removedID {
+                        session.selectedTemplateID = settings.defaultTemplateID
+                    }
                 } label: {
-                    Image(systemName: selected.isBuiltIn ? "arrow.uturn.backward" : "minus")
+                    Image(systemName: "minus")
                 }
-                .disabled(selected.isBuiltIn && !hasOverride)
-                .help(selected.isBuiltIn ? "Réinitialiser au modèle d'origine" : "Supprimer")
+                .disabled(activeTemplates.count <= 1)
+                .help(selected.hasBuiltInIdentity ? "Retirer ce type du profil" : "Supprimer")
 
                 Spacer()
             }
@@ -72,25 +88,26 @@ struct TemplatesSettingsView: View {
         .frame(minWidth: 170, maxWidth: 220)
     }
 
-    /// A hidden type stays in this list (so it can be shown again) but
-    /// disappears from the selection list offered before a recording.
     private func row(for template: MeetingTemplate) -> some View {
-        let enabled = settings.isTemplateEnabled(template)
-        return Label(template.name, systemImage: template.symbol)
+        Label(template.localizedName, systemImage: template.symbol)
             .tag(template.id)
-            .opacity(enabled ? 1 : 0.4)
     }
 
     private var detail: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                if selected.isBuiltIn {
+                if selected.hasBuiltInIdentity {
                     Label(
-                        L("Type fourni, modifiable : le bouton ↺ efface tes changements et revient à la version d'origine."),
+                        L("Type fourni et modifiable. La réinitialisation restaure sa version d'origine."),
                         systemImage: "pencil"
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    if hasOverride {
+                        Button("Réinitialiser au modèle d'origine") {
+                            settings.resetBuiltInTemplate(selected)
+                        }
+                    }
                 }
 
                 identity
@@ -103,20 +120,9 @@ struct TemplatesSettingsView: View {
                     "Type par défaut au démarrage",
                     isOn: Binding(
                         get: { settings.defaultTemplateID == selected.id },
-                        set: { settings.defaultTemplateID = $0 ? selected.id : MeetingTemplate.personal.id }
+                        set: { if $0 { settings.defaultTemplateID = selected.id } }
                     )
                 )
-
-                Toggle(
-                    "Afficher dans la liste des types",
-                    isOn: Binding(
-                        get: { settings.isTemplateEnabled(selected) },
-                        set: { settings.setTemplateEnabled($0, for: selected) }
-                    )
-                )
-                Text("Masqué, ce type reste ici (réactivable) mais n'apparaît plus dans le sélecteur avant un enregistrement.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
             .padding()
         }
@@ -126,8 +132,21 @@ struct TemplatesSettingsView: View {
     private var identity: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Nom").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-            TextField("Nom", text: binding(\.name)).textFieldStyle(.roundedBorder)
+            TextField("Nom", text: nameBinding).textFieldStyle(.roundedBorder)
         }
+    }
+
+    /// An untouched built-in is shown in the app's language, but the first
+    /// edit becomes an explicit persisted override and is never translated.
+    private var nameBinding: Binding<String> {
+        Binding(
+            get: { selected.localizedName },
+            set: { newValue in
+                var template = selected
+                template.name = newValue
+                settings.upsert(template)
+            }
+        )
     }
 
     /// The title produced by the model varies from one meeting to another;
@@ -164,36 +183,66 @@ struct TemplatesSettingsView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
 
-            Picker("Page parente", selection: parentModeBinding) {
-                Text("Page de sprint courante").tag(ParentMode.sprint)
-                Text("Page fixe").tag(ParentMode.fixed)
-                Text("Accueil de l'espace").tag(ParentMode.home)
+            Picker("Service de publication", selection: binding(\.serviceKind)) {
+                Text(inheritedServiceLabel).tag(ServiceKind?.none)
+                ForEach(settings.enabledServices.sorted { $0.displayName < $1.displayName }) { kind in
+                    Text(kind.displayName).tag(ServiceKind?.some(kind))
+                }
             }
-            .pickerStyle(.radioGroup)
 
-            if case .page(let id) = selected.parent {
-                TextField(
-                    "URL ou identifiant de la page",
-                    text: Binding(
-                        get: { id },
-                        set: { newValue in
-                            var template = selected
-                            template.parent = .page(
-                                id: SprintPage.extractPageID(from: newValue) ?? newValue
-                            )
-                            settings.upsert(template)
-                        }
+            switch settings.publicationServiceKind(for: selected) {
+            case .atlassian:
+                Picker("Page parente Confluence", selection: parentModeBinding) {
+                    Text("Page de sprint courante").tag(ParentMode.sprint)
+                    Text("Page fixe").tag(ParentMode.fixed)
+                    Text("Accueil de l'espace").tag(ParentMode.home)
+                }
+                .pickerStyle(.radioGroup)
+
+                if case .page(let id) = selected.parent {
+                    TextField(
+                        "URL ou identifiant de la page",
+                        text: Binding(
+                            get: { id },
+                            set: { newValue in
+                                var template = selected
+                                template.parent = .page(
+                                    id: SprintPage.extractPageID(from: newValue) ?? newValue
+                                )
+                                settings.upsert(template)
+                            }
+                        )
                     )
-                )
-                .textFieldStyle(.roundedBorder)
-            }
+                    .textFieldStyle(.roundedBorder)
+                }
 
-            if !selected.parent.isSprintPage {
-                TextField(
-                    "Espace (vide = espace par défaut)",
-                    text: binding(\.spaceKeyOverride)
+                if !selected.parent.isSprintPage {
+                    TextField(
+                        "Espace Confluence (vide = espace par défaut)",
+                        text: binding(\.spaceKeyOverride)
+                    )
+                    .textFieldStyle(.roundedBorder)
+                }
+
+                if selected.parent.isSprintPage, settings.sprintPage == nil {
+                    Label(
+                        "Aucune page de sprint définie — onglet Services. En attendant, les comptes rendus iront à l'accueil de l'espace.",
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                }
+            case .notion:
+                Text("La page parente Notion est configurée pour le profil dans l'onglet Services.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            case nil:
+                Label(
+                    "Ajoute un service au profil ou choisis un service par défaut pour permettre la publication automatique.",
+                    systemImage: "exclamationmark.triangle"
                 )
-                .textFieldStyle(.roundedBorder)
+                .font(.caption)
+                .foregroundStyle(.orange)
             }
 
             Label(
@@ -203,15 +252,13 @@ struct TemplatesSettingsView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
 
-            if selected.parent.isSprintPage, settings.sprintPage == nil {
-                Label(
-                    "Aucune page de sprint définie — onglet Atlassian. En attendant, les comptes rendus iront à l'accueil de l'espace.",
-                    systemImage: "exclamationmark.triangle"
-                )
-                .font(.caption)
-                .foregroundStyle(.orange)
-            }
         }
+    }
+
+    private var inheritedServiceLabel: String {
+        let inherited = settings.activeProfile.effectivePublicationServiceKind?.displayName
+            ?? L("aucun service")
+        return L("Hériter du profil (%@)", inherited)
     }
 
     private enum ParentMode: Hashable { case sprint, fixed, home }
@@ -291,6 +338,11 @@ struct TemplatesSettingsView: View {
     }
 
     // MARK: - Editing
+
+    private func normalizeSelection() {
+        guard !activeTemplates.contains(where: { $0.id == selectedID }) else { return }
+        selectedID = activeTemplates.first?.id ?? MeetingTemplate.personal.id
+    }
 
     private func binding<Value>(
         _ keyPath: WritableKeyPath<MeetingTemplate, Value>

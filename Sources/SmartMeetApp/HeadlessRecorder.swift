@@ -195,6 +195,7 @@ enum HeadlessRecorder {
                 createJiraIssues: settings.atlassian.isJiraReady,
                 template: template,
                 language: meeting.outputLanguage,
+                includeTranscript: settings.includesTranscript(for: .atlassian),
                 translateForJira: translateForJira
             )
             emit("✅ publié : \(result.pageURL?.absoluteString ?? result.pageID)")

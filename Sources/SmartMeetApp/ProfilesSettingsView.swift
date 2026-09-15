@@ -91,14 +91,18 @@ struct ProfilesSettingsView: View {
             Section("Publication") {
                 Picker("Service par défaut", selection: Binding(
                     get: { settings.activeProfile.defaultServiceKind },
-                    set: { var profile = settings.activeProfile; profile.defaultServiceKind = $0; settings.activeProfile = profile }
+                    set: {
+                        var profile = settings.activeProfile
+                        profile.defaultServiceKind = $0
+                        settings.activeProfile = profile
+                    }
                 )) {
                     Text("Aucun").tag(ServiceKind?.none)
                     ForEach(settings.enabledServices.sorted { $0.displayName < $1.displayName }) { kind in
                         Text(kind.displayName).tag(ServiceKind?.some(kind))
                     }
                 }
-                Text("Service mis en avant pour ce profil au moment de publier un compte rendu. Ajoute d'abord un service dans l'onglet « Services » pour pouvoir le choisir ici.")
+                Text("Service utilisé pour la publication automatique et mis en avant lors d'une publication manuelle. Avec un seul service ajouté, celui-ci est choisi automatiquement.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

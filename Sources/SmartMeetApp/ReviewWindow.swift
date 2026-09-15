@@ -8,6 +8,7 @@ struct ReviewWindow: View {
     @Bindable var session: RecordingSession
     @State private var draft = MeetingSummary()
     @State private var createJiraIssues = true
+    @State private var createNotionTasks = true
     @State private var loadedMeetingID: UUID?
     @State private var diarizationStatus: String?
     @State private var isDiarizing = false
@@ -134,7 +135,7 @@ struct ReviewWindow: View {
                 Text(meeting.title).font(.title3.weight(.semibold)).lineLimit(1)
                 HStack(spacing: 6) {
                     Label(
-                        session.template(for: meeting).name,
+                        session.template(for: meeting).localizedName,
                         systemImage: session.template(for: meeting).symbol
                     )
                     Text("·")
@@ -179,8 +180,8 @@ struct ReviewWindow: View {
                 }
                 if meeting.hasSummary {
                     Picker("Type", selection: $templateSelection) {
-                        ForEach(session.settings.allTemplatesIncludingDisabled) { template in
-                            Label(template.name, systemImage: template.symbol).tag(template.id)
+                        ForEach(session.settings.allTemplates) { template in
+                            Label(template.localizedName, systemImage: template.symbol).tag(template.id)
                         }
                     }
                     .labelsHidden()
@@ -716,6 +717,8 @@ struct ReviewWindow: View {
             HStack {
                 Toggle("Créer les tickets Jira cochés", isOn: $createJiraIssues)
                     .disabled(!session.settings.atlassian.isJiraReady)
+                Toggle("Créer les tâches Notion cochées", isOn: $createNotionTasks)
+                    .disabled(!session.settings.notion.isTaskDataSourceConfigured)
                 Spacer()
                 Button("Copier en markdown") {
                     NSPasteboard.general.clearContents()
@@ -733,11 +736,16 @@ struct ReviewWindow: View {
                                 ProgressView().controlSize(.small)
                             }
                             .disabled(true)
-                        } else if session.settings.activeProfile.defaultServiceKind == .notion {
+                        } else if session.settings.publicationServiceKind(for: template) == .notion {
                             Button("Publier sur Notion") {
                                 session.saveReviewedSummary(draft)
                                 if let updated = session.reviewedMeeting {
-                                    Task { await session.publishToNotion(updated) }
+                                    Task {
+                                        await session.publishToNotion(
+                                            updated,
+                                            createTasks: createNotionTasks
+                                        )
+                                    }
                                 }
                             }
                             .buttonStyle(.borderedProminent)
@@ -745,15 +753,19 @@ struct ReviewWindow: View {
                             Button("Publier sur Notion") {
                                 session.saveReviewedSummary(draft)
                                 if let updated = session.reviewedMeeting {
-                                    Task { await session.publishToNotion(updated) }
+                                    Task {
+                                        await session.publishToNotion(
+                                            updated,
+                                            createTasks: createNotionTasks
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
                 Group {
-                    if session.settings.activeProfile.defaultServiceKind == .atlassian
-                        || session.settings.activeProfile.defaultServiceKind == nil {
+                    if session.settings.publicationServiceKind(for: template) == .atlassian {
                         Button("Publier sur Confluence") {
                             confluencePublishAction()
                         }

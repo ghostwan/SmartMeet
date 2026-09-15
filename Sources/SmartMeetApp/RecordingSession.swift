@@ -322,6 +322,20 @@ public final class RecordingSession {
     /// Readable destination, computed locally with no network call, to
     /// display before publishing.
     public func destinationSummary(for template: MeetingTemplate) -> String {
+        guard let service = settings.publicationServiceKind(for: template) else {
+            if let explicit = template.serviceKind {
+                return L("%@ n'est plus activé pour ce profil", explicit.displayName)
+            }
+            return L("Aucun service de publication sélectionné")
+        }
+        if service == .notion {
+            guard settings.canPublishToNotion else { return L("Notion › configuration incomplète") }
+            let parent = settings.notion.parentPageTitle.isEmpty
+                ? settings.notion.parentPageID
+                : settings.notion.parentPageTitle
+            return parent.isEmpty ? "Notion › workspace" : "Notion › \(parent)"
+        }
+
         let space = template.parent.isSprintPage
             ? (settings.sprintPage?.spaceKey ?? settings.atlassian.spaceKey)
             : (template.spaceKeyOverride.isEmpty ? settings.atlassian.spaceKey : template.spaceKeyOverride)
@@ -591,8 +605,9 @@ public final class RecordingSession {
             reviewedMeeting = updated
             summaryState = .ready
 
-            if settings.autoPublish, settings.canPublish {
-                await publish(updated, createJiraIssues: settings.autoCreateJiraIssues)
+            let template = settings.template(id: updated.templateID)
+            if settings.autoPublish, settings.canAutoPublish(template: template) {
+                await publishAutomatically(updated)
             } else {
                 notifier.announceSummaryReady(
                     meetingID: updated.id,
@@ -627,7 +642,28 @@ public final class RecordingSession {
     private func publishFromNotification(_ id: UUID) async {
         guard let meeting = meetings.first(where: { $0.id == id }) else { return }
         openReview(meeting)
-        await publish(meeting, createJiraIssues: settings.atlassian.isJiraReady)
+        let template = settings.template(id: meeting.templateID)
+        guard settings.canAutoPublish(template: template) else { return }
+        await publishAutomatically(meeting)
+    }
+
+    private func publishAutomatically(_ meeting: Meeting) async {
+        let template = settings.template(id: meeting.templateID)
+        switch settings.publicationServiceKind(for: template) {
+        case .atlassian:
+            await publish(
+                meeting,
+                createJiraIssues: settings.autoCreateJiraIssues
+                    && settings.atlassian.isJiraReady
+            )
+        case .notion:
+            await publishToNotion(
+                meeting,
+                createTasks: settings.autoCreateNotionTasks
+            )
+        case nil:
+            break
+        }
     }
 
     private static func describe(_ progress: SummaryProgress) -> String {
@@ -720,6 +756,7 @@ public final class RecordingSession {
                 template: settings.template(id: meeting.templateID),
                 meetingDate: meeting.startedAt,
                 language: meeting.outputLanguage,
+                includeTranscript: settings.includesTranscript(for: .atlassian),
                 jiraProjectKey: jiraProjectKey,
                 jiraParentKey: jiraParentKey,
                 translateForJira: translateForJira,
@@ -764,6 +801,7 @@ public final class RecordingSession {
             notifier.announcePublication(
                 meetingID: updated.id,
                 title: result.pageTitle,
+                serviceName: "Confluence",
                 url: result.pageURL,
                 issues: updated.jiraIssueKeys
             )
@@ -787,9 +825,9 @@ public final class RecordingSession {
         }
     }
 
-    /// Publishes the minutes (sections only, not the transcript) as a Notion
-    /// page, a child of the page configured in settings.
-    public func publishToNotion(_ meeting: Meeting) async {
+    /// Publishes the minutes as a Notion page, optionally followed by the
+    /// transcript in a collapsed toggle according to the active profile.
+    public func publishToNotion(_ meeting: Meeting, createTasks: Bool = false) async {
         guard let summary = meeting.summary else {
             notionPublishState = .failed(L("Aucun compte rendu à publier."))
             return
@@ -803,20 +841,73 @@ public final class RecordingSession {
         let client = NotionClient(configuration: settings.notion, token: settings.notionToken)
         let template = settings.template(id: meeting.templateID)
         let title = template.pageTitle(
-            summaryTitle: summary.title, date: meeting.startedAt, language: meeting.outputLanguage
+            summaryTitle: summary.title,
+            date: meeting.startedAt,
+            language: meeting.outputLanguage,
+            participant: meeting.oneToOneParticipant ?? ""
         )
         let markdown = summary.markdown(template: template, language: meeting.outputLanguage)
+        let transcript = settings.includesTranscript(for: .notion)
+            ? store.transcriptMarkdown(for: meeting.id)
+            : nil
 
         do {
-            let page = try await client.createPage(title: title, markdown: markdown)
+            let page = try await client.createPage(
+                title: title,
+                markdown: markdown,
+                transcript: transcript,
+                transcriptTitle: meeting.outputLanguage.pick(
+                    fr: "Transcript intégral", en: "Full transcript"
+                )
+            )
             var updated = meeting
             updated.notionPageURL = page.url?.absoluteString
+            var failures: [String] = []
+            if createTasks, settings.notion.isTaskDataSourceConfigured,
+               var updatedSummary = updated.summary {
+                for index in updatedSummary.actionItems.indices
+                    where updatedSummary.actionItems[index].isSelected {
+                    let item = updatedSummary.actionItems[index]
+                    do {
+                        let task = try await client.createTask(
+                            NotionTaskInput(
+                                title: item.description,
+                                owner: item.owner,
+                                dueDate: item.dueDate,
+                                type: item.issueType.displayName(in: meeting.outputLanguage),
+                                meetingTitle: title,
+                                meetingURL: page.url
+                            ),
+                            dataSourceID: settings.notion.taskDataSourceID
+                        )
+                        updatedSummary.actionItems[index].notionTaskURL = task.url?.absoluteString
+                    } catch {
+                        failures.append(item.description + " — " + error.localizedDescription)
+                    }
+                }
+                updated.summary = updatedSummary
+            }
             try? store.update(updated, customTemplates: settings.customTemplates)
             meetings = store.loadAll()
             reviewedMeeting = updated
             notionPublishState = .published(url: page.url?.absoluteString ?? "")
+            if !failures.isEmpty {
+                notionPublishState = .failed(failures.joined(separator: "\n"))
+            }
+            notifier.announcePublication(
+                meetingID: updated.id,
+                title: title,
+                serviceName: ServiceKind.notion.displayName,
+                url: page.url,
+                issues: []
+            )
         } catch {
             notionPublishState = .failed(error.localizedDescription)
+            notifier.announceFailure(
+                meetingID: meeting.id,
+                title: meeting.title,
+                message: error.localizedDescription
+            )
         }
     }
 
@@ -923,6 +1014,9 @@ public final class RecordingSession {
                 failures: [],
                 jiraSearchURL: meeting.jiraSearchURL
             )
+            : .none
+        notionPublishState = meeting.isPublishedToNotion
+            ? .published(url: meeting.notionPageURL ?? "")
             : .none
     }
 

@@ -46,6 +46,19 @@ enum MarkdownToNotionBlocks {
         return blocks
     }
 
+    /// A native Notion toggle: its children stay collapsed until the reader
+    /// opens it, matching Confluence's `expand` macro.
+    static func toggle(title: String, children: [[String: Any]]) -> [String: Any] {
+        [
+            "object": "block",
+            "type": "toggle",
+            "toggle": [
+                "rich_text": richText(from: title),
+                "children": children,
+            ],
+        ]
+    }
+
     private static func heading(_ level: Int, _ text: String) -> [String: Any] {
         ["object": "block", "type": "heading_\(level)",
          "heading_\(level)": ["rich_text": richText(from: text)]]

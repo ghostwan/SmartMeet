@@ -442,6 +442,7 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
         public var issueType: IssueType
         /// Filled in after publication.
         public var jiraKey: String?
+        public var notionTaskURL: String?
 
         public init(
             id: UUID = UUID(),
@@ -450,7 +451,8 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
             dueDate: String? = nil,
             isSelected: Bool = true,
             issueType: IssueType = .task,
-            jiraKey: String? = nil
+            jiraKey: String? = nil,
+            notionTaskURL: String? = nil
         ) {
             self.id = id
             self.owner = owner
@@ -459,10 +461,11 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
             self.isSelected = isSelected
             self.issueType = issueType
             self.jiraKey = jiraKey
+            self.notionTaskURL = notionTaskURL
         }
 
         private enum CodingKeys: String, CodingKey {
-            case owner, description, dueDate, isSelected, issueType, jiraKey
+            case owner, description, dueDate, isSelected, issueType, jiraKey, notionTaskURL
         }
 
         public init(from decoder: any Decoder) throws {
@@ -475,6 +478,7 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
             let rawIssueType = try container.decodeIfPresent(String.self, forKey: .issueType)
             issueType = IssueType.parse(rawIssueType) ?? IssueType.detect(from: description)
             jiraKey = try container.decodeIfPresent(String.self, forKey: .jiraKey)
+            notionTaskURL = try container.decodeIfPresent(String.self, forKey: .notionTaskURL)
         }
     }
 }

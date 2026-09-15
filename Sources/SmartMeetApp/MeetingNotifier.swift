@@ -151,7 +151,13 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
     }
 
     /// The page has been published: the notification carries the link.
-    func announcePublication(meetingID: UUID, title: String, url: URL?, issues: [String]) {
+    func announcePublication(
+        meetingID: UUID,
+        title: String,
+        serviceName: String,
+        url: URL?,
+        issues: [String]
+    ) {
         var body = L("« %@ »", title)
         if !issues.isEmpty {
             body += " " + L("— %d ticket(s) créé(s)", issues.count)
@@ -162,7 +168,7 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
         send(
             id: "published-\(meetingID.uuidString)",
             category: Category.published,
-            title: L("Publié sur Confluence"),
+            title: L("Publié sur %@", serviceName),
             body: body,
             payload: payload
         )

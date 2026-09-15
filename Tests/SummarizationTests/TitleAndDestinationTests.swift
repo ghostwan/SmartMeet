@@ -175,6 +175,7 @@ struct DestinationTests {
         template.parent = .sprintPage
         template.titleFormat = "Review {Weekday} {date}"
         template.spaceKeyOverride = "EQUIPE"
+        template.serviceKind = .notion
 
         let data = try JSONEncoder().encode(template)
         let decoded = try JSONDecoder().decode(MeetingTemplate.self, from: data)
@@ -191,5 +192,16 @@ struct DestinationTests {
         #expect(template.name == "Ancien")
         #expect(template.parent == .spaceHome)
         #expect(template.titleFormat == "{summary} — {date}")
+        #expect(template.serviceKind == nil)
+    }
+
+    @Test("Un service inconnu retombe sur l'héritage du profil")
+    func unknownServiceFallsBackToInheritance() throws {
+        let json = """
+        {"id":"future","name":"Future","symbol":"doc","sections":["tldr"],
+         "instructions":"","serviceKind":"future-service","isBuiltIn":false}
+        """
+        let template = try JSONDecoder().decode(MeetingTemplate.self, from: Data(json.utf8))
+        #expect(template.serviceKind == nil)
     }
 }

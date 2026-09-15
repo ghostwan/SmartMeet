@@ -29,6 +29,7 @@ struct SettingsWindow: View {
         }
         .onChange(of: settings.activeProfileID) {
             vocabularyText = settings.vocabulary.joined(separator: ", ")
+            knownPeopleText = settings.knownPeople.joined(separator: ", ")
         }
         .task { await loadLocales() }
     }
@@ -167,10 +168,20 @@ struct SettingsWindow: View {
                     .foregroundStyle(.secondary)
             }
 
-            Picker("Langue par défaut du compte rendu", selection: $settings.defaultOutputLanguage) {
-                ForEach(SummaryLanguage.allCases) { language in
-                    Text("\(language.flag) \(language.displayName)").tag(language)
+            Section("Langues du compte rendu") {
+                outputLanguagesEditor
+
+                Picker(
+                    "Langue par défaut du compte rendu",
+                    selection: $settings.defaultOutputLanguage
+                ) {
+                    ForEach(settings.availableOutputLanguages) { language in
+                        Text("\(language.flag) \(language.displayName)").tag(language)
+                    }
                 }
+                Text("Ces langues sont proposées dans le sélecteur avant chaque enregistrement. Au moins une langue doit rester active.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Text("Modifiable avant chaque enregistrement. Indépendante de la langue parlée en réunion : une équipe francophone peut livrer un compte rendu en anglais.")
                 .font(.caption)
@@ -178,10 +189,8 @@ struct SettingsWindow: View {
 
             Section("À l'arrêt de l'enregistrement") {
                 Toggle("Générer le compte rendu", isOn: $settings.autoSummarize)
-                Toggle("Publier sur Confluence sans relecture", isOn: $settings.autoPublish)
-                    .disabled(!settings.autoSummarize || !settings.canPublish)
-                Toggle("Créer aussi les tickets Jira", isOn: $settings.autoCreateJiraIssues)
-                    .disabled(!settings.autoPublish || !settings.atlassian.isJiraReady)
+                Toggle("Publier sans relecture", isOn: $settings.autoPublish)
+                    .disabled(!settings.autoSummarize || !settings.canAutoPublish)
                 Text("Une notification prévient dès que le compte rendu est prêt, avec le lien vers la page si la publication est automatique. La publication sans relecture reste désactivée par défaut : un compte rendu écrit par un modèle mérite un coup d'œil avant d'atterrir sur un espace d'équipe.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -189,6 +198,44 @@ struct SettingsWindow: View {
         }
         .formStyle(.grouped)
         .padding()
+    }
+
+    private var outputLanguagesEditor: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(settings.availableOutputLanguages) { language in
+                HStack {
+                    Text("\(language.flag) \(language.displayName)")
+                    Spacer()
+                    Button {
+                        settings.setOutputLanguage(language, enabled: false)
+                        if !settings.enabledOutputLanguages.contains(
+                            session.selectedOutputLanguage
+                        ) {
+                            session.selectedOutputLanguage = settings.defaultOutputLanguage
+                        }
+                    } label: {
+                        Image(systemName: "minus")
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(settings.enabledOutputLanguages.count == 1)
+                    .help("Retirer cette langue")
+                }
+            }
+
+            let available = SummaryLanguage.allCases.filter {
+                !settings.enabledOutputLanguages.contains($0)
+            }
+            Menu {
+                ForEach(available) { language in
+                    Button("\(language.flag) \(language.displayName)") {
+                        settings.setOutputLanguage(language, enabled: true)
+                    }
+                }
+            } label: {
+                Label("Ajouter une langue", systemImage: "plus")
+            }
+            .disabled(available.isEmpty)
+        }
     }
 
 }

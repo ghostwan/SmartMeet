@@ -18,6 +18,9 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
     /// Business vocabulary and proper nouns specific to this profile, injected
     /// into speech recognition and the minutes prompt.
     public var vocabulary: [String]
+    /// People regularly involved in meetings under this profile, used for
+    /// transcription hints, prompt context and one-to-one suggestions.
+    public var knownPeople: [String]
     /// Meeting types created by the user for this profile, in addition to the
     /// built-in templates.
     public var customTemplates: [MeetingTemplate]
@@ -37,6 +40,9 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
     /// (site, token…) is kept separately in `AppSettings` even when a
     /// service is removed here, in case it's added back later.
     public var enabledServices: Set<ServiceKind>
+    /// Services whose published page includes the raw transcript in a
+    /// collapsed section at the bottom.
+    public var servicesIncludingTranscript: Set<ServiceKind>
     /// Spoken language expected during transcription for this profile (e.g.
     /// French for "Work", English for an "International" profile).
     public var localeIdentifier: String
@@ -45,6 +51,10 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
     public var recentTranscriptionLocales: [String]
     /// Default language proposed for the minutes under this profile.
     public var defaultOutputLanguage: SummaryLanguage
+    /// Languages offered in the minutes-language picker under this profile.
+    /// A new profile deliberately starts with English only; additional
+    /// languages are opt-in from Settings.
+    public var enabledOutputLanguages: Set<SummaryLanguage>
     /// Suggests recording when a meeting is detected, under this profile.
     public var detectMeetings: Bool
     /// Starts without asking, under this profile. Off by default: recording
@@ -65,59 +75,90 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
     /// Also creates Jira tickets during an automatic publication, under this
     /// profile.
     public var autoCreateJiraIssues: Bool
+    /// Creates Notion tasks from selected action items when automatic
+    /// publication targets Notion.
+    public var autoCreateNotionTasks: Bool
     /// Experimental microphone-track diarization for this profile: off by
     /// default, the separation can get it wrong, especially if the two
     /// voices sound alike.
     public var diarizeMicrophoneTrack: Bool
+
+    /// Service used when publication is triggered without asking. An enabled
+    /// explicit default wins; otherwise a single enabled service is
+    /// unambiguous. Multiple services without a default deliberately resolve
+    /// to `nil` so the app never publishes to an arbitrary destination.
+    public var effectivePublicationServiceKind: ServiceKind? {
+        if let defaultServiceKind, enabledServices.contains(defaultServiceKind) {
+            return defaultServiceKind
+        }
+        return enabledServices.count == 1 ? enabledServices.first : nil
+    }
+
+    public func effectivePublicationServiceKind(for template: MeetingTemplate) -> ServiceKind? {
+        if let serviceKind = template.serviceKind {
+            return enabledServices.contains(serviceKind) ? serviceKind : nil
+        }
+        return effectivePublicationServiceKind
+    }
 
     public init(
         id: String = UUID().uuidString,
         name: String,
         symbol: String = "person.crop.circle",
         vocabulary: [String] = [],
+        knownPeople: [String] = [],
         customTemplates: [MeetingTemplate] = [],
         enabledTemplateIDs: Set<String>? = nil,
         defaultTemplateID: String? = nil,
         defaultServiceKind: ServiceKind? = nil,
         enabledServices: Set<ServiceKind> = [],
+        servicesIncludingTranscript: Set<ServiceKind> = [.atlassian],
         localeIdentifier: String = "fr-FR",
         recentTranscriptionLocales: [String] = [],
-        defaultOutputLanguage: SummaryLanguage = .french,
+        defaultOutputLanguage: SummaryLanguage = .english,
+        enabledOutputLanguages: Set<SummaryLanguage> = [.english],
         detectMeetings: Bool = true,
         autoStartOnDetection: Bool = false,
         detectMeetingEnd: Bool = true,
         autoSummarize: Bool = true,
         autoPublish: Bool = false,
         autoCreateJiraIssues: Bool = false,
+        autoCreateNotionTasks: Bool = false,
         diarizeMicrophoneTrack: Bool = false
     ) {
         self.id = id
         self.name = name
         self.symbol = symbol
         self.vocabulary = vocabulary
+        self.knownPeople = knownPeople
         self.customTemplates = customTemplates
         self.enabledTemplateIDs = enabledTemplateIDs ?? [MeetingTemplate.personal.id]
         self.defaultTemplateID = defaultTemplateID ?? MeetingTemplate.personal.id
         self.defaultServiceKind = defaultServiceKind
         self.enabledServices = enabledServices
+        self.servicesIncludingTranscript = servicesIncludingTranscript
         self.localeIdentifier = localeIdentifier
         self.recentTranscriptionLocales = recentTranscriptionLocales
         self.defaultOutputLanguage = defaultOutputLanguage
+        self.enabledOutputLanguages = enabledOutputLanguages.isEmpty
+            ? [defaultOutputLanguage]
+            : enabledOutputLanguages.union([defaultOutputLanguage])
         self.detectMeetings = detectMeetings
         self.autoStartOnDetection = autoStartOnDetection
         self.detectMeetingEnd = detectMeetingEnd
         self.autoSummarize = autoSummarize
         self.autoPublish = autoPublish
         self.autoCreateJiraIssues = autoCreateJiraIssues
+        self.autoCreateNotionTasks = autoCreateNotionTasks
         self.diarizeMicrophoneTrack = diarizeMicrophoneTrack
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, symbol, vocabulary, customTemplates
+        case id, name, symbol, vocabulary, knownPeople, customTemplates
         case enabledTemplateIDs, defaultTemplateID, defaultServiceKind
-        case enabledServices, localeIdentifier, recentTranscriptionLocales
-        case defaultOutputLanguage, detectMeetings, autoStartOnDetection
-        case detectMeetingEnd, autoSummarize, autoPublish, autoCreateJiraIssues
+        case enabledServices, servicesIncludingTranscript, localeIdentifier, recentTranscriptionLocales
+        case defaultOutputLanguage, enabledOutputLanguages, detectMeetings, autoStartOnDetection
+        case detectMeetingEnd, autoSummarize, autoPublish, autoCreateJiraIssues, autoCreateNotionTasks
         case diarizeMicrophoneTrack
     }
 
@@ -129,6 +170,7 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
         name = try container.decode(String.self, forKey: .name)
         symbol = try container.decodeIfPresent(String.self, forKey: .symbol) ?? "person.crop.circle"
         vocabulary = try container.decodeIfPresent([String].self, forKey: .vocabulary) ?? []
+        knownPeople = try container.decodeIfPresent([String].self, forKey: .knownPeople) ?? []
         customTemplates = try container.decodeIfPresent(
             [MeetingTemplate].self, forKey: .customTemplates
         ) ?? []
@@ -143,14 +185,37 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
         enabledServices = try container.decodeIfPresent(
             Set<ServiceKind>.self, forKey: .enabledServices
         ) ?? []
+        if container.contains(.servicesIncludingTranscript) {
+            let rawServices = (try? container.decode([String].self, forKey: .servicesIncludingTranscript)) ?? []
+            servicesIncludingTranscript = Set(rawServices.compactMap(ServiceKind.init(rawValue:)))
+        } else {
+            // Preserve the behavior that existed before this setting:
+            // Confluence included the transcript, Notion did not.
+            servicesIncludingTranscript = [.atlassian]
+        }
         localeIdentifier = try container.decodeIfPresent(String.self, forKey: .localeIdentifier)
             ?? "fr-FR"
         recentTranscriptionLocales = try container.decodeIfPresent(
             [String].self, forKey: .recentTranscriptionLocales
         ) ?? []
-        defaultOutputLanguage = try container.decodeIfPresent(
+        let decodedDefaultOutputLanguage = try container.decodeIfPresent(
             SummaryLanguage.self, forKey: .defaultOutputLanguage
-        ) ?? .french
+        ) ?? .english
+        // Profiles written before this allow-list existed adopt the same
+        // English-only baseline as a newly created profile. Explicitly saved
+        // allow-lists remain authoritative on subsequent launches.
+        let rawEnabledLanguages = (try? container.decodeIfPresent(
+            [String].self, forKey: .enabledOutputLanguages
+        )) ?? nil
+        let decodedLanguages = Set((rawEnabledLanguages ?? [SummaryLanguage.english.rawValue])
+            .compactMap(SummaryLanguage.init(rawValue:)))
+        let normalizedLanguages: Set<SummaryLanguage> = decodedLanguages.isEmpty
+            ? [.english]
+            : decodedLanguages
+        enabledOutputLanguages = normalizedLanguages
+        defaultOutputLanguage = normalizedLanguages.contains(decodedDefaultOutputLanguage)
+            ? decodedDefaultOutputLanguage
+            : SummaryLanguage.allCases.first { normalizedLanguages.contains($0) } ?? .english
         detectMeetings = try container.decodeIfPresent(Bool.self, forKey: .detectMeetings) ?? true
         autoStartOnDetection = try container.decodeIfPresent(
             Bool.self, forKey: .autoStartOnDetection
@@ -161,6 +226,9 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
         autoPublish = try container.decodeIfPresent(Bool.self, forKey: .autoPublish) ?? false
         autoCreateJiraIssues = try container.decodeIfPresent(
             Bool.self, forKey: .autoCreateJiraIssues
+        ) ?? false
+        autoCreateNotionTasks = try container.decodeIfPresent(
+            Bool.self, forKey: .autoCreateNotionTasks
         ) ?? false
         diarizeMicrophoneTrack = try container.decodeIfPresent(
             Bool.self, forKey: .diarizeMicrophoneTrack

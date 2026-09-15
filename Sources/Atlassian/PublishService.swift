@@ -120,6 +120,7 @@ public struct PublishService: Sendable {
         template: MeetingTemplate = .generic,
         meetingDate: Date = .now,
         language: SummaryLanguage = .french,
+        includeTranscript: Bool = true,
         /// Destination chosen for this specific publication (typically asked of
         /// the user right before creating the tickets). `nil` falls back to the
         /// global settings.
@@ -156,7 +157,8 @@ public struct PublishService: Sendable {
             transcript: transcript,
             audioNote: audioNote,
             template: template,
-            language: language
+            language: language,
+            includeTranscript: includeTranscript
         )
         let (page, title) = try await createPageResolvingTitleConflict(
             baseTitle: baseTitle,
@@ -254,7 +256,8 @@ public struct PublishService: Sendable {
                         transcript: transcript,
                         audioNote: audioNote,
                         template: template,
-                        language: language
+                        language: language,
+                        includeTranscript: includeTranscript
                     )
                 )
             }

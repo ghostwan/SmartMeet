@@ -25,7 +25,7 @@ enum HeadlessSummarizer {
         let provider = settings.makeProvider()
         let template = settings.template(id: templateID ?? settings.defaultTemplateID)
         print("provider : \(provider.displayName)")
-        print("type     : \(template.name) — \(template.sections.map { $0.displayName(in: language) }.joined(separator: ", "))")
+        print("type     : \(template.localizedName) — \(template.sections.map { $0.displayName(in: language) }.joined(separator: ", "))")
         print("langue   : \(language.flag) \(language.displayName)")
 
         guard await provider.isAvailable() else {
@@ -134,6 +134,7 @@ enum HeadlessSummarizer {
                 createJiraIssues: settings.atlassian.isJiraReady,
                 template: template,
                 language: language,
+                includeTranscript: settings.includesTranscript(for: .atlassian),
                 translateForJira: translateForJira
             ) { step in print("  · \(step)") }
 

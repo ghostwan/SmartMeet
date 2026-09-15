@@ -189,7 +189,7 @@ struct SummaryLanguageTests {
     func confluenceFollowsLanguage() {
         let english = ConfluenceStorageRenderer.render(
             summary: retroSummary,
-            transcript: "",
+            transcript: "**[00:01] Me:** Hello",
             audioNote: nil,
             template: .retrospective,
             language: .english

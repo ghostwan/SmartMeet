@@ -201,6 +201,19 @@ struct ConfluenceRendererTests {
         // Markdown markup is stripped before publishing.
         #expect(!html.contains("**"))
         #expect(html.contains("[00:01] Moi : Bonjour"))
+        #expect(html.hasSuffix("</ac:structured-macro>"))
+    }
+
+    @Test("Le transcript peut être exclu de la page Confluence")
+    func omitsTranscriptWhenDisabled() {
+        let html = ConfluenceStorageRenderer.render(
+            summary: MeetingSummary(title: "T", tldr: "S"),
+            transcript: "**[00:01] Moi :** Bonjour",
+            audioNote: nil,
+            includeTranscript: false
+        )
+        #expect(!html.contains(#"ac:name="expand""#))
+        #expect(!html.contains("[00:01] Moi"))
     }
 
     @Test("Une section vide n'est pas rendue")

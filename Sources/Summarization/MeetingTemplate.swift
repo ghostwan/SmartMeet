@@ -222,6 +222,10 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
     public var spaceKeyOverride: String
     /// Page under which to publish.
     public var parent: ParentPageReference
+    /// Publication service for this type. `nil` inherits the profile's
+    /// effective service; a concrete value never silently falls back to a
+    /// different service if it later becomes unavailable.
+    public var serviceKind: ServiceKind?
     /// True for a type that involves exactly two people (the user and a single
     /// counterpart) — a one-to-one, typically. This drives two things: the UI
     /// asks for that counterpart before recording, and the published page is
@@ -239,6 +243,7 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
         titleFormat: String = "{summary} — {date}",
         spaceKeyOverride: String = "",
         parent: ParentPageReference = .spaceHome,
+        serviceKind: ServiceKind? = nil,
         requiresParticipant: Bool = false,
         isBuiltIn: Bool = false
     ) {
@@ -250,13 +255,14 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
         self.titleFormat = titleFormat
         self.spaceKeyOverride = spaceKeyOverride
         self.parent = parent
+        self.serviceKind = serviceKind
         self.requiresParticipant = requiresParticipant
         self.isBuiltIn = isBuiltIn
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, name, symbol, sections, instructions
-        case titleFormat, spaceKeyOverride, parent, requiresParticipant, isBuiltIn
+        case titleFormat, spaceKeyOverride, parent, serviceKind, requiresParticipant, isBuiltIn
     }
 
     /// Tolerant decoding: templates saved before the destination field was added
@@ -273,6 +279,8 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
         spaceKeyOverride = try container.decodeIfPresent(String.self, forKey: .spaceKeyOverride) ?? ""
         parent = try container.decodeIfPresent(ParentPageReference.self, forKey: .parent)
             ?? .spaceHome
+        let rawServiceKind = try container.decodeIfPresent(String.self, forKey: .serviceKind)
+        serviceKind = rawServiceKind.flatMap(ServiceKind.init(rawValue:))
         requiresParticipant = try container.decodeIfPresent(Bool.self, forKey: .requiresParticipant) ?? false
         isBuiltIn = try container.decodeIfPresent(Bool.self, forKey: .isBuiltIn) ?? false
     }
@@ -296,6 +304,39 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
 }
 
 public extension MeetingTemplate {
+    /// Localized UI name for an untouched built-in template. The persisted
+    /// `name` remains the source of truth for prompts, publication titles,
+    /// inference and custom templates; checking both the stable identifier and
+    /// canonical name ensures that a user-renamed built-in stays exactly as
+    /// they named it instead of being replaced by a translation.
+    var localizedName: String {
+        let canonicalName: String?
+        switch (id, name) {
+        case ("builtin.generic", "Réunion de travail"):
+            canonicalName = "Réunion de travail"
+        case ("builtin.daily", "Daily"):
+            canonicalName = "Daily"
+        case ("builtin.synchro", "Synchro"):
+            canonicalName = "Synchro"
+        case ("builtin.retro", "Rétrospective"):
+            canonicalName = "Rétrospective"
+        case ("builtin.personal", "Réunion générique"):
+            canonicalName = "Réunion générique"
+        case ("builtin.oneToOne", "One to One"):
+            canonicalName = "One to One"
+        default:
+            canonicalName = nil
+        }
+
+        guard let canonicalName else { return name }
+        return NSLocalizedString(
+            canonicalName,
+            bundle: .main,
+            value: canonicalName,
+            comment: "Built-in meeting template name"
+        )
+    }
+
     static let generic = MeetingTemplate(
         id: "builtin.generic",
         name: "Réunion de travail",
@@ -428,7 +469,11 @@ public extension MeetingTemplate {
         isBuiltIn: true
     )
 
-    static let builtIns: [MeetingTemplate] = [generic, daily, synchro, retrospective, personal, oneToOne]
+    static let builtIns: [MeetingTemplate] = [personal, generic, daily, synchro, retrospective, oneToOne]
+
+    static let builtInIDs = Set(builtIns.map(\.id))
+
+    var hasBuiltInIdentity: Bool { Self.builtInIDs.contains(id) }
 
     /// Looks up a template by identifier, falling back to the generic template
     /// (the neutral "Réunion générique" baseline, not the work-oriented one).

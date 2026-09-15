@@ -143,7 +143,7 @@ struct MenuBarContent: View {
             HStack(spacing: 8) {
                 Picker("Type", selection: $session.selectedTemplateID) {
                     ForEach(session.settings.allTemplates) { template in
-                        Label(template.name, systemImage: template.symbol).tag(template.id)
+                        Label(template.localizedName, systemImage: template.symbol).tag(template.id)
                     }
                 }
                 .labelsHidden()
@@ -210,7 +210,7 @@ struct MenuBarContent: View {
 
                 Text("📝").font(.caption)
                 Picker("Compte rendu", selection: $session.selectedOutputLanguage) {
-                    ForEach(SummaryLanguage.allCases) { language in
+                    ForEach(session.settings.availableOutputLanguages) { language in
                         Text("\(language.flag) \(language.displayName)").tag(language)
                     }
                 }

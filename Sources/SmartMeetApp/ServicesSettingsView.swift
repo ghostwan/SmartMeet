@@ -26,6 +26,10 @@ struct ServicesSettingsView: View {
     @State private var notionPageStatus: String?
     @State private var notionVerifyStatus: String?
     @State private var isVerifyingNotion = false
+    @State private var notionDataSources: [NotionDataSourceSummary] = []
+    @State private var notionTaskDatabaseName = "Tâches SmartMeet"
+    @State private var notionTaskStatus: String?
+    @State private var isLoadingNotionDataSources = false
 
     private var enabledSorted: [ServiceKind] {
         settings.enabledServices.sorted { $0.displayName < $1.displayName }
@@ -70,6 +74,12 @@ struct ServicesSettingsView: View {
                 if let selectedKind {
                     Button {
                         settings.enabledServices.remove(selectedKind)
+                        if settings.activeProfile.defaultServiceKind == selectedKind {
+                            var profile = settings.activeProfile
+                            profile.defaultServiceKind = nil
+                            settings.activeProfile = profile
+                        }
+                        if settings.enabledServices.isEmpty { settings.autoPublish = false }
                         self.selectedKind = enabledSorted.first
                     } label: {
                         Image(systemName: "minus")
@@ -149,10 +159,20 @@ struct ServicesSettingsView: View {
                     }
                 }
                 TextField("Epic parent", text: $settings.atlassian.jiraParentKey)
+                Toggle(
+                    "Créer les tickets Jira lors des publications automatiques",
+                    isOn: $settings.autoCreateJiraIssues
+                )
+                .disabled(!settings.atlassian.isJiraReady)
                 Text("Certains projets imposent un epic parent via un validateur de workflow, que l'API createmeta ne déclare pas.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Text("Cette option s'applique uniquement lorsque ce profil publie automatiquement via Atlassian.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
+
+            transcriptSection(for: .atlassian)
 
             HStack {
                 Button("Tester la connexion") { Task { await loadRemoteOptions() } }
@@ -186,7 +206,8 @@ struct ServicesSettingsView: View {
                         Text(settings.notion.parentPageID).font(.callout).lineLimit(1)
                         Spacer()
                         Button("Retirer") {
-                            settings.notion = NotionConfiguration()
+                            settings.notion.parentPageID = ""
+                            settings.notion.parentPageTitle = ""
                             notionPageStatus = nil
                         }
                     }
@@ -219,6 +240,68 @@ struct ServicesSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Base de tâches") {
+                if settings.notion.isTaskDataSourceConfigured {
+                    HStack {
+                        Text(settings.notion.taskDataSourceTitle.isEmpty
+                            ? settings.notion.taskDataSourceID
+                            : settings.notion.taskDataSourceTitle)
+                            .lineLimit(1)
+                        Spacer()
+                        Button("Retirer") {
+                            settings.notion.taskDataSourceID = ""
+                            settings.notion.taskDataSourceTitle = ""
+                            settings.autoCreateNotionTasks = false
+                        }
+                    }
+                }
+
+                HStack {
+                    Picker("Base existante", selection: Binding(
+                        get: { settings.notion.taskDataSourceID },
+                        set: { id in
+                            settings.notion.taskDataSourceID = id
+                            settings.notion.taskDataSourceTitle = notionDataSources
+                                .first { $0.id == id }?.title ?? ""
+                        }
+                    )) {
+                        Text("Choisir…").tag("")
+                        ForEach(notionDataSources) { source in
+                            Text(source.title).tag(source.id)
+                        }
+                    }
+                    Button(isLoadingNotionDataSources ? "…" : "Actualiser") {
+                        Task { await loadNotionDataSources() }
+                    }
+                    .disabled(isLoadingNotionDataSources || !settings.canPublishToNotion)
+                }
+
+                HStack {
+                    TextField("Nom de la nouvelle base", text: $notionTaskDatabaseName)
+                    Button("Créer") { Task { await createNotionTaskDataSource() } }
+                        .disabled(
+                            notionTaskDatabaseName.trimmingCharacters(in: .whitespaces).isEmpty
+                                || !settings.notion.isConfigured
+                                || !settings.canPublishToNotion
+                        )
+                }
+
+                Toggle(
+                    "Créer des tâches Notion lors des publications automatiques",
+                    isOn: $settings.autoCreateNotionTasks
+                )
+                .disabled(!settings.notion.isTaskDataSourceConfigured)
+
+                Text("La base doit être partagée avec l'intégration. Une base créée ici contient les colonnes Name, Owner, Due, Type et Meeting.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let notionTaskStatus {
+                    Text(notionTaskStatus).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+
+            transcriptSection(for: .notion)
+
             HStack {
                 Button(isVerifyingNotion ? "…" : "Tester la connexion") {
                     Task { await verifyNotionAccess() }
@@ -232,6 +315,21 @@ struct ServicesSettingsView: View {
         .formStyle(.grouped)
         .padding()
         .frame(minWidth: 330)
+    }
+
+    private func transcriptSection(for service: ServiceKind) -> some View {
+        Section("Transcription") {
+            Toggle(
+                "Inclure la transcription dans la page publiée",
+                isOn: Binding(
+                    get: { settings.includesTranscript(for: service) },
+                    set: { settings.setIncludesTranscript($0, for: service) }
+                )
+            )
+            Text("Lorsqu'elle est incluse, la transcription apparaît tout en bas dans un accordéon replié.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     /// `NSWorkspace.shared.open(url)` honors universal links: if the Notion
@@ -272,6 +370,37 @@ struct ServicesSettingsView: View {
             notionVerifyStatus = L("❌ %@", error.localizedDescription)
         }
         isVerifyingNotion = false
+    }
+
+    private func loadNotionDataSources() async {
+        isLoadingNotionDataSources = true
+        notionTaskStatus = L("Connexion…")
+        let client = NotionClient(configuration: settings.notion, token: settings.notionToken)
+        do {
+            notionDataSources = try await client.dataSources()
+            notionTaskStatus = L("✅ %d base(s) accessible(s)", notionDataSources.count)
+        } catch {
+            notionTaskStatus = L("❌ %@", error.localizedDescription)
+        }
+        isLoadingNotionDataSources = false
+    }
+
+    private func createNotionTaskDataSource() async {
+        isLoadingNotionDataSources = true
+        notionTaskStatus = L("Création…")
+        let title = notionTaskDatabaseName.trimmingCharacters(in: .whitespaces)
+        let client = NotionClient(configuration: settings.notion, token: settings.notionToken)
+        do {
+            let source = try await client.createTaskDataSource(title: title)
+            notionDataSources.append(source)
+            notionDataSources.sort { $0.title < $1.title }
+            settings.notion.taskDataSourceID = source.id
+            settings.notion.taskDataSourceTitle = source.title
+            notionTaskStatus = L("✅ Base créée et sélectionnée.")
+        } catch {
+            notionTaskStatus = L("❌ %@", error.localizedDescription)
+        }
+        isLoadingNotionDataSources = false
     }
 
     /// The sprint page is set once at the start of a sprint; every meeting

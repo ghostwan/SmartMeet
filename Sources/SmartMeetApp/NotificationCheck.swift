@@ -110,6 +110,7 @@ enum NotificationCheck {
         notifier.announcePublication(
             meetingID: UUID(),
             title: "Réunion de test",
+            serviceName: "Confluence",
             url: URL(string: "https://example.com/page"),
             issues: ["TEST-1", "TEST-2"]
         )

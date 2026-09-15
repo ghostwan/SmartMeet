@@ -7,13 +7,36 @@ public struct NotionConfiguration: Codable, Sendable, Equatable {
     public var parentPageID: String
     /// Human-readable label, shown in the settings (title of the pasted page).
     public var parentPageTitle: String
+    /// Data source receiving action items as Notion tasks.
+    public var taskDataSourceID: String
+    public var taskDataSourceTitle: String
 
-    public init(parentPageID: String = "", parentPageTitle: String = "") {
+    public init(
+        parentPageID: String = "",
+        parentPageTitle: String = "",
+        taskDataSourceID: String = "",
+        taskDataSourceTitle: String = ""
+    ) {
         self.parentPageID = parentPageID
         self.parentPageTitle = parentPageTitle
+        self.taskDataSourceID = taskDataSourceID
+        self.taskDataSourceTitle = taskDataSourceTitle
     }
 
     public var isConfigured: Bool { !parentPageID.isEmpty }
+    public var isTaskDataSourceConfigured: Bool { !taskDataSourceID.isEmpty }
+
+    private enum CodingKeys: String, CodingKey {
+        case parentPageID, parentPageTitle, taskDataSourceID, taskDataSourceTitle
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        parentPageID = try container.decodeIfPresent(String.self, forKey: .parentPageID) ?? ""
+        parentPageTitle = try container.decodeIfPresent(String.self, forKey: .parentPageTitle) ?? ""
+        taskDataSourceID = try container.decodeIfPresent(String.self, forKey: .taskDataSourceID) ?? ""
+        taskDataSourceTitle = try container.decodeIfPresent(String.self, forKey: .taskDataSourceTitle) ?? ""
+    }
 
     /// Accepts a bare identifier (with or without dashes) or a Notion URL
     /// copied from the browser.

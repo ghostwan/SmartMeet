@@ -125,8 +125,13 @@ Each meeting is a self-contained folder:
 | Sync | summary, decisions, action items, topics, open questions, next steps | `{summary} — {Weekday} {date}` | sprint page |
 | Retrospective | **sprint weather**, depersonalized 4L, action items, decisions | `{type} — {date}` | sprint page |
 
-They're duplicated and edited in *Settings › Meeting Types*: sections,
-order, writing guidance, title format, and destination.
+Each profile initially contains only **Generic meeting**. In *Settings ›
+Meeting Types*, the `+` menu adds either one of the supplied templates above
+or a blank custom type. Every added type remains editable: name, sections,
+order, writing guidance, title format, publication service and its
+service-specific destination. Removing a supplied type only removes it from
+the profile and preserves its edits if it is added again; custom types are
+deleted permanently.
 
 ### Retrospective: sprint weather and 4L
 
@@ -168,7 +173,10 @@ minutes.
 
 ### Destination
 
-Each type publishes to one of these targets:
+Each type can inherit the profile's publication service or explicitly target
+Notion or Atlassian. A manual choice in the review window always takes
+precedence. Notion types publish under the profile's configured parent page;
+Atlassian types can additionally target one of these Confluence parents:
 
 - **current sprint page** — set in *Settings › Services*, by pasting the
   page's URL. The space is inferred from the page. As long as no page is
@@ -205,6 +213,15 @@ only the generic meeting type enabled. Upgrading from a version without
 profiles migrates every existing setting into a single seed "Work" profile
 automatically.
 
+Known people and the set of languages offered for generated minutes are also
+profile-specific. New profiles offer English only; the compact menu in
+*Settings › Minutes* can add Mandarin Chinese, Hindi, Spanish, French, Modern
+Standard Arabic, Bengali, Portuguese, Russian, Urdu, Indonesian, German,
+Japanese and Italian. Automatic publication uses the meeting type's service,
+then the profile default or its sole configured service when unambiguous.
+Jira ticket creation remains specific to Atlassian; Notion can create tasks in
+a configured data source.
+
 ## Configuration
 
 *Settings › Services* lists publication services as a dynamic, addable list
@@ -218,6 +235,14 @@ token is kept in the keychain. On first launch, it is picked up from
 Some Jira projects require an epic parent through a workflow validator that
 the `createmeta` API doesn't declare. The *Epic parent* field covers that
 case.
+
+*Notion*: integration token, parent page, and an optional task database. An
+accessible data source can be selected, or SmartMeet can create a database
+under the configured parent page with `Name`, `Owner`, `Due`, `Type`, and
+`Meeting` columns. Selected action items can then be created as Notion tasks,
+each linking back to the published minutes. Confluence and Notion also have
+independent per-profile switches for including the raw transcript in a
+collapsed section at the bottom of the published page.
 
 ## Architecture
 

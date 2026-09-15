@@ -6,6 +6,11 @@ import Testing
 
 @Suite("Types de réunion")
 struct MeetingTemplateTests {
+    @Test("Le type générique neutre est toujours proposé en premier")
+    func neutralGenericComesFirst() {
+        #expect(MeetingTemplate.builtIns.first?.id == MeetingTemplate.personal.id)
+    }
+
     @Test("Le daily remonte les points bloquants en premier")
     func dailyLeadsWithBlockers() {
         #expect(MeetingTemplate.daily.sections.first == .blockers)
@@ -56,6 +61,26 @@ struct MeetingTemplateTests {
         }
     }
 
+    @Test("Chaque langue de compte rendu est explicitement demandée au modèle")
+    func everyOutputLanguageIsRequestedExplicitly() {
+        for language in SummaryLanguage.allCases {
+            let prompt = SummaryPrompt.single(
+                transcript: "Hello",
+                context: SummaryContext(),
+                template: .personal,
+                language: language
+            )
+            switch language {
+            case .french:
+                #expect(prompt.contains("en français"))
+            case .english:
+                #expect(prompt.contains("in English"))
+            default:
+                #expect(prompt.contains("in \(language.promptName)"))
+            }
+        }
+    }
+
     @Test("Les consignes de section accompagnent la section demandée")
     func sectionGuidanceIsIncluded() {
         let daily = SummaryPrompt.instructions(
@@ -80,6 +105,19 @@ struct MeetingTemplateTests {
     func resolveFindsCustom() {
         let custom = MeetingTemplate(id: "mine", name: "Mon type", sections: [.tldr])
         #expect(MeetingTemplate.resolve(id: "mine", in: [custom]) == custom)
+    }
+
+    @Test("Le nom d'affichage d'un type personnalisé n'est jamais traduit")
+    func customDisplayNameStaysVerbatim() {
+        let custom = MeetingTemplate(id: "mine", name: "Comité produit", sections: [.tldr])
+        #expect(custom.localizedName == "Comité produit")
+    }
+
+    @Test("Le nom modifié d'un type fourni n'est jamais remplacé par sa traduction")
+    func renamedBuiltInDisplayNameStaysVerbatim() {
+        var renamed = MeetingTemplate.daily
+        renamed.name = "Point du matin"
+        #expect(renamed.localizedName == "Point du matin")
     }
 
     @Test("A title suggests the daily, in French or in English")

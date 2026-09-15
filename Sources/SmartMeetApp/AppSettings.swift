@@ -36,6 +36,7 @@ public final class AppSettings {
         static let profiles = "profiles"
         static let activeProfileID = "activeProfileID"
         static let enabledServices = "enabledServices"
+        static let profileKnownPeopleMigrated = "profileKnownPeopleMigrated"
     }
 
     private let defaults = UserDefaults.standard
@@ -143,13 +144,16 @@ public final class AppSettings {
             activeProfile = profile
         }
     }
-    /// First (and last) names of people the user regularly interacts with,
-    /// spelled correctly. Kept separate from the domain vocabulary to stay
-    /// readable, but used exactly the same way: injected into speech
-    /// recognition and into the minutes prompt, so that a name misheard or
-    /// misspelled by the model corrects itself.
+    /// First (and last) names associated with the active profile. Kept
+    /// separate from domain vocabulary for readability, but used the same
+    /// way by speech recognition and the minutes prompt.
     public var knownPeople: [String] {
-        didSet { defaults.set(knownPeople, forKey: Key.knownPeople) }
+        get { activeProfile.knownPeople }
+        set {
+            var profile = activeProfile
+            profile.knownPeople = newValue
+            activeProfile = profile
+        }
     }
     /// User's name: the transcript only knows them by the label "Moi" ("Me").
     public var userName: String {
@@ -161,8 +165,42 @@ public final class AppSettings {
         set {
             var profile = activeProfile
             profile.defaultOutputLanguage = newValue
+            profile.enabledOutputLanguages.insert(newValue)
             activeProfile = profile
         }
+    }
+    /// Minutes languages offered under the active profile.
+    public var enabledOutputLanguages: Set<SummaryLanguage> {
+        get { activeProfile.enabledOutputLanguages }
+        set {
+            var profile = activeProfile
+            let normalized = newValue.isEmpty ? [SummaryLanguage.english] : newValue
+            profile.enabledOutputLanguages = normalized
+            if !normalized.contains(profile.defaultOutputLanguage) {
+                profile.defaultOutputLanguage = Self.orderedOutputLanguages(in: normalized)[0]
+            }
+            activeProfile = profile
+        }
+    }
+
+    public var availableOutputLanguages: [SummaryLanguage] {
+        Self.orderedOutputLanguages(in: enabledOutputLanguages)
+    }
+
+    public func setOutputLanguage(_ language: SummaryLanguage, enabled: Bool) {
+        var languages = enabledOutputLanguages
+        if enabled {
+            languages.insert(language)
+        } else if languages.count > 1 {
+            languages.remove(language)
+        }
+        enabledOutputLanguages = languages
+    }
+
+    private static func orderedOutputLanguages(
+        in languages: Set<SummaryLanguage>
+    ) -> [SummaryLanguage] {
+        SummaryLanguage.allCases.filter { languages.contains($0) }
     }
     /// Suggests recording when a meeting is detected, under the active profile.
     public var detectMeetings: Bool {
@@ -221,6 +259,14 @@ public final class AppSettings {
         set {
             var profile = activeProfile
             profile.autoCreateJiraIssues = newValue
+            activeProfile = profile
+        }
+    }
+    public var autoCreateNotionTasks: Bool {
+        get { activeProfile.autoCreateNotionTasks }
+        set {
+            var profile = activeProfile
+            profile.autoCreateNotionTasks = newValue
             activeProfile = profile
         }
     }
@@ -330,7 +376,6 @@ public final class AppSettings {
         copilotACPModel = defaults.string(forKey: Key.copilotACPModel) ?? "claude-sonnet-5"
         ollamaModel = defaults.string(forKey: Key.ollamaModel) ?? "gemma4"
         claudeCodeModel = defaults.string(forKey: Key.claudeCodeModel) ?? "sonnet"
-        knownPeople = defaults.stringArray(forKey: Key.knownPeople) ?? []
         userName = defaults.string(forKey: Key.userName) ?? NSFullUserName()
         useCalendar = defaults.object(forKey: Key.useCalendar) as? Bool ?? true
 
@@ -340,14 +385,27 @@ public final class AppSettings {
         // single seed profile, so upgrading doesn't reset anyone's
         // configuration.
         let isFreshMigration = defaults.data(forKey: Key.profiles) == nil
-        let resolvedProfiles: [Profile]
+        var resolvedProfiles: [Profile]
         if let data = defaults.data(forKey: Key.profiles),
            let decoded = try? JSONDecoder().decode([Profile].self, from: data), !decoded.isEmpty {
             resolvedProfiles = decoded
+            // `knownPeople` used to be global. Copy the legacy list into every
+            // existing profile once so upgrading preserves current speech and
+            // one-to-one suggestions, then each profile evolves independently.
+            if !defaults.bool(forKey: Key.profileKnownPeopleMigrated) {
+                let legacyKnownPeople = defaults.stringArray(forKey: Key.knownPeople) ?? []
+                if !legacyKnownPeople.isEmpty {
+                    for index in resolvedProfiles.indices where resolvedProfiles[index].knownPeople.isEmpty {
+                        resolvedProfiles[index].knownPeople = legacyKnownPeople
+                    }
+                }
+                defaults.set(true, forKey: Key.profileKnownPeopleMigrated)
+            }
         } else {
             let legacyVocabulary = defaults.stringArray(forKey: Key.vocabulary) ?? [
                 "Confluence", "Jira", "SmartMeet",
             ]
+            let legacyKnownPeople = defaults.stringArray(forKey: Key.knownPeople) ?? []
             var legacyCustomTemplates: [MeetingTemplate] = []
             if let data = defaults.data(forKey: Key.customTemplates),
                let decoded = try? JSONDecoder().decode([MeetingTemplate].self, from: data) {
@@ -365,9 +423,6 @@ public final class AppSettings {
             let legacyRecentLocales = defaults.stringArray(
                 forKey: Key.recentTranscriptionLocales
             ) ?? []
-            let legacyOutputLanguage = SummaryLanguage(
-                rawValue: defaults.string(forKey: Key.outputLanguage) ?? ""
-            ) ?? .french
             let legacyDetectMeetings = defaults.object(forKey: Key.detectMeetings) as? Bool ?? true
             let legacyAutoStart = defaults.object(
                 forKey: Key.autoStartOnDetection
@@ -392,13 +447,15 @@ public final class AppSettings {
                     name: L("Travail"),
                     symbol: "briefcase",
                     vocabulary: legacyVocabulary,
+                    knownPeople: legacyKnownPeople,
                     customTemplates: legacyCustomTemplates,
                     enabledTemplateIDs: legacyEnabled,
                     defaultTemplateID: legacyDefaultTemplateID,
                     enabledServices: legacyEnabledServices,
                     localeIdentifier: legacyLocaleIdentifier,
                     recentTranscriptionLocales: legacyRecentLocales,
-                    defaultOutputLanguage: legacyOutputLanguage,
+                    defaultOutputLanguage: .english,
+                    enabledOutputLanguages: [.english],
                     detectMeetings: legacyDetectMeetings,
                     autoStartOnDetection: legacyAutoStart,
                     detectMeetingEnd: legacyDetectMeetingEnd,
@@ -408,6 +465,7 @@ public final class AppSettings {
                     diarizeMicrophoneTrack: legacyDiarize
                 ),
             ]
+            defaults.set(true, forKey: Key.profileKnownPeopleMigrated)
         }
         profiles = resolvedProfiles
         let resolvedActiveProfileID: String
@@ -566,6 +624,48 @@ public final class AppSettings {
         !notionToken.isEmpty
     }
 
+    public var automaticPublicationServiceKind: ServiceKind? {
+        activeProfile.effectivePublicationServiceKind
+    }
+
+    public func publicationServiceKind(for template: MeetingTemplate) -> ServiceKind? {
+        activeProfile.effectivePublicationServiceKind(for: template)
+    }
+
+    public func canPublish(to service: ServiceKind) -> Bool {
+        switch service {
+        case .atlassian: canPublish
+        case .notion: canPublishToNotion
+        }
+    }
+
+    public func canAutoPublish(template: MeetingTemplate) -> Bool {
+        guard let service = publicationServiceKind(for: template) else { return false }
+        return canPublish(to: service)
+    }
+
+    public var canAutoPublish: Bool {
+        switch automaticPublicationServiceKind {
+        case .atlassian: canPublish
+        case .notion: canPublishToNotion
+        case nil: false
+        }
+    }
+
+    public func includesTranscript(for service: ServiceKind) -> Bool {
+        activeProfile.servicesIncludingTranscript.contains(service)
+    }
+
+    public func setIncludesTranscript(_ included: Bool, for service: ServiceKind) {
+        var profile = activeProfile
+        if included {
+            profile.servicesIncludingTranscript.insert(service)
+        } else {
+            profile.servicesIncludingTranscript.remove(service)
+        }
+        activeProfile = profile
+    }
+
     /// Current sprint page, common parent of the sprint's meetings.
     public var sprintPage: SprintPage? {
         get { atlassian.sprintPage }
@@ -592,31 +692,47 @@ public final class AppSettings {
         return (effectiveBuiltIns + trueCustoms).filter { enabled.contains($0.id) }
     }
 
-    /// All types for the active profile, including hidden ones — for the
-    /// settings screen which must allow showing them again.
-    public var allTemplatesIncludingDisabled: [MeetingTemplate] {
-        let effectiveBuiltIns = MeetingTemplate.builtIns.map { template(id: $0.id) }
-        let trueCustoms = customTemplates.filter { custom in
-            !MeetingTemplate.builtIns.contains { $0.id == custom.id }
-        }
-        return effectiveBuiltIns + trueCustoms
+    public var availableBuiltInTemplates: [MeetingTemplate] {
+        MeetingTemplate.builtIns.filter { !enabledTemplateIDs.contains($0.id) }
     }
 
-    public func isTemplateEnabled(_ template: MeetingTemplate) -> Bool {
-        enabledTemplateIDs.contains(template.id)
+    public func addBuiltInTemplate(_ template: MeetingTemplate) {
+        guard template.hasBuiltInIdentity else { return }
+        enabledTemplateIDs.insert(template.id)
     }
 
-    /// Hides or shows a type again in the selection list of the active
-    /// profile. If the hidden type was the default type, falls back to the
-    /// generic one so as not to propose an unreachable type on the next
-    /// startup.
-    public func setTemplateEnabled(_ enabled: Bool, for template: MeetingTemplate) {
-        if enabled {
-            enabledTemplateIDs.insert(template.id)
-        } else {
-            enabledTemplateIDs.remove(template.id)
-            if defaultTemplateID == template.id { defaultTemplateID = MeetingTemplate.personal.id }
+    @discardableResult
+    public func createCustomTemplate() -> MeetingTemplate {
+        let template = MeetingTemplate(
+            name: L("Nouveau type"),
+            symbol: "doc.text",
+            sections: MeetingTemplate.personal.sections,
+            instructions: "",
+            titleFormat: "{summary} — {date}",
+            parent: .spaceHome
+        )
+        customTemplates.append(template)
+        enabledTemplateIDs.insert(template.id)
+        return template
+    }
+
+    /// Removes a type from the active profile. Built-in overrides are retained
+    /// so adding that built-in again restores the user's edits; custom types
+    /// are deleted because they have no global canonical definition.
+    public func removeTemplateFromActiveProfile(_ template: MeetingTemplate) {
+        guard allTemplates.count > 1 else { return }
+        enabledTemplateIDs.remove(template.id)
+        if !template.hasBuiltInIdentity {
+            customTemplates.removeAll { $0.id == template.id }
         }
+        if defaultTemplateID == template.id {
+            defaultTemplateID = allTemplates.first?.id ?? MeetingTemplate.personal.id
+        }
+    }
+
+    public func resetBuiltInTemplate(_ template: MeetingTemplate) {
+        guard template.hasBuiltInIdentity else { return }
+        customTemplates.removeAll { $0.id == template.id }
     }
 
     public func template(id: String?) -> MeetingTemplate {
@@ -639,7 +755,7 @@ public final class AppSettings {
     public func duplicate(_ template: MeetingTemplate) -> MeetingTemplate {
         var copy = template
         copy.id = UUID().uuidString
-        copy.name = L("%@ (copie)", template.name)
+        copy.name = L("%@ (copie)", template.localizedName)
         copy.isBuiltIn = false
         customTemplates.append(copy)
         enabledTemplateIDs.insert(copy.id)
@@ -656,10 +772,4 @@ public final class AppSettings {
         }
     }
 
-    /// For a custom type, permanent deletion. For an edited built-in type,
-    /// removes the override and thus reverts to the original version.
-    public func remove(_ template: MeetingTemplate) {
-        customTemplates.removeAll { $0.id == template.id }
-        if defaultTemplateID == template.id { defaultTemplateID = MeetingTemplate.personal.id }
-    }
 }
