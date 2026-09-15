@@ -39,7 +39,7 @@ enum CoreAudioSystem {
         )
     }
 
-    static func value<T>(
+    static func value<T: FixedWidthInteger>(
         _ objectID: AudioObjectID,
         _ selector: AudioObjectPropertySelector,
         default defaultValue: T,
@@ -48,10 +48,12 @@ enum CoreAudioSystem {
         var propertyAddress = address(selector)
         var size = UInt32(MemoryLayout<T>.size)
         var value = defaultValue
-        try check(
-            AudioObjectGetPropertyData(objectID, &propertyAddress, 0, nil, &size, &value),
-            context
-        )
+        let status = withUnsafeMutableBytes(of: &value) { buffer in
+            AudioObjectGetPropertyData(
+                objectID, &propertyAddress, 0, nil, &size, buffer.baseAddress!
+            )
+        }
+        try check(status, context)
         return value
     }
 

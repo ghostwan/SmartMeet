@@ -73,3 +73,6 @@ notes, then resets it to this template once the release is published.
   like every other built-in type, is opt-in per profile.
 
 ### Fixed
+
+- Release builds no longer emit an unsafe-pointer warning from the generic
+  Core Audio scalar-property helper.
