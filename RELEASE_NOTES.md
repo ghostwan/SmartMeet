@@ -13,3 +13,7 @@ notes, then resets it to this template once the release is published.
 ### Changed
 
 ### Fixed
+
+- The Notion "Test connection" button now enables immediately after entering
+  a token when it is the profile's only publication service; token changes
+  now invalidate the SwiftUI view instead of waiting for an unrelated refresh.

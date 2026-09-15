@@ -41,6 +41,13 @@ public final class AppSettings {
     private let defaults = UserDefaults.standard
     private let keychain = KeychainStore()
     private let notionKeychain = KeychainStore(service: "com.smartmeet.notion")
+    /// Keychain-backed values still need an in-memory observable copy:
+    /// writing directly to the keychain doesn't invalidate SwiftUI views.
+    /// Without these caches, `canPublishToNotion` stayed false after typing a
+    /// token until some unrelated state change (such as switching services)
+    /// happened to refresh the screen.
+    private var cachedAtlassianToken = ""
+    private var cachedNotionToken = ""
     /// Legacy fixed account name, from before tokens were scoped per profile.
     /// Kept only so the one-time migration in `init()` can find a
     /// pre-existing token to carry over to the seed profile's own account.
@@ -103,7 +110,15 @@ public final class AppSettings {
     /// Profile currently in effect — drives `vocabulary`, `customTemplates`,
     /// `allTemplates`, `defaultTemplateID` below, all of which proxy into it.
     public var activeProfileID: String {
-        didSet { defaults.set(activeProfileID, forKey: Key.activeProfileID) }
+        didSet {
+            defaults.set(activeProfileID, forKey: Key.activeProfileID)
+            cachedAtlassianToken = keychain.read(
+                account: Self.tokenAccount(for: activeProfileID)
+            ) ?? ""
+            cachedNotionToken = notionKeychain.read(
+                account: Self.notionTokenAccount(for: activeProfileID)
+            ) ?? ""
+        }
     }
     /// Publication services added under the active profile. Notion and
     /// Atlassian's own settings (tokens, sites, pages…) stay stored
@@ -264,8 +279,11 @@ public final class AppSettings {
     /// preferences, under an account name that varies per profile so each
     /// profile can point at a different Atlassian site.
     public var atlassianToken: String {
-        get { keychain.read(account: Self.tokenAccount(for: activeProfileID)) ?? "" }
-        set { keychain.write(newValue, account: Self.tokenAccount(for: activeProfileID)) }
+        get { cachedAtlassianToken }
+        set {
+            cachedAtlassianToken = newValue
+            keychain.write(newValue, account: Self.tokenAccount(for: activeProfileID))
+        }
     }
 
     /// Notion configuration per profile ID — same rationale as
@@ -284,8 +302,11 @@ public final class AppSettings {
     /// Notion integration token: keychain, never the preferences, one
     /// account per profile.
     public var notionToken: String {
-        get { notionKeychain.read(account: Self.notionTokenAccount(for: activeProfileID)) ?? "" }
-        set { notionKeychain.write(newValue, account: Self.notionTokenAccount(for: activeProfileID)) }
+        get { cachedNotionToken }
+        set {
+            cachedNotionToken = newValue
+            notionKeychain.write(newValue, account: Self.notionTokenAccount(for: activeProfileID))
+        }
     }
 
     /// Meeting types (built-in or custom) visible in the selection list for
@@ -450,6 +471,8 @@ public final class AppSettings {
         notionKeychain.seedFromEnvironmentIfNeeded(
             account: notionProfileAccount, variable: "NOTION_API_TOKEN"
         )
+        cachedAtlassianToken = keychain.read(account: profileAccount) ?? ""
+        cachedNotionToken = notionKeychain.read(account: notionProfileAccount) ?? ""
 
         // Property observers (`didSet`) never fire for a property's very
         // first assignment inside its own initializer — standard Swift
