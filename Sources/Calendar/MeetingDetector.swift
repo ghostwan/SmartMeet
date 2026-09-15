@@ -32,11 +32,22 @@ public struct MeetingSuggestion: Sendable, Equatable, Identifiable {
     public var reason: String {
         switch trigger {
         case .calendar:
-            "Réunion à l'agenda"
+            NSLocalizedString("Réunion à l'agenda", bundle: .main, value: "Réunion à l'agenda", comment: "")
         case .conferencingApp(let app):
-            "\(app) utilise le micro"
+            String(
+                format: NSLocalizedString("%@ utilise le micro", bundle: .main, value: "%@ utilise le micro", comment: ""),
+                app
+            )
         case .both(let app):
-            "Réunion à l'agenda · \(app) utilise le micro"
+            String(
+                format: NSLocalizedString(
+                    "Réunion à l'agenda · %@ utilise le micro",
+                    bundle: .main,
+                    value: "Réunion à l'agenda · %@ utilise le micro",
+                    comment: ""
+                ),
+                app
+            )
         }
     }
 }

@@ -63,27 +63,27 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
             UNNotificationCategory(
                 identifier: Category.suggestion,
                 actions: [
-                    action(Action.record, "Enregistrer", foreground: true),
-                    action(Action.dismiss, "Pas maintenant"),
+                    action(Action.record, L("Enregistrer"), foreground: true),
+                    action(Action.dismiss, L("Pas maintenant")),
                 ],
                 intentIdentifiers: []
             ),
             UNNotificationCategory(
                 identifier: Category.summaryReady,
                 actions: [
-                    action(Action.review, "Relire", foreground: true),
-                    action(Action.publish, "Publier", foreground: true),
+                    action(Action.review, L("Relire"), foreground: true),
+                    action(Action.publish, L("Publier"), foreground: true),
                 ],
                 intentIdentifiers: []
             ),
             UNNotificationCategory(
                 identifier: Category.published,
-                actions: [action(Action.open, "Ouvrir la page", foreground: true)],
+                actions: [action(Action.open, L("Ouvrir la page"), foreground: true)],
                 intentIdentifiers: []
             ),
             UNNotificationCategory(
                 identifier: Category.failure,
-                actions: [action(Action.retry, "Réessayer", foreground: true)],
+                actions: [action(Action.retry, L("Réessayer"), foreground: true)],
                 intentIdentifiers: []
             ),
         ])
@@ -117,7 +117,7 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
         send(
             id: suggestion.id,
             category: Category.suggestion,
-            title: "Enregistrer « \(suggestion.title) » ?",
+            title: L("Enregistrer « %@ » ?", suggestion.title),
             body: suggestion.reason
         )
     }
@@ -125,22 +125,22 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
     /// Le compte rendu est prêt à être relu.
     func announceSummaryReady(meetingID: UUID, title: String, actionItemCount: Int) {
         let detail = actionItemCount == 0
-            ? "Aucun action item"
-            : "\(actionItemCount) action item\(actionItemCount > 1 ? "s" : "")"
+            ? L("Aucun action item")
+            : L("%d action item(s)", actionItemCount)
         send(
             id: "summary-\(meetingID.uuidString)",
             category: Category.summaryReady,
-            title: "Compte rendu prêt",
-            body: "« \(title) » — \(detail)",
+            title: L("Compte rendu prêt"),
+            body: L("« %@ » — %@", title, detail),
             payload: [Payload.meetingID: meetingID.uuidString]
         )
     }
 
     /// La page est publiée : la notification porte le lien.
     func announcePublication(meetingID: UUID, title: String, url: URL?, issues: [String]) {
-        var body = "« \(title) »"
+        var body = L("« %@ »", title)
         if !issues.isEmpty {
-            body += " — \(issues.count) ticket\(issues.count > 1 ? "s" : "") créé\(issues.count > 1 ? "s" : "")"
+            body += " " + L("— %d ticket(s) créé(s)", issues.count)
         }
         var payload: [String: String] = [Payload.meetingID: meetingID.uuidString]
         if let url { payload[Payload.url] = url.absoluteString }
@@ -148,7 +148,7 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
         send(
             id: "published-\(meetingID.uuidString)",
             category: Category.published,
-            title: "Publié sur Confluence",
+            title: L("Publié sur Confluence"),
             body: body,
             payload: payload
         )
@@ -160,8 +160,8 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
         send(
             id: "failure-\(meetingID.uuidString)",
             category: Category.failure,
-            title: "Compte rendu impossible",
-            body: "« \(title) » — \(message)",
+            title: L("Compte rendu impossible"),
+            body: L("« %@ » — %@", title, message),
             payload: [Payload.meetingID: meetingID.uuidString]
         )
     }

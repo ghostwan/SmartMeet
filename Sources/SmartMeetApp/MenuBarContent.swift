@@ -205,11 +205,11 @@ struct MenuBarContent: View {
     private var statusText: String {
         switch session.state {
         case .idle: session.settings.providerKind.displayName
-        case .preparing: "Préparation des modèles…"
+        case .preparing: L("Préparation des modèles…")
         case .recording(let since):
-            "Enregistrement · \(Self.elapsed(since: since))"
-        case .finishing: "Finalisation…"
-        case .failed: "Erreur"
+            L("Enregistrement · %@", Self.elapsed(since: since))
+        case .finishing: L("Finalisation…")
+        case .failed: L("Erreur")
         }
     }
 
@@ -225,7 +225,7 @@ struct MenuBarContent: View {
                 .font(.title3)
                 .foregroundStyle(.red)
             VStack(alignment: .leading, spacing: 1) {
-                Text("Enregistrer « \(suggestion.title) » ?")
+                Text(L("Enregistrer « %@ » ?", suggestion.title))
                     .font(.callout.weight(.medium))
                     .lineLimit(1)
                 Text(suggestion.reason)

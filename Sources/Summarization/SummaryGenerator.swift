@@ -40,13 +40,36 @@ public enum SummaryGenerationError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .noJSONObject:
-            "La réponse du modèle ne contient aucun objet JSON."
+            NSLocalizedString(
+                "La réponse du modèle ne contient aucun objet JSON.",
+                bundle: .main,
+                value: "La réponse du modèle ne contient aucun objet JSON.",
+                comment: ""
+            )
         case .invalidSchema(let detail):
-            "JSON non conforme au schéma : \(detail)"
+            String(
+                format: NSLocalizedString(
+                    "JSON non conforme au schéma : %@", bundle: .main, value: "JSON non conforme au schéma : %@", comment: ""
+                ),
+                detail
+            )
         case .emptyTranscript:
-            "Le transcript est vide, aucun compte rendu à générer."
+            NSLocalizedString(
+                "Le transcript est vide, aucun compte rendu à générer.",
+                bundle: .main,
+                value: "Le transcript est vide, aucun compte rendu à générer.",
+                comment: ""
+            )
         case .allAttemptsFailed(let detail):
-            "Génération impossible après plusieurs tentatives — \(detail)"
+            String(
+                format: NSLocalizedString(
+                    "Génération impossible après plusieurs tentatives — %@",
+                    bundle: .main,
+                    value: "Génération impossible après plusieurs tentatives — %@",
+                    comment: ""
+                ),
+                detail
+            )
         }
     }
 }

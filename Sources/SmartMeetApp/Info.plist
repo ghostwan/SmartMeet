@@ -22,6 +22,16 @@
 	<string>26.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>fr</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>fr</string>
+		<string>en</string>
+		<string>es</string>
+		<string>pt</string>
+		<string>it</string>
+	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>SmartMeet enregistre votre micro pour transcrire vos réunions.</string>
 	<key>NSAudioCaptureUsageDescription</key>

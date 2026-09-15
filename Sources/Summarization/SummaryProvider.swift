@@ -34,13 +34,30 @@ public enum SummaryProviderError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .executableNotFound(let name):
-            "Exécutable introuvable : \(name)."
+            String(
+                format: NSLocalizedString(
+                    "Exécutable introuvable : %@.", bundle: .main, value: "Exécutable introuvable : %@.", comment: ""
+                ),
+                name
+            )
         case .processFailed(let detail):
-            "Le provider a échoué : \(detail)"
+            String(
+                format: NSLocalizedString(
+                    "Le provider a échoué : %@", bundle: .main, value: "Le provider a échoué : %@", comment: ""
+                ),
+                detail
+            )
         case .emptyResponse:
-            "Le provider n'a rien renvoyé."
+            NSLocalizedString(
+                "Le provider n'a rien renvoyé.", bundle: .main, value: "Le provider n'a rien renvoyé.", comment: ""
+            )
         case .serverUnreachable(let url):
-            "Serveur injoignable : \(url)"
+            String(
+                format: NSLocalizedString(
+                    "Serveur injoignable : %@", bundle: .main, value: "Serveur injoignable : %@", comment: ""
+                ),
+                url
+            )
         }
     }
 }

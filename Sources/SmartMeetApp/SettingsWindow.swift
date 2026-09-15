@@ -119,7 +119,10 @@ struct SettingsWindow: View {
                     "Distinguer les voix sur le micro (réunion en présentiel)",
                     isOn: $settings.diarizeMicrophoneTrack
                 )
-                Text("Pour une réunion où plusieurs personnes parlent dans le même micro. Basé sur la hauteur et le timbre de la voix, pas sur un modèle de reconnaissance vocale : fonctionne surtout quand les voix sont nettement différentes, et jusqu'à \(MicrophoneDiarizer.defaultMaxSpeakers) locuteurs. Une seule voix n'est pas scindée à tort si la séparation n'est pas nette.")
+                Text(L(
+                    "Pour une réunion où plusieurs personnes parlent dans le même micro. Basé sur la hauteur et le timbre de la voix, pas sur un modèle de reconnaissance vocale : fonctionne surtout quand les voix sont nettement différentes, et jusqu'à %d locuteurs. Une seule voix n'est pas scindée à tort si la séparation n'est pas nette.",
+                    MicrophoneDiarizer.defaultMaxSpeakers
+                ))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -322,23 +325,23 @@ struct SettingsWindow: View {
 
     private func applyNotionPage() {
         guard let id = NotionConfiguration.extractPageID(from: notionPageInput) else {
-            notionPageStatus = "❌ Identifiant ou URL de page non reconnu."
+            notionPageStatus = L("❌ Identifiant ou URL de page non reconnu.")
             return
         }
         settings.notion.parentPageID = id
-        notionPageStatus = "✅ Page enregistrée."
+        notionPageStatus = L("✅ Page enregistrée.")
         notionPageInput = ""
     }
 
     private func verifyNotionAccess() async {
         isVerifyingNotion = true
-        notionVerifyStatus = "Connexion…"
+        notionVerifyStatus = L("Connexion…")
         let client = NotionClient(configuration: settings.notion, token: settings.notionToken)
         do {
             try await client.verifyAccess()
-            notionVerifyStatus = "✅ Connexion réussie."
+            notionVerifyStatus = L("✅ Connexion réussie.")
         } catch {
-            notionVerifyStatus = "❌ \(error.localizedDescription)"
+            notionVerifyStatus = L("❌ %@", error.localizedDescription)
         }
         isVerifyingNotion = false
     }
@@ -351,7 +354,11 @@ struct SettingsWindow: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(sprint.title).font(.callout).lineLimit(1)
-                        Text("\(sprint.spaceKey) · définie le \(sprint.setAt.formatted(date: .abbreviated, time: .shortened))")
+                        Text(L(
+                            "%@ · définie le %@",
+                            sprint.spaceKey,
+                            sprint.setAt.formatted(date: .abbreviated, time: .shortened)
+                        ))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -400,7 +407,7 @@ struct SettingsWindow: View {
     }
 
     private func loadRemoteOptions() async {
-        statusMessage = "Connexion…"
+        statusMessage = L("Connexion…")
         let configuration = settings.atlassian
         let token = settings.atlassianToken
 
@@ -412,9 +419,9 @@ struct SettingsWindow: View {
                 let jira = JiraClient(configuration: configuration, token: token)
                 issueTypes = (try? await jira.issueTypes()) ?? []
             }
-            statusMessage = "✅ \(spaces.count) espaces, \(issueTypes.count) types de ticket"
+            statusMessage = L("✅ %d espaces, %d types de ticket", spaces.count, issueTypes.count)
         } catch {
-            statusMessage = "❌ \(error.localizedDescription)"
+            statusMessage = L("❌ %@", error.localizedDescription)
         }
     }
 }

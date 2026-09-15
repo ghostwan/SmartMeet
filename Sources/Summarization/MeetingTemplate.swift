@@ -405,4 +405,52 @@ public extension MeetingTemplate {
         guard let id else { return .generic }
         return custom.first { $0.id == id } ?? builtIns.first { $0.id == id } ?? .generic
     }
+
+    /// Guesses the meeting type from its title — useful as soon as a meeting is
+    /// suggested by the calendar or a video conferencing app, before the user has
+    /// manually picked a type from the menu.
+    ///
+    /// A simple keyword match rather than a model: a meeting title is short and
+    /// rarely follows elaborate grammar, a substring match is good enough and stays
+    /// predictable for the user (unlike a probabilistic score, hard to explain if
+    /// the guessed type is surprising). `nil` when nothing matches: it's up to the
+    /// caller to keep whatever type is already selected rather than force generic.
+    static func infer(fromTitle title: String, in candidates: [MeetingTemplate]) -> MeetingTemplate? {
+        let normalized = title
+            .lowercased()
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
+        guard !normalized.isEmpty else { return nil }
+
+        // Keywords specific to the built-in types, in French and English: a
+        // meeting title follows the organizer's language, not necessarily the
+        // minutes' language. Generic and personal conversation have no reliable
+        // keyword — they're fallbacks, not types we detect.
+        let builtInKeywords: [String: [String]] = [
+            daily.id: ["daily", "standup", "stand-up", "stand up", "point quotidien"],
+            synchro.id: ["synchro", "sync"],
+            retrospective.id: ["retro", "rétro", "retrospective", "rétrospective"],
+        ]
+
+        for candidate in candidates {
+            let keywords = builtInKeywords[candidate.id] ?? []
+            if keywords.contains(where: normalized.contains) {
+                return candidate
+            }
+        }
+
+        // Custom (or renamed built-in) types: absent dedicated keywords, the
+        // type's own name is the only available hint. A name that's too short
+        // ("IT", "QA"…) would produce too many false positives, so it's ignored.
+        for candidate in candidates where builtInKeywords[candidate.id] == nil {
+            let candidateName = candidate.name
+                .lowercased()
+                .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
+            guard candidateName.count >= 4 else { continue }
+            if normalized.contains(candidateName) {
+                return candidate
+            }
+        }
+
+        return nil
+    }
 }

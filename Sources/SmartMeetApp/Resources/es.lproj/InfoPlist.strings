@@ -1,0 +1,5 @@
+/* TCC permission prompts shown by macOS itself. */
+"NSMicrophoneUsageDescription" = "SmartMeet graba tu micrófono para transcribir tus reuniones.";
+"NSAudioCaptureUsageDescription" = "SmartMeet captura el audio del sistema para transcribir la voz de los participantes.";
+"NSCalendarsFullAccessUsageDescription" = "SmartMeet lee tu calendario para obtener el título y los participantes de la reunión en curso.";
+"NSSpeechRecognitionUsageDescription" = "SmartMeet transcribe tus reuniones en el dispositivo, sin enviar nada a un servidor.";

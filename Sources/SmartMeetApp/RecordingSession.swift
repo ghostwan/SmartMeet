@@ -132,6 +132,7 @@ public final class RecordingSession {
                     if current?.id != lastSeen {
                         lastSeen = current?.id
                         if let current, !self.isRecording {
+                            self.applyInferredTemplate(fromTitle: current.title)
                             if self.settings.autoStartOnDetection {
                                 await self.acceptSuggestion()
                             } else {
@@ -143,6 +144,19 @@ public final class RecordingSession {
                 try? await Task.sleep(for: .seconds(2))
             }
         }
+    }
+
+    /// Guesses the meeting type from a title (calendar or conferencing app) and
+    /// applies it — but only if the user hasn't already picked a type by hand from
+    /// the menu. The default template acts as a "still untouched" marker: as soon
+    /// as it changes, whether by this inference or by the user, it's never
+    /// automatically overridden again.
+    private func applyInferredTemplate(fromTitle title: String) {
+        guard selectedTemplateID == settings.defaultTemplateID else { return }
+        guard let inferred = MeetingTemplate.infer(fromTitle: title, in: settings.allTemplates) else {
+            return
+        }
+        selectedTemplateID = inferred.id
     }
 
     /// Démarre l'enregistrement de la réunion proposée, en reprenant son titre et
@@ -178,20 +192,20 @@ public final class RecordingSession {
             ? (settings.sprintPage?.spaceKey ?? settings.atlassian.spaceKey)
             : (template.spaceKeyOverride.isEmpty ? settings.atlassian.spaceKey : template.spaceKeyOverride)
 
-        guard !space.isEmpty else { return "Destination non configurée" }
+        guard !space.isEmpty else { return L("Destination non configurée") }
 
         switch template.parent {
         case .sprintPage:
             if let sprint = settings.sprintPage {
-                return "\(space) › \(sprint.title)"
+                return L("%@ › %@", space, sprint.title)
             }
-            return "\(space) › accueil — aucune page de sprint définie"
+            return L("%@ › accueil — aucune page de sprint définie", space)
         case .page(let id) where !id.isEmpty:
-            return "\(space) › page \(id)"
+            return L("%@ › page %@", space, id)
         case .page, .spaceHome:
             return settings.atlassian.parentPageID.isEmpty
-                ? "\(space) › accueil de l'espace"
-                : "\(space) › page \(settings.atlassian.parentPageID)"
+                ? L("%@ › accueil de l'espace", space)
+                : L("%@ › page %@", space, settings.atlassian.parentPageID)
         }
     }
 
@@ -199,10 +213,10 @@ public final class RecordingSession {
     /// L'espace est déduit de la page, pas saisi à la main.
     public func setSprintPage(from input: String) async -> String {
         guard let pageID = SprintPage.extractPageID(from: input) else {
-            return "❌ Identifiant ou URL de page non reconnu."
+            return L("❌ Identifiant ou URL de page non reconnu.")
         }
         guard settings.canPublish else {
-            return "❌ Configure d'abord le site, l'e-mail et le jeton Atlassian."
+            return L("❌ Configure d'abord le site, l'e-mail et le jeton Atlassian.")
         }
 
         let client = ConfluenceClient(
@@ -212,9 +226,9 @@ public final class RecordingSession {
             let page = try await client.page(id: pageID)
             let spaceKey = try await client.spaceKey(forPage: pageID)
             settings.sprintPage = SprintPage(id: pageID, title: page.title, spaceKey: spaceKey)
-            return "✅ \(spaceKey) › \(page.title)"
+            return L("✅ %@ › %@", spaceKey, page.title)
         } catch {
-            return "❌ \(error.localizedDescription)"
+            return L("❌ %@", error.localizedDescription)
         }
     }
 
@@ -259,6 +273,9 @@ public final class RecordingSession {
             _ = await calendar.requestAccess()
         }
         detectedCalendarMeeting = calendar.currentMeeting()
+        if let title = detectedCalendarMeeting?.title {
+            applyInferredTemplate(fromTitle: title)
+        }
     }
 
     public func start() async {
@@ -272,7 +289,7 @@ public final class RecordingSession {
         await refreshCalendarContext()
 
         guard await MicrophoneCapture.requestAccess() else {
-            state = .failed("Accès au micro refusé. Réglages › Confidentialité et sécurité › Microphone.")
+            state = .failed(L("Accès au micro refusé. Réglages › Confidentialité et sécurité › Microphone."))
             return
         }
 
@@ -358,7 +375,7 @@ public final class RecordingSession {
             meetings = store.loadAll()
             reviewedMeeting = meeting
         } catch {
-            state = .failed("Enregistrement non sauvegardé : \(error.localizedDescription)")
+            state = .failed(L("Enregistrement non sauvegardé : %@", error.localizedDescription))
             await teardown()
             return
         }
@@ -380,17 +397,17 @@ public final class RecordingSession {
     public func generateSummary(for meeting: Meeting) async {
         let transcript = store.transcriptMarkdown(for: meeting.id)
         guard !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            summaryState = .failed("Transcript vide.")
+            summaryState = .failed(L("Transcript vide."))
             return
         }
 
         let provider = settings.makeProvider()
         guard await provider.isAvailable() else {
-            summaryState = .failed("\(provider.displayName) est indisponible.")
+            summaryState = .failed(L("%@ est indisponible.", provider.displayName))
             return
         }
 
-        summaryState = .running("Analyse du transcript…")
+        summaryState = .running(L("Analyse du transcript…"))
 
         let generator = SummaryGenerator(provider: provider)
         let context = SummaryContext(
@@ -464,10 +481,10 @@ public final class RecordingSession {
 
     private static func describe(_ progress: SummaryProgress) -> String {
         switch progress {
-        case .preparing: "Préparation…"
-        case .summarizingChunk(let index, let total): "Analyse de la tranche \(index)/\(total)…"
-        case .synthesizing: "Synthèse finale…"
-        case .repairing(let attempt): "JSON non conforme, correction (\(attempt))…"
+        case .preparing: L("Préparation…")
+        case .summarizingChunk(let index, let total): L("Analyse de la tranche %d/%d…", index, total)
+        case .synthesizing: L("Synthèse finale…")
+        case .repairing(let attempt): L("JSON non conforme, correction (%d)…", attempt)
         }
     }
 
@@ -503,21 +520,23 @@ public final class RecordingSession {
         jiraParentKey: String? = nil
     ) async {
         guard let summary = meeting.summary else {
-            publishState = .failed("Aucun compte rendu à publier.")
+            publishState = .failed(L("Aucun compte rendu à publier."))
             return
         }
         guard settings.canPublish else {
-            publishState = .failed("Configuration Atlassian incomplète (site, e-mail, espace, jeton).")
+            publishState = .failed(L("Configuration Atlassian incomplète (site, e-mail, espace, jeton)."))
             return
         }
 
-        publishState = .running("Publication…")
+        publishState = .running(L("Publication…"))
         let service = PublishService(
             configuration: settings.atlassian, token: settings.atlassianToken
         )
         let transcript = store.transcriptMarkdown(for: meeting.id)
-        let audioNote = "durée \(meeting.formattedDuration), transcription on-device — "
-            + "participants informés de l'enregistrement"
+        let audioNote = L(
+            "durée %@, transcription on-device — participants informés de l'enregistrement",
+            meeting.formattedDuration
+        )
 
         // Les tickets Jira sont toujours en anglais, quelle que soit la langue du
         // compte rendu : on ne traduit que si nécessaire, pour éviter un appel LLM
@@ -596,11 +615,11 @@ public final class RecordingSession {
 
     private static func describe(_ step: PublishStep) -> String {
         switch step {
-        case .resolvingDestination: "Résolution de la destination…"
-        case .creatingPage: "Création de la page Confluence…"
-        case .creatingIssue(let index, let total): "Création du ticket \(index)/\(total)…"
-        case .linkingIssues: "Mise à jour de la page avec les clés Jira…"
-        case .done: "Terminé"
+        case .resolvingDestination: L("Résolution de la destination…")
+        case .creatingPage: L("Création de la page Confluence…")
+        case .creatingIssue(let index, let total): L("Création du ticket %d/%d…", index, total)
+        case .linkingIssues: L("Mise à jour de la page avec les clés Jira…")
+        case .done: L("Terminé")
         }
     }
 
@@ -608,11 +627,11 @@ public final class RecordingSession {
     /// Notion, enfant de la page configurée dans les réglages.
     public func publishToNotion(_ meeting: Meeting) async {
         guard let summary = meeting.summary else {
-            notionPublishState = .failed("Aucun compte rendu à publier.")
+            notionPublishState = .failed(L("Aucun compte rendu à publier."))
             return
         }
         guard settings.canPublishToNotion else {
-            notionPublishState = .failed("Configuration Notion incomplète (page parente, jeton).")
+            notionPublishState = .failed(L("Configuration Notion incomplète (page parente, jeton)."))
             return
         }
 
@@ -662,11 +681,11 @@ public final class RecordingSession {
         do {
             try store.deleteRawRecording(for: meeting.id)
         } catch {
-            return "Échec de la suppression : \(error.localizedDescription)"
+            return L("Échec de la suppression : %@", error.localizedDescription)
         }
         if reviewedMeeting?.id == meeting.id { segments = [] }
         meetings = store.loadAll()
-        return "Audio et transcript supprimés. Le compte rendu est conservé."
+        return L("Audio et transcript supprimés. Le compte rendu est conservé.")
     }
 
     public func directory(for meeting: Meeting) -> URL {
@@ -685,19 +704,18 @@ public final class RecordingSession {
     public func rediarize(_ meeting: Meeting) async -> String {
         let existing = store.loadSegments(for: meeting.id)
         guard !existing.isEmpty else {
-            return "Aucun transcript à réanalyser pour cette réunion."
+            return L("Aucun transcript à réanalyser pour cette réunion.")
         }
         let audioURL = directory(for: meeting).appending(path: AudioTrack.microphone.fileName)
         guard FileManager.default.fileExists(atPath: audioURL.path) else {
-            return "Piste micro introuvable (\(AudioTrack.microphone.fileName))."
+            return L("Piste micro introuvable (%@).", AudioTrack.microphone.fileName)
         }
         let offset = meeting.trackStartOffsets[AudioTrack.microphone.rawValue] ?? 0
 
         guard let mapping = try? MicrophoneDiarizer.diarize(
             segments: existing, audioFileURL: audioURL, fileTimeOffset: offset
         ) else {
-            return "Aucune séparation nette trouvée — probablement une seule voix, "
-                + "ou pas assez de segments micro."
+            return L("Aucune séparation nette trouvée — probablement une seule voix, ou pas assez de segments micro.")
         }
 
         let updated = existing.map { segment -> TranscriptSegment in
@@ -712,13 +730,13 @@ public final class RecordingSession {
                 updated, for: meeting.id, title: meeting.title, date: meeting.startedAt
             )
         } catch {
-            return "Échec de l'enregistrement : \(error.localizedDescription)"
+            return L("Échec de l'enregistrement : %@", error.localizedDescription)
         }
 
         segments = updated
         meetings = store.loadAll()
         let speakerCount = Set(mapping.values).count
-        return "\(speakerCount) locuteur\(speakerCount > 1 ? "s" : "") distingué\(speakerCount > 1 ? "s" : "") sur la piste micro."
+        return L("%d locuteur(s) distingué(s) sur la piste micro.", speakerCount)
     }
 
     public func exportMarkdown(for meeting: Meeting) -> String {
@@ -757,7 +775,7 @@ public final class RecordingSession {
     }
 
     private static func defaultTitle(for date: Date) -> String {
-        "Réunion du \(date.formatted(date: .abbreviated, time: .shortened))"
+        L("Réunion du %@", date.formatted(date: .abbreviated, time: .shortened))
     }
 
     /// Distingue jusqu'à deux locuteurs sur la piste micro, pour les réunions en

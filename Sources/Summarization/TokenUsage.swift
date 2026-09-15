@@ -65,8 +65,18 @@ public struct TokenUsage: Sendable, Codable, Equatable {
         numberFormatter.numberStyle = .decimal
         numberFormatter.groupingSeparator = " "
         let tokens = numberFormatter.string(from: NSNumber(value: total)) ?? "\(total)"
-        guard let costUSD else { return "\(tokens) tokens" }
-        return "\(tokens) tokens (≈ \(String(format: "%.3f", costUSD)) $)"
+        guard let costUSD else {
+            return String(
+                format: NSLocalizedString("%@ tokens", bundle: .main, value: "%@ tokens", comment: ""),
+                tokens
+            )
+        }
+        return String(
+            format: NSLocalizedString(
+                "%@ tokens (≈ %@ $)", bundle: .main, value: "%@ tokens (≈ %@ $)", comment: ""
+            ),
+            tokens, String(format: "%.3f", costUSD)
+        )
     }
 }
 

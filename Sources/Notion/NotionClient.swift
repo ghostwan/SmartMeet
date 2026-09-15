@@ -14,13 +14,30 @@ public enum NotionError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .notConfigured:
-            "Aucune page Notion parente configurée."
+            NSLocalizedString(
+                "Aucune page Notion parente configurée.",
+                bundle: .main,
+                value: "Aucune page Notion parente configurée.",
+                comment: ""
+            )
         case .missingToken:
-            "Jeton d'intégration Notion absent. Renseigne-le dans les réglages."
+            NSLocalizedString(
+                "Jeton d'intégration Notion absent. Renseigne-le dans les réglages.",
+                bundle: .main,
+                value: "Jeton d'intégration Notion absent. Renseigne-le dans les réglages.",
+                comment: ""
+            )
         case .http(let status, let body):
-            "Notion a répondu \(status) — \(body.prefix(300))"
+            String(
+                format: NSLocalizedString(
+                    "Notion a répondu %d — %@", bundle: .main, value: "Notion a répondu %d — %@", comment: ""
+                ),
+                status, String(body.prefix(300))
+            )
         case .unexpectedResponse:
-            "Réponse Notion inattendue."
+            NSLocalizedString(
+                "Réponse Notion inattendue.", bundle: .main, value: "Réponse Notion inattendue.", comment: ""
+            )
         }
     }
 }

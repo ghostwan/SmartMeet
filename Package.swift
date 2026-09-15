@@ -60,13 +60,31 @@ let package = Package(
                 "Summarization", "Atlassian", "SmartMeetCalendar", "Diarization", "Notion",
             ],
             path: "Sources/SmartMeetApp",
-            exclude: ["Info.plist", "SmartMeet.entitlements"],
+            exclude: ["Info.plist", "SmartMeet.entitlements", "Resources"],
             linkerSettings: [
                 .unsafeFlags([
                     "-Xlinker", "-sectcreate",
                     "-Xlinker", "__TEXT",
                     "-Xlinker", "__info_plist",
                     "-Xlinker", "Sources/SmartMeetApp/Info.plist",
+                ])
+            ]
+        ),
+
+        // Spike de diagnostic (pas un composant de production) : vérifie si
+        // Microsoft Teams expose dans son arbre d'accessibilité de quoi déduire qui
+        // parle et le nom des participants, avant d'investir dans une vraie
+        // fonctionnalité de diarisation par nom.
+        .executableTarget(
+            name: "SpikeAX",
+            path: "Spikes/SpikeAX",
+            exclude: ["Info.plist", "SpikeAX.entitlements"],
+            linkerSettings: [
+                .unsafeFlags([
+                    "-Xlinker", "-sectcreate",
+                    "-Xlinker", "__TEXT",
+                    "-Xlinker", "__info_plist",
+                    "-Xlinker", "Spikes/SpikeAX/Info.plist",
                 ])
             ]
         ),

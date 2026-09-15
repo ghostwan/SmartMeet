@@ -44,7 +44,7 @@ public struct ConfluenceClient: Sendable {
     public func space(key: String) async throws -> ConfluenceSpaceSummary {
         let payload = try await client.request("GET", "/wiki/api/v2/spaces?keys=\(key)")
         guard let first = (payload["results"] as? [[String: Any]])?.first else {
-            throw AtlassianError.notConfigured("espace \(key) introuvable")
+            throw AtlassianError.notConfigured(String(format: NSLocalizedString("espace %@ introuvable", bundle: .main, value: "espace %@ introuvable", comment: ""), key))
         }
         return ConfluenceSpaceSummary(
             id: string(first["id"]),

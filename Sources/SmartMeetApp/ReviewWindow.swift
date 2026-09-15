@@ -210,7 +210,10 @@ struct ReviewWindow: View {
                         }
                         Button("Annuler", role: .cancel) {}
                     } message: {
-                        Text("Le compte rendu est conservé. L'audio (\(meeting.formattedDuration)) et le transcript seront définitivement supprimés — plus de réanalyse ni de nouvelle génération possible ensuite.")
+                        Text(L(
+                            "Le compte rendu est conservé. L'audio (%@) et le transcript seront définitivement supprimés — plus de réanalyse ni de nouvelle génération possible ensuite.",
+                            meeting.formattedDuration
+                        ))
                     }
                 }
             }
@@ -253,7 +256,7 @@ struct ReviewWindow: View {
         ContentUnavailableView {
             Label("Pas encore de compte rendu", systemImage: "sparkles")
         } description: {
-            Text("Génère le compte rendu avec \(session.settings.providerKind.displayName).")
+            Text(L("Génère le compte rendu avec %@.", session.settings.providerKind.displayName))
         } actions: {
             Button("Générer le compte rendu") {
                 Task { await session.generateSummary(for: meeting) }
@@ -269,9 +272,9 @@ struct ReviewWindow: View {
                 VStack(alignment: .leading, spacing: 18) {
                     field("Titre", text: $draft.title)
                     Label(
-                        "Publié sous : " + template.pageTitle(
+                        L("Publié sous : %@", template.pageTitle(
                             summaryTitle: draft.title, date: meeting.startedAt
-                        ),
+                        )),
                         systemImage: "text.badge.checkmark"
                     )
                     .font(.caption)
@@ -628,10 +631,10 @@ struct ReviewWindow: View {
             if case .published(let url, let pageTitle, let issues, let failures, let jiraSearchURL) = session.publishState {
                 VStack(alignment: .leading, spacing: 4) {
                     if let pageURL = URL(string: url) {
-                        Link("« \(pageTitle) »", destination: pageURL).font(.callout)
+                        Link(L("« %@ »", pageTitle), destination: pageURL).font(.callout)
                     }
                     if !issues.isEmpty {
-                        Text("Tickets créés : \(issues.joined(separator: ", "))")
+                        Text(L("Tickets créés : %@", issues.joined(separator: ", ")))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     if let jiraSearchURL, let searchURL = URL(string: jiraSearchURL) {
@@ -657,7 +660,7 @@ struct ReviewWindow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             if case .failed(let message) = session.notionPublishState {
-                Label("Notion : \(message)", systemImage: "xmark.octagon")
+                Label(L("Notion : %@", message), systemImage: "xmark.octagon")
                     .font(.caption).foregroundStyle(.red)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -689,7 +692,7 @@ struct ReviewWindow: View {
                         forType: .string
                     )
                 }
-                Button("Enregistrer") { session.saveReviewedSummary(draft) }
+                Button(L("Enregistrer les modifications")) { session.saveReviewedSummary(draft) }
                 if session.settings.canPublishToNotion {
                     Button {
                         session.saveReviewedSummary(draft)
@@ -757,7 +760,7 @@ private struct TranscriptSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Transcription — \(meeting.title)")
+                Text(L("Transcription — %@", meeting.title))
                     .font(.headline)
                     .lineLimit(1)
                 Spacer()

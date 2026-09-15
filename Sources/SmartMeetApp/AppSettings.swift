@@ -306,7 +306,7 @@ public final class AppSettings {
     public func duplicate(_ template: MeetingTemplate) -> MeetingTemplate {
         var copy = template
         copy.id = UUID().uuidString
-        copy.name = "\(template.name) (copie)"
+        copy.name = L("%@ (copie)", template.name)
         copy.isBuiltIn = false
         customTemplates.append(copy)
         return copy

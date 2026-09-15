@@ -66,7 +66,7 @@ public struct PublishService: Sendable {
         }
 
         guard !spaceKey.isEmpty else {
-            throw AtlassianError.notConfigured("espace Confluence")
+            throw AtlassianError.notConfigured(NSLocalizedString("espace Confluence", bundle: .main, value: "espace Confluence", comment: ""))
         }
         let space = try await confluence.space(key: spaceKey)
 
@@ -131,7 +131,7 @@ public struct PublishService: Sendable {
         onStep: @Sendable (PublishStep) -> Void = { _ in }
     ) async throws -> PublicationResult {
         guard configuration.isConfluenceReady || !template.spaceKeyOverride.isEmpty else {
-            throw AtlassianError.notConfigured("site, e-mail ou espace Confluence")
+            throw AtlassianError.notConfigured(NSLocalizedString("site, e-mail ou espace Confluence", bundle: .main, value: "site, e-mail ou espace Confluence", comment: ""))
         }
 
         onStep(.resolvingDestination)
@@ -188,7 +188,12 @@ public struct PublishService: Sendable {
                     createdKeys[item.id.uuidString] = issue.key
                 } catch {
                     // Un ticket refusé ne doit pas faire perdre la page déjà publiée.
-                    failures.append("« \(item.description.prefix(60)) » — \(error.localizedDescription)")
+                    failures.append(String(
+                        format: NSLocalizedString(
+                            "« %@ » — %@", bundle: .main, value: "« %@ » — %@", comment: ""
+                        ),
+                        String(item.description.prefix(60)), error.localizedDescription
+                    ))
                 }
             }
 
@@ -263,7 +268,15 @@ public struct PublishService: Sendable {
         }
         throw AtlassianError.http(
             status: 400,
-            body: "Cinq pages portent déjà un titre dérivé de « \(baseTitle) »."
+            body: String(
+                format: NSLocalizedString(
+                    "Cinq pages portent déjà un titre dérivé de « %@ ».",
+                    bundle: .main,
+                    value: "Cinq pages portent déjà un titre dérivé de « %@ ».",
+                    comment: ""
+                ),
+                baseTitle
+            )
         )
     }
 }

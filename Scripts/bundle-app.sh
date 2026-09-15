@@ -31,6 +31,11 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp Sources/SmartMeetApp/Info.plist "$APP/Contents/Info.plist"
 cp "$BIN" "$APP/Contents/MacOS/SmartMeet"
 
+# Localisation : dossiers .lproj classiques (pas de String Catalog SPM ici, le
+# bundle est assemblé à la main, donc Bundle.main les résout directement sans
+# plomberie de resource bundle supplémentaire).
+cp -R Sources/SmartMeetApp/Resources/*.lproj "$APP/Contents/Resources/"
+
 # Icône : régénérée depuis le dessin vectoriel, jamais commitée en binaire.
 swift Scripts/make-icon.swift >/dev/null
 iconutil -c icns build/SmartMeet.iconset -o "$APP/Contents/Resources/SmartMeet.icns"

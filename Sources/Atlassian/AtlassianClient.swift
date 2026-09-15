@@ -101,16 +101,40 @@ public enum AtlassianError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .notConfigured(let what):
-            "Configuration incomplète : \(what)."
+            String(
+                format: NSLocalizedString(
+                    "Configuration incomplète : %@.", bundle: .main, value: "Configuration incomplète : %@.", comment: ""
+                ),
+                what
+            )
         case .missingToken:
-            "Jeton d'API Atlassian absent. Renseigne-le dans les réglages."
+            NSLocalizedString(
+                "Jeton d'API Atlassian absent. Renseigne-le dans les réglages.",
+                bundle: .main,
+                value: "Jeton d'API Atlassian absent. Renseigne-le dans les réglages.",
+                comment: ""
+            )
         case .http(let status, let body):
-            "Atlassian a répondu \(status) — \(body.prefix(300))"
+            String(
+                format: NSLocalizedString(
+                    "Atlassian a répondu %d — %@", bundle: .main, value: "Atlassian a répondu %d — %@", comment: ""
+                ),
+                status, String(body.prefix(300))
+            )
         case .unexpectedResponse:
-            "Réponse Atlassian inattendue."
+            NSLocalizedString(
+                "Réponse Atlassian inattendue.", bundle: .main, value: "Réponse Atlassian inattendue.", comment: ""
+            )
         case .pageNotFound(let id):
-            "La page Confluence \(id) est introuvable (supprimée ou déplacée). "
-                + "Vérifie la page de sprint dans les réglages."
+            String(
+                format: NSLocalizedString(
+                    "La page Confluence %@ est introuvable (supprimée ou déplacée). Vérifie la page de sprint dans les réglages.",
+                    bundle: .main,
+                    value: "La page Confluence %@ est introuvable (supprimée ou déplacée). Vérifie la page de sprint dans les réglages.",
+                    comment: ""
+                ),
+                id
+            )
         }
     }
 }
@@ -131,14 +155,14 @@ public struct AtlassianClient: Sendable {
         body: [String: Any]? = nil
     ) async throws -> [String: Any] {
         guard let baseURL = configuration.baseURL else {
-            throw AtlassianError.notConfigured("site Atlassian")
+            throw AtlassianError.notConfigured(NSLocalizedString("site Atlassian", bundle: .main, value: "site Atlassian", comment: ""))
         }
         guard !token.isEmpty else { throw AtlassianError.missingToken }
 
         // Concaténation explicite et non `appending(path:)` : cette dernière encode le
         // « ? » en %3F et transforme la query en segment de chemin.
         guard let url = URL(string: baseURL.absoluteString + path) else {
-            throw AtlassianError.notConfigured("URL invalide : \(path)")
+            throw AtlassianError.notConfigured(String(format: NSLocalizedString("URL invalide : %@", bundle: .main, value: "URL invalide : %@", comment: ""), path))
         }
 
         var request = URLRequest(url: url)

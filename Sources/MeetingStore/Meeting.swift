@@ -104,9 +104,12 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
     public var formattedDuration: String {
         let total = Int(duration.rounded())
         let (hours, minutes, seconds) = (total / 3600, (total % 3600) / 60, total % 60)
+        let format = hours > 0
+            ? NSLocalizedString("%d h %02d min", bundle: .main, value: "%d h %02d min", comment: "")
+            : NSLocalizedString("%d min %02d s", bundle: .main, value: "%d min %02d s", comment: "")
         return hours > 0
-            ? String(format: "%d h %02d min", hours, minutes)
-            : String(format: "%d min %02d s", minutes, seconds)
+            ? String(format: format, hours, minutes)
+            : String(format: format, minutes, seconds)
     }
 
     public var isPublished: Bool { confluencePageURL != nil }

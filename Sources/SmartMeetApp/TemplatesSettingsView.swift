@@ -87,8 +87,7 @@ struct TemplatesSettingsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 if selected.isBuiltIn {
                     Label(
-                        "Type fourni, modifiable : le bouton ↺ efface tes changements et "
-                            + "revient à la version d'origine.",
+                        L("Type fourni, modifiable : le bouton ↺ efface tes changements et revient à la version d'origine."),
                         systemImage: "pencil"
                     )
                     .font(.caption)
@@ -141,11 +140,11 @@ struct TemplatesSettingsView: View {
                 .foregroundStyle(.secondary)
             TextField("Format", text: binding(\.titleFormat)).textFieldStyle(.roundedBorder)
 
-            Text("Aperçu : " + selected.pageTitle(
+            Text(L("Aperçu : %@", selected.pageTitle(
                 summaryTitle: "Point sur la migration",
                 date: .now,
                 language: settings.defaultOutputLanguage
-            ))
+            )))
             .font(.caption)
             .foregroundStyle(.primary)
 

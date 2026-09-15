@@ -81,6 +81,50 @@ struct MeetingTemplateTests {
         let custom = MeetingTemplate(id: "mine", name: "Mon type", sections: [.tldr])
         #expect(MeetingTemplate.resolve(id: "mine", in: [custom]) == custom)
     }
+
+    @Test("A title suggests the daily, in French or in English")
+    func inferMatchesDaily() {
+        let candidates = MeetingTemplate.builtIns
+        #expect(MeetingTemplate.infer(fromTitle: "Daily équipe Home", in: candidates) == .daily)
+        #expect(MeetingTemplate.infer(fromTitle: "Team standup", in: candidates) == .daily)
+        #expect(MeetingTemplate.infer(fromTitle: "Point quotidien produit", in: candidates) == .daily)
+    }
+
+    @Test("A title suggests the retrospective, accented or not")
+    func inferMatchesRetro() {
+        let candidates = MeetingTemplate.builtIns
+        #expect(MeetingTemplate.infer(fromTitle: "Rétrospective sprint 12", in: candidates) == .retrospective)
+        #expect(MeetingTemplate.infer(fromTitle: "Retrospective sprint 12", in: candidates) == .retrospective)
+        #expect(MeetingTemplate.infer(fromTitle: "Sprint retro", in: candidates) == .retrospective)
+    }
+
+    @Test("A title suggests the sync")
+    func inferMatchesSynchro() {
+        let candidates = MeetingTemplate.builtIns
+        #expect(MeetingTemplate.infer(fromTitle: "Synchro Home + Security", in: candidates) == .synchro)
+        #expect(MeetingTemplate.infer(fromTitle: "Weekly sync avec le produit", in: candidates) == .synchro)
+    }
+
+    @Test("A title with no keyword guesses nothing rather than forcing generic")
+    func inferReturnsNilWithoutMatch() {
+        let candidates = MeetingTemplate.builtIns
+        #expect(MeetingTemplate.infer(fromTitle: "Point sur la migration Crowdin", in: candidates) == nil)
+        #expect(MeetingTemplate.infer(fromTitle: "", in: candidates) == nil)
+    }
+
+    @Test("A custom type is guessed from its own name")
+    func inferMatchesCustomByName() {
+        let custom = MeetingTemplate(id: "mine", name: "Comité produit", sections: [.tldr])
+        let candidates = MeetingTemplate.builtIns + [custom]
+        #expect(MeetingTemplate.infer(fromTitle: "Comité produit du jeudi", in: candidates) == custom)
+    }
+
+    @Test("A type name that's too short isn't matched, to avoid false positives")
+    func inferIgnoresShortCustomNames() {
+        let custom = MeetingTemplate(id: "mine", name: "IT", sections: [.tldr])
+        let candidates = MeetingTemplate.builtIns + [custom]
+        #expect(MeetingTemplate.infer(fromTitle: "Point IT hebdomadaire", in: candidates) == nil)
+    }
 }
 
 @Suite("Décodage des sections spécialisées")
