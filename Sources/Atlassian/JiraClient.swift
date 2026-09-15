@@ -15,7 +15,7 @@ public struct JiraClient: Sendable {
         self.client = AtlassianClient(configuration: configuration, token: token)
     }
 
-    /// Types d'issue disponibles sur le projet, pour peupler les réglages.
+    /// Issue types available on the project, to populate the settings.
     public func issueTypes() async throws -> [String] {
         let payload = try await client.request(
             "GET",
@@ -30,13 +30,13 @@ public struct JiraClient: Sendable {
         }
     }
 
-    /// Crée le ticket Jira correspondant à un action item.
+    /// Creates the Jira ticket corresponding to an action item.
     ///
-    /// Les tickets sont toujours rédigés en anglais, quelle que soit la langue du
-    /// compte rendu : `summaryText` et `meetingTitle` sont donc attendus déjà
-    /// traduits par l'appelant. `projectKey` et `parentKey` permettent de choisir la
-    /// destination au moment de la création plutôt que de dépendre uniquement des
-    /// réglages globaux.
+    /// Tickets are always written in English, regardless of the meeting
+    /// minutes' language: `summaryText` and `meetingTitle` are therefore
+    /// expected to already be translated by the caller. `projectKey` and
+    /// `parentKey` allow choosing the destination at creation time rather than
+    /// depending solely on the global settings.
     public func createIssue(
         for item: MeetingSummary.ActionItem,
         summaryText: String,
@@ -66,7 +66,7 @@ public struct JiraClient: Sendable {
         var fields: [String: Any] = [
             "project": ["key": resolvedProjectKey],
             "issuetype": ["name": resolvedIssueType],
-            // Jira refuse un résumé multi-ligne ou trop long.
+            // Jira rejects a multi-line or overly long summary.
             "summary": String(summaryText.replacingOccurrences(of: "\n", with: " ").prefix(250)),
             "description": ["type": "doc", "version": 1, "content": paragraphs],
         ]

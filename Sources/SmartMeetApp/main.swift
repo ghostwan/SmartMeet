@@ -1,7 +1,7 @@
 import Foundation
 import Summarization
 
-// `open` passe un argument -psn_… qu'il faut ignorer.
+// `open` passes a -psn_… argument that must be ignored.
 let arguments = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("-psn_") }
 
 func value(after flag: String) -> String? {
@@ -23,10 +23,10 @@ if let index = arguments.firstIndex(of: "--headless") {
             publish: arguments.contains("--publish")
         )
     }
-    // Core Audio et Speech ont besoin d'une boucle d'exécution active.
+    // Core Audio and Speech need an active run loop.
     RunLoop.main.run()
 } else if arguments.contains("--summarize-file") {
-    // Génère un compte rendu à partir d'un transcript existant, sans rien enregistrer.
+    // Generates meeting minutes from an existing transcript, without recording anything.
     let path = value(after: "--summarize-file") ?? ""
     Task {
         await HeadlessSummarizer.run(

@@ -3,11 +3,12 @@ import Foundation
 import SmartMeetCalendar
 import UserNotifications
 
-/// Notifications actionnables du cycle de vie d'une réunion.
+/// Actionable notifications for a meeting's lifecycle.
 ///
-/// Le menu-bar est masqué la plupart du temps : une bannière système est le seul
-/// moyen d'atteindre l'utilisateur, qu'il soit en train de basculer vers sa
-/// visioconférence ou parti faire autre chose pendant la génération du compte rendu.
+/// The menu bar is hidden most of the time: a system banner is the only way
+/// to reach the user, whether they're switching over to their video
+/// conference or have gone off to do something else while minutes are
+/// being generated.
 @MainActor
 final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
     private enum Category {
@@ -34,7 +35,7 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
         static let url = "url"
     }
 
-    /// Branchés par la session.
+    /// Wired up by the session.
     var onRecord: (() -> Void)?
     var onDismiss: (() -> Void)?
     var onReview: ((UUID) -> Void)?
@@ -44,13 +45,13 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
     var onMeetingEndedKeepRecording: (() -> Void)?
 
     private var isAuthorized = false
-    /// Dernière erreur d'autorisation, remontée par le diagnostic.
+    /// Last authorization error, surfaced by the diagnostic.
     private(set) var authorizationError: String?
     private var deliveredSuggestionIDs: Set<String> = []
 
-    /// `UNUserNotificationCenter` lève une exception Objective-C, non rattrapable en
-    /// Swift, si l'exécutable ne vit pas dans un bundle. Le mode headless en ligne de
-    /// commande passerait sinon par là.
+    /// `UNUserNotificationCenter` throws an uncatchable Objective-C exception in
+    /// Swift if the executable doesn't live inside a bundle. The headless
+    /// command-line mode would otherwise hit this.
     private var isBundled: Bool { Bundle.main.bundleIdentifier != nil }
 
     func prepare() async {
@@ -102,13 +103,13 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
         ])
 
         do {
-            // Piste non tranchée du TODO : en mode agent (`LSUIElement`/`.accessory`),
-            // `usernoted` refuserait l'enregistrement de l'application auprès du centre
-            // de notifications. On bascule temporairement en `.regular` pour la seule
-            // durée de la demande d'autorisation, avant de revenir en `.accessory` — ce
-            // sera visible un court instant dans le Dock. Si l'échec persiste malgré
-            // cela, la seconde piste (premier refus mémorisé par le bundle identifier)
-            // reste à tester en changeant `CFBundleIdentifier`.
+            // Unresolved lead from the TODO: in agent mode (`LSUIElement`/`.accessory`),
+            // `usernoted` supposedly refuses to register the app with the notification
+            // center. We temporarily switch to `.regular` for the duration of the
+            // authorization request only, then revert to `.accessory` — this will be
+            // briefly visible in the Dock. If the failure persists despite this, the
+            // second lead (first denial remembered by the bundle identifier) still
+            // needs testing by changing `CFBundleIdentifier`.
             let application = NSApplication.shared
             let previousPolicy = application.activationPolicy()
             application.setActivationPolicy(.regular)
@@ -122,7 +123,7 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    // MARK: - Émission
+    // MARK: - Emission
 
     func propose(_ suggestion: MeetingSuggestion) {
         guard !deliveredSuggestionIDs.contains(suggestion.id) else { return }
@@ -135,7 +136,7 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
         )
     }
 
-    /// Le compte rendu est prêt à être relu.
+    /// The minutes are ready to be reviewed.
     func announceSummaryReady(meetingID: UUID, title: String, actionItemCount: Int) {
         let detail = actionItemCount == 0
             ? L("Aucun action item")
@@ -149,7 +150,7 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
         )
     }
 
-    /// La page est publiée : la notification porte le lien.
+    /// The page has been published: the notification carries the link.
     func announcePublication(meetingID: UUID, title: String, url: URL?, issues: [String]) {
         var body = L("« %@ »", title)
         if !issues.isEmpty {
@@ -167,8 +168,8 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
         )
     }
 
-    /// Une génération ratée doit se voir : sans notification, l'échec passe inaperçu
-    /// jusqu'à ce qu'on rouvre le menu.
+    /// A failed generation must be visible: without a notification, the failure
+    /// goes unnoticed until the menu is reopened.
     func announceFailure(meetingID: UUID, title: String, message: String) {
         send(
             id: "failure-\(meetingID.uuidString)",
@@ -179,10 +180,10 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
         )
     }
 
-    /// L'application de visioconférence suivie ne capte plus le micro depuis un
-    /// moment : la réunion semble terminée. Une simple proposition — jamais un arrêt
-    /// automatique, une coupure passagère (réseau, micro coupé volontairement…) ne
-    /// doit pas couper l'enregistrement à la place de l'utilisateur.
+    /// The tracked video-conferencing app has stopped picking up the microphone
+    /// for a while: the meeting seems to be over. Just a suggestion — never an
+    /// automatic stop, since a transient interruption (network hiccup, mic
+    /// muted on purpose…) shouldn't end the recording in the user's place.
     func announceMeetingEnded(meetingID: UUID) {
         send(
             id: "ended-\(meetingID.uuidString)",
@@ -223,7 +224,7 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
 
     // MARK: - UNUserNotificationCenterDelegate
 
-    /// Sans ceci, macOS masque la bannière quand l'application est au premier plan.
+    /// Without this, macOS hides the banner when the app is in the foreground.
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
@@ -254,7 +255,7 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
                 if let meetingID { onReview?(meetingID) }
 
             case (Category.published, _):
-                // Le lien est le cœur de cette notification : cliquer ouvre la page.
+                // The link is the whole point of this notification: tapping opens the page.
                 if let url {
                     NSWorkspace.shared.open(url)
                 } else if let meetingID {
@@ -269,9 +270,9 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
             case (Category.meetingEnded, Action.generateSummary):
                 onMeetingEndedGenerateSummary?()
             case (Category.meetingEnded, _):
-                // Tapoter la bannière elle-même reste le choix le moins engageant :
-                // on continue l'enregistrement plutôt que de risquer de l'arrêter
-                // par un clic hâtif sur la notification.
+                // Tapping the banner itself remains the least committal choice:
+                // keep recording rather than risk stopping it via a hasty tap
+                // on the notification.
                 onMeetingEndedKeepRecording?()
 
             default:

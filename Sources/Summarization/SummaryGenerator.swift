@@ -1,14 +1,14 @@
 import Foundation
 
-/// Extrait un objet JSON d'une réponse de modèle.
+/// Extracts a JSON object from a model's response.
 ///
-/// Malgré la consigne, les modèles encadrent régulièrement leur sortie d'un bloc de
-/// code markdown, ou la font précéder d'une phrase d'introduction.
+/// Despite the instruction, models regularly wrap their output in a markdown
+/// code block, or prefix it with an introductory sentence.
 enum JSONExtractor {
     static func extract(from raw: String) throws -> Data {
         var text = raw
 
-        // Bloc ```json … ``` éventuel.
+        // Optional ```json … ``` block.
         if let fenceStart = text.range(of: "```") {
             let afterFence = text[fenceStart.upperBound...]
             let body = afterFence.hasPrefix("json")
@@ -74,7 +74,7 @@ public enum SummaryGenerationError: LocalizedError {
     }
 }
 
-/// Étape en cours, pour informer l'interface pendant une génération longue.
+/// Current step, to inform the UI during a long generation.
 public enum SummaryProgress: Sendable, Equatable {
     case preparing
     case summarizingChunk(index: Int, total: Int)
@@ -82,15 +82,15 @@ public enum SummaryProgress: Sendable, Equatable {
     case repairing(attempt: Int)
 }
 
-/// Produit un `MeetingSummary` à partir d'un transcript, quel que soit le provider.
+/// Produces a `MeetingSummary` from a transcript, regardless of the provider.
 ///
-/// Trois responsabilités que le provider n'assume pas : découper les réunions trop
-/// longues pour la fenêtre de contexte, extraire le JSON de la réponse, et relancer
-/// le modèle quand la sortie n'est pas conforme.
+/// Three responsibilities the provider does not take on: splitting meetings
+/// too long for the context window, extracting JSON from the response, and
+/// retrying the model when the output doesn't conform.
 public struct SummaryGenerator: Sendable {
     public let provider: any SummaryProvider
-    /// Au-delà de cette taille, on bascule en map-reduce. ~48 000 caractères
-    /// correspondent grossièrement à une heure de réunion.
+    /// Beyond this size, generation switches to map-reduce. ~48,000 characters
+    /// roughly corresponds to an hour-long meeting.
     public var chunkThreshold: Int
     public var maxRepairAttempts: Int
 
@@ -117,8 +117,13 @@ public struct SummaryGenerator: Sendable {
 
         onProgress(.preparing)
 
+        // Some providers (Apple Intelligence's on-device model, very narrow
+        // context window) advertise a lower threshold than the generic one:
+        // whichever of the two is more restrictive determines the chunking.
+        let effectiveChunkThreshold = min(chunkThreshold, provider.maxPromptCharacters ?? chunkThreshold)
+
         let prompt: String
-        if trimmed.count <= chunkThreshold {
+        if trimmed.count <= effectiveChunkThreshold {
             prompt = SummaryPrompt.single(
                 transcript: trimmed,
                 context: context,
@@ -126,7 +131,7 @@ public struct SummaryGenerator: Sendable {
                 language: language
             )
         } else {
-            let chunks = Self.split(trimmed, maxLength: chunkThreshold)
+            let chunks = Self.split(trimmed, maxLength: effectiveChunkThreshold)
             var notes: [String] = []
             for (index, chunk) in chunks.enumerated() {
                 onProgress(.summarizingChunk(index: index + 1, total: chunks.count))
@@ -151,16 +156,16 @@ public struct SummaryGenerator: Sendable {
         var summary = try await completeAndDecode(
             prompt: prompt, template: template, language: language, onProgress: onProgress, onUsage: onUsage
         )
-        // Le type retenu est conservé : c'est lui qui pilotera le rendu et la relecture.
+        // The chosen template is kept: it will drive both rendering and review.
         summary.templateID = template.id
         return Self.sanitize(summary, context: context)
     }
 
-    /// Les libellés de piste audio ne sont pas des identités.
+    /// Audio track labels are not identities.
     ///
-    /// Malgré la consigne, les modèles attribuent régulièrement un engagement à
-    /// « Moi » ou « Participants ». Une consigne de prompt ne se vérifie pas : la
-    /// normalisation est donc faite après coup, de façon déterministe.
+    /// Despite the instruction, models regularly attribute a commitment to
+    /// "Moi" or "Participants". A prompt instruction can't be verified: so
+    /// normalization is done afterward, deterministically.
     static func sanitize(_ summary: MeetingSummary, context: SummaryContext) -> MeetingSummary {
         let trackLabels: Set<String> = ["moi", "participants", "participant", "me", "moi-même"]
         let userName = context.userName?.trimmingCharacters(in: .whitespaces)
@@ -170,7 +175,7 @@ public struct SummaryGenerator: Sendable {
             let trimmed = name.trimmingCharacters(in: .whitespaces)
             guard !trimmed.isEmpty else { return nil }
             guard trackLabels.contains(trimmed.lowercased()) else { return trimmed }
-            // « Moi » désigne l'utilisateur ; « Participants » ne désigne personne.
+            // "Moi" refers to the user; "Participants" refers to no one in particular.
             let isSelf = trimmed.lowercased() != "participants" && trimmed.lowercased() != "participant"
             return isSelf ? userName.flatMap { $0.isEmpty ? nil : $0 } : nil
         }
@@ -187,8 +192,8 @@ public struct SummaryGenerator: Sendable {
             blocker.person = resolve($0.person)
             return blocker
         }
-        // Une entrée nominative sans nom exploitable n'a aucune valeur : on la retire
-        // plutôt que d'afficher une ligne anonyme.
+        // A named entry without a usable name has no value: it's dropped
+        // rather than displayed as an anonymous line.
         cleaned.participantReports = summary.participantReports.compactMap {
             guard let person = resolve($0.person) else { return nil }
             var report = $0
@@ -230,7 +235,7 @@ public struct SummaryGenerator: Sendable {
                 raw = completion.text
             } catch {
                 lastError = error.localizedDescription
-                // Une panne du provider ne se répare pas en reformulant le prompt.
+                // A provider failure isn't fixed by rephrasing the prompt.
                 throw SummaryGenerationError.allAttemptsFailed(lastError)
             }
 
@@ -255,8 +260,8 @@ public struct SummaryGenerator: Sendable {
         throw SummaryGenerationError.allAttemptsFailed(lastError)
     }
 
-    /// Découpe le transcript sur les frontières de paragraphes, pour ne jamais couper
-    /// au milieu d'une prise de parole.
+    /// Splits the transcript on paragraph boundaries, to never cut in the
+    /// middle of someone speaking.
     static func split(_ transcript: String, maxLength: Int) -> [String] {
         let paragraphs = transcript.components(separatedBy: "\n\n")
         var chunks: [String] = []
@@ -276,7 +281,7 @@ public struct SummaryGenerator: Sendable {
 }
 
 extension Array where Element: Hashable {
-    /// Déduplique en conservant l'ordre d'apparition.
+    /// Deduplicates while preserving order of appearance.
     func uniqued() -> [Element] {
         var seen = Set<Element>()
         return filter { seen.insert($0).inserted }

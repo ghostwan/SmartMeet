@@ -1,28 +1,28 @@
 import Foundation
 
-/// Regroupe des points en `k` classes (k-means), avec un score de silhouette
-/// permettant de comparer différentes valeurs de `k` entre elles et de refuser la
-/// scission quand elle n'est pas justifiée.
+/// Groups points into `k` classes (k-means), with a silhouette score allowing
+/// different values of `k` to be compared with each other and rejecting a split
+/// when it isn't warranted.
 ///
-/// Le score de silhouette (Rousseeuw, 1987) est le choix standard ici précisément
-/// parce qu'il reste comparable d'un `k` à l'autre — contrairement à un simple
-/// rapport distance inter/intra-cluster, dont l'échelle dépend du nombre de
-/// classes. C'est ce qui permet à `MicrophoneDiarizer` d'essayer plusieurs `k` et de
-/// garder le meilleur, plutôt que de figer arbitrairement un nombre de locuteurs.
+/// The silhouette score (Rousseeuw, 1987) is the standard choice here precisely
+/// because it stays comparable across different `k` values — unlike a simple
+/// inter/intra-cluster distance ratio, whose scale depends on the number of
+/// classes. This is what lets `MicrophoneDiarizer` try several `k` values and keep
+/// the best one, rather than arbitrarily fixing a number of speakers.
 enum SpeakerClusterer {
     struct Result {
-        /// Index de cluster pour chaque point, dans l'ordre d'entrée.
+        /// Cluster index for each point, in input order.
         let assignments: [Int]
         let clusterCount: Int
-        /// Moyenne des scores de silhouette par point, dans `[-1, 1]`. Proche de 1 :
-        /// classes nettement séparées. Proche de 0 ou négatif : la scission n'est
-        /// pas justifiée par les données.
+        /// Average silhouette score across points, in `[-1, 1]`. Close to 1:
+        /// clearly separated classes. Close to 0 or negative: the split isn't
+        /// warranted by the data.
         let silhouetteScore: Double
     }
 
     /// - Parameters:
-    ///   - points: vecteurs déjà normalisés (voir `normalize`).
-    ///   - k: nombre de classes à former.
+    ///   - points: already-normalized vectors (see `normalize`).
+    ///   - k: number of classes to form.
     static func cluster(points: [[Double]], k: Int) -> Result? {
         guard k >= 2, points.count >= k, let dimensions = points.first?.count, dimensions > 0
         else { return nil }
@@ -46,17 +46,17 @@ enum SpeakerClusterer {
             if !changed { break }
         }
 
-        // Un cluster vide signale un `k` trop grand pour ces données : pas de
-        // résultat exploitable plutôt qu'une classe fantôme.
+        // An empty cluster signals a `k` too large for this data: no usable
+        // result rather than a phantom class.
         guard Set(assignments).count == k else { return nil }
 
         let silhouette = silhouetteScore(points: points, assignments: assignments, k: k)
         return Result(assignments: assignments, clusterCount: k, silhouetteScore: silhouette)
     }
 
-    /// Initialisation déterministe (« farthest-first ») : le premier centroïde est le
-    /// point le plus excentré, les suivants maximisent la distance minimale aux
-    /// centroïdes déjà choisis. Reproductible, contrairement à un tirage aléatoire.
+    /// Deterministic ("farthest-first") initialization: the first centroid is the
+    /// most outlying point, subsequent ones maximize the minimum distance to
+    /// already-chosen centroids. Reproducible, unlike a random draw.
     private static func farthestFirstCentroids(points: [[Double]], k: Int) -> [[Double]] {
         var centroids = [points[0]]
         while centroids.count < k {
@@ -119,9 +119,9 @@ enum SpeakerClusterer {
         return scores.reduce(0, +) / Double(scores.count)
     }
 
-    /// Centre-réduit chaque dimension sur l'ensemble des points, pour que la hauteur
-    /// (en Hz, grandes valeurs) ne domine pas le centroïde spectral dans le calcul de
-    /// distance, ou l'inverse.
+    /// Standardizes each dimension across the set of points, so pitch (in Hz, large
+    /// values) doesn't dominate the spectral centroid in the distance calculation,
+    /// or vice versa.
     static func normalize(_ points: [[Double]]) -> [[Double]] {
         guard let dimensions = points.first?.count, dimensions > 0 else { return points }
         var means = [Double](repeating: 0, count: dimensions)

@@ -1,21 +1,23 @@
 import AudioCapture
 import Foundation
 
-/// Supprime la diaphonie entre les deux pistes.
+/// Removes cross-talk between the two tracks.
 ///
-/// Sans casque, la voix des participants sort par les haut-parleurs et revient dans le
-/// micro : le même propos est alors transcrit deux fois, une fois par piste, ce qui
-/// ruine la diarisation. L'annulation d'écho matérielle n'est pas utilisable ici (le
-/// traitement de voix d'Apple s'approprie le périphérique de sortie et prive le tap
-/// système de sa source), la correction se fait donc sur le texte.
+/// Without headphones, participants' voices come out of the speakers and back
+/// into the microphone: the same remarks then get transcribed twice, once per
+/// track, which ruins diarization. Hardware echo cancellation isn't usable here
+/// (Apple's voice processing takes ownership of the output device and starves
+/// the system tap of its source), so the correction happens at the text level.
 ///
-/// Règle d'arbitrage : en cas de doublon, on conserve le segment **système**. La voix
-/// d'un participant distant arrive propre par le tap et dégradée par le micro ; à
-/// l'inverse, la voix de l'utilisateur n'est jamais renvoyée vers la sortie système.
+/// Arbitration rule: in case of a duplicate, the **system** segment is kept. A
+/// remote participant's voice arrives clean through the tap and degraded
+/// through the microphone; conversely, the user's own voice is never routed
+/// back to the system output.
 public struct CrossTalkFilter: Sendable {
-    /// Tolérance de recouvrement temporel entre deux segments candidats.
+    /// Time-overlap tolerance between two candidate segments.
     public var timeTolerance: TimeInterval
-    /// Part minimale des mots du segment micro devant se retrouver côté système.
+    /// Minimum share of the microphone segment's words that must be found on
+    /// the system side.
     public var containmentThreshold: Double
 
     public init(timeTolerance: TimeInterval = 3, containmentThreshold: Double = 0.5) {
@@ -40,12 +42,12 @@ public struct CrossTalkFilter: Sendable {
         lhs.start < rhs.end + timeTolerance && rhs.start < lhs.end + timeTolerance
     }
 
-    /// Proportion des mots du segment micro retrouvés dans le segment système.
+    /// Proportion of the microphone segment's words found in the system segment.
     ///
-    /// Mesure asymétrique et non un indice de Jaccard : les deux pistes ne découpent
-    /// pas la parole aux mêmes endroits, et la piste système regroupe souvent
-    /// plusieurs phrases en un seul segment. Comparer les ensembles complets diluait
-    /// la similarité au point de laisser passer les doublons.
+    /// Asymmetric measure rather than a Jaccard index: the two tracks don't cut
+    /// speech at the same points, and the system track often groups several
+    /// sentences into a single segment. Comparing full sets diluted the
+    /// similarity to the point of letting duplicates through.
     func containment(of candidate: String, in reference: String) -> Double {
         let candidateTokens = tokens(candidate)
         let referenceTokens = tokens(reference)

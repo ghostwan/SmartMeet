@@ -9,8 +9,8 @@ import SmartMeetCalendar
 import Summarization
 import Transcription
 
-/// Coordonne capture, transcription, génération du compte rendu et publication.
-/// Source de vérité unique de l'interface.
+/// Coordinates capture, transcription, minutes generation, and publication.
+/// The single source of truth for the UI.
 @MainActor
 @Observable
 public final class RecordingSession {
@@ -51,29 +51,29 @@ public final class RecordingSession {
     public private(set) var summaryState: SummaryState = .none
     public private(set) var publishState: PublishState = .none
     public private(set) var notionPublishState: NotionPublishState = .none
-    /// Réunion actuellement ouverte dans la fenêtre de relecture.
+    /// Meeting currently open in the review window.
     public var reviewedMeeting: Meeting?
     public var detectedCalendarMeeting: CalendarMeeting?
-    /// Réunion détectée en cours, proposée à l'enregistrement.
+    /// Meeting currently detected, offered up for recording.
     public var suggestion: MeetingSuggestion? { detector.suggestion }
-    /// Fenêtre à ouvrir, demandée depuis une notification. La scène SwiftUI est seule
-    /// à disposer de `openWindow` ; la session se contente de poser le drapeau.
+    /// Window to open, requested from a notification. Only the SwiftUI scene
+    /// has access to `openWindow`; the session just sets the flag.
     public var windowToOpen: String?
     public var searchQuery: String = ""
-    /// Type de réunion appliqué au prochain enregistrement.
+    /// Meeting type applied to the next recording.
     public var selectedTemplateID: String
-    /// Langue du compte rendu du prochain enregistrement.
+    /// Language of the minutes for the next recording.
     public var selectedOutputLanguage: SummaryLanguage
-    /// Langue parlée (source) attendue pour le prochain enregistrement — distincte
-    /// de la langue du compte rendu ci-dessus. Le moteur de transcription ne gère
-    /// pas le changement de langue en cours de réunion : elle doit être fixée avant
-    /// de démarrer.
+    /// Spoken (source) language expected for the next recording — distinct
+    /// from the minutes' language above. The transcription engine doesn't
+    /// handle a language change mid-meeting: it must be fixed before
+    /// starting.
     public var selectedTranscriptionLocale: String
-    /// Interlocuteur du prochain enregistrement, pour les types « one-to-one »
-    /// (`MeetingTemplate.requiresParticipant`). Ignoré pour tout autre type.
+    /// Other party for the next recording, for "one-to-one" types
+    /// (`MeetingTemplate.requiresParticipant`). Ignored for any other type.
     public var oneToOneParticipantName: String = ""
-    /// E-mail de cet interlocuteur — optionnel, sert uniquement à restreindre la
-    /// page Confluence publiée à l'utilisateur et cette seule personne.
+    /// E-mail of this other party — optional, only used to restrict the
+    /// published Confluence page to the user and this one person.
     public var oneToOneParticipantEmail: String = ""
 
     public let settings: AppSettings
@@ -88,29 +88,31 @@ public final class RecordingSession {
     private var startedAt: Date?
     private var pipelineTasks: [Task<Void, Never>] = []
     private var suggestionObserver: Task<Void, Never>?
-    /// Titre issu d'une suggestion acceptée, quand le calendrier ne le fournit pas.
+    /// Title from an accepted suggestion, when the calendar doesn't provide one.
     private var pendingSuggestionTitle: String?
-    /// Application de visio dont on surveille le micro pendant l'enregistrement, pour
-    /// proposer la fin de réunion. `nil` si aucune application connue n'a été
-    /// identifiée (enregistrement démarré manuellement sans visio détectée).
+    /// Video-conferencing app whose microphone use is being monitored during
+    /// recording, in order to suggest the meeting's end. `nil` if no known
+    /// app was identified (recording started manually with no detected video call).
     private var monitoredConferencingApp: String?
     private var endOfMeetingObserver: Task<Void, Never>?
-    /// Depuis quand l'application suivie ne capte plus le micro. Remis à `nil` dès
-    /// qu'elle recapte le micro : une coupure passagère ne doit pas compter.
+    /// Since when the tracked app has stopped picking up the microphone. Reset
+    /// to `nil` as soon as it picks it up again: a transient interruption
+    /// shouldn't count.
     private var conferencingAppAbsentSince: Date?
-    /// Empêche de renotifier en boucle tant que l'absence se poursuit sans que
-    /// l'utilisateur n'ait répondu.
+    /// Prevents re-notifying in a loop as long as the absence continues
+    /// without the user having responded.
     private var meetingEndNotified = false
-    /// Posé quand l'utilisateur répond « je continue » : n'y revient pas avant ce
-    /// délai, même si l'application suivie reste absente entre-temps.
+    /// Set when the user responds "keep recording": won't come back before
+    /// this delay, even if the tracked app remains absent in the meantime.
     private var meetingEndSnoozedUntil: Date?
 
-    /// Intervalle entre deux vérifications de fin de réunion.
+    /// Interval between two end-of-meeting checks.
     private static let endOfMeetingCheckInterval: Double = 10
-    /// Durée d'absence continue du micro avant de proposer la fin de réunion — une
-    /// coupure réseau ou un micro coupé un instant ne doit pas suffire.
+    /// Duration of continuous microphone absence before suggesting the
+    /// meeting's end — a network hiccup or a mic muted for a moment
+    /// shouldn't be enough.
     private static let endOfMeetingGracePeriod: Double = 90
-    /// Délai avant de reproposer, une fois l'utilisateur ayant choisi de continuer.
+    /// Delay before suggesting again, once the user has chosen to continue.
     private static let endOfMeetingSnooze: Double = 300
 
     public init(settings: AppSettings = AppSettings()) {
@@ -139,7 +141,7 @@ public final class RecordingSession {
         }
     }
 
-    /// Démarre la surveillance des réunions. Appelé au lancement de l'application.
+    /// Starts meeting surveillance. Called at app launch.
     public func startMeetingDetection() async {
         guard settings.detectMeetings else { return }
         if !calendar.isAuthorized { _ = await calendar.requestAccess() }
@@ -154,8 +156,8 @@ public final class RecordingSession {
         suggestionObserver = nil
     }
 
-    /// Réagit à l'apparition d'une suggestion : notification, ou démarrage direct si
-    /// l'utilisateur l'a explicitement demandé.
+    /// Reacts to a suggestion appearing: notification, or direct start if
+    /// the user explicitly requested it.
     private func observeSuggestions() {
         suggestionObserver?.cancel()
         suggestionObserver = Task { [weak self] in
@@ -180,10 +182,10 @@ public final class RecordingSession {
         }
     }
 
-    /// Surveille, pendant l'enregistrement, si l'application de visio suivie capte
-    /// toujours le micro. Une absence continue au-delà d'un délai de grâce propose
-    /// (jamais n'impose) de générer le compte rendu — voir `endOfMeetingGracePeriod`
-    /// pour le raisonnement sur les coupures passagères.
+    /// Monitors, during recording, whether the tracked video-conferencing app
+    /// still picks up the microphone. A continuous absence beyond a grace
+    /// period suggests (never forces) generating the minutes — see
+    /// `endOfMeetingGracePeriod` for the reasoning on transient interruptions.
     private func observeMeetingEnd() {
         endOfMeetingObserver?.cancel()
         guard settings.detectMeetingEnd, let appName = monitoredConferencingApp else { return }
@@ -218,10 +220,10 @@ public final class RecordingSession {
         }
     }
 
-    /// Réponse à l'action « Générer le compte rendu » de la notification de fin de
-    /// réunion : arrête l'enregistrement, puis génère le compte rendu même si
-    /// `autoSummarize` est désactivé — l'utilisateur vient de le demander
-    /// explicitement en tapant l'action, ce n'est plus une décision prise pour lui.
+    /// Response to the "Generate minutes" action from the end-of-meeting
+    /// notification: stops the recording, then generates the minutes even if
+    /// `autoSummarize` is off — the user just explicitly requested it by
+    /// tapping the action, this is no longer a decision made on their behalf.
     private func stopAndGenerateSummaryFromNotification() async {
         guard isRecording else { return }
         let shouldForceSummary = !settings.autoSummarize
@@ -231,9 +233,9 @@ public final class RecordingSession {
         }
     }
 
-    /// Réponse à l'action « Continuer l'enregistrement » : ne touche à rien d'autre
-    /// que de repousser la prochaine proposition, pour ne pas relancer une
-    /// notification à chaque cycle tant que la visio reste éteinte.
+    /// Response to the "Keep recording" action: only postpones the next
+    /// suggestion, so as not to re-trigger a notification on every cycle
+    /// while the video call remains off.
     private func snoozeMeetingEndDetection() {
         meetingEndSnoozedUntil = Date.now.addingTimeInterval(Self.endOfMeetingSnooze)
         meetingEndNotified = false
@@ -253,8 +255,8 @@ public final class RecordingSession {
         selectedTemplateID = inferred.id
     }
 
-    /// Démarre l'enregistrement de la réunion proposée, en reprenant son titre et
-    /// ses participants.
+    /// Starts recording the suggested meeting, reusing its title and
+    /// attendees.
     public func acceptSuggestion() async {
         guard let suggestion = detector.suggestion else { return }
         notifier.withdraw(suggestion.id)
@@ -270,8 +272,8 @@ public final class RecordingSession {
         detector.dismissCurrent()
     }
 
-    /// Type retenu pour une réunion donnée, avec repli sur le modèle générique si le
-    /// modèle personnalisé a été supprimé entre-temps.
+    /// Type retained for a given meeting, falling back to the generic
+    /// template if the custom template was deleted in the meantime.
     public func template(for meeting: Meeting) -> MeetingTemplate {
         settings.template(id: meeting.templateID)
     }
@@ -280,10 +282,10 @@ public final class RecordingSession {
         settings.template(id: selectedTemplateID)
     }
 
-    /// Candidats proposés pour « avec qui » sur un one-to-one : participants du
-    /// calendrier en premier (ils portent un e-mail exploitable pour restreindre la
-    /// page ensuite), puis les personnes connues des réglages, en repli — sans
-    /// e-mail, la page ne pourra être restreinte qu'à l'utilisateur seul.
+    /// Candidates suggested for "with whom" on a one-to-one: calendar
+    /// attendees first (they carry a usable e-mail for later restricting the
+    /// page), then known people from settings, as a fallback — without an
+    /// e-mail, the page can only be restricted to the user alone.
     public var oneToOneCandidates: [(name: String, email: String?)] {
         var seen = Set<String>()
         var candidates: [(name: String, email: String?)] = []
@@ -298,8 +300,8 @@ public final class RecordingSession {
         return candidates
     }
 
-    /// Destination lisible, calculée localement sans appel réseau, pour l'afficher
-    /// avant de publier.
+    /// Readable destination, computed locally with no network call, to
+    /// display before publishing.
     public func destinationSummary(for template: MeetingTemplate) -> String {
         let space = template.parent.isSprintPage
             ? (settings.sprintPage?.spaceKey ?? settings.atlassian.spaceKey)
@@ -322,8 +324,8 @@ public final class RecordingSession {
         }
     }
 
-    /// Fixe la page de sprint à partir d'un identifiant ou d'une URL Confluence.
-    /// L'espace est déduit de la page, pas saisi à la main.
+    /// Sets the sprint page from a Confluence identifier or URL. The space
+    /// is deduced from the page, not typed by hand.
     public func setSprintPage(from input: String) async -> String {
         guard let pageID = SprintPage.extractPageID(from: input) else {
             return L("❌ Identifiant ou URL de page non reconnu.")
@@ -349,7 +351,7 @@ public final class RecordingSession {
         settings.sprintPage = nil
     }
 
-    // MARK: - État dérivé
+    // MARK: - Derived state
 
     public var isRecording: Bool {
         if case .recording = state { return true }
@@ -370,13 +372,13 @@ public final class RecordingSession {
         }
     }
 
-    // MARK: - Enregistrement
+    // MARK: - Recording
 
     public func toggle() async {
         isRecording ? await stop() : await start()
     }
 
-    /// Interroge le calendrier pour préremplir titre et participants.
+    /// Queries the calendar to pre-fill the title and attendees.
     public func refreshCalendarContext() async {
         guard settings.useCalendar else {
             detectedCalendarMeeting = nil
@@ -410,9 +412,9 @@ public final class RecordingSession {
         meetingID = id
         startedAt = .now
 
-        // Si le démarrage n'est pas passé par une suggestion (bouton manuel), on
-        // tente quand même de repérer une application de visio déjà active, pour
-        // pouvoir proposer la fin de réunion plus tard.
+        // If the start didn't go through a suggestion (manual button), still
+        // try to spot an already-active video-conferencing app, so the
+        // meeting's end can be suggested later.
         if monitoredConferencingApp == nil {
             monitoredConferencingApp = ConferencingDetector.activeApps().first?.name
         }
@@ -513,7 +515,7 @@ public final class RecordingSession {
         pendingSuggestionTitle = nil
         oneToOneParticipantName = ""
         oneToOneParticipantEmail = ""
-        // Une nouvelle réunion peut suivre immédiatement : on réarme les propositions.
+        // A new meeting can follow right away: reset the dismissed suggestions.
         detector.resetDismissals()
         notifier.reset()
 
@@ -522,7 +524,7 @@ public final class RecordingSession {
         }
     }
 
-    // MARK: - Compte rendu
+    // MARK: - Minutes
 
     public func generateSummary(for meeting: Meeting) async {
         let transcript = store.transcriptMarkdown(for: meeting.id)
@@ -589,7 +591,7 @@ public final class RecordingSession {
         }
     }
 
-    /// Ouvre la fenêtre de relecture sur une réunion donnée, depuis une notification.
+    /// Opens the review window on a given meeting, from a notification.
     private func openReview(id: UUID) {
         guard let meeting = meetings.first(where: { $0.id == id }) else { return }
         openReview(meeting)
@@ -618,7 +620,7 @@ public final class RecordingSession {
         }
     }
 
-    /// Enregistre les corrections apportées dans la fenêtre de relecture.
+    /// Saves the edits made in the review window.
     public func saveReviewedSummary(_ summary: MeetingSummary) {
         guard var meeting = reviewedMeeting else { return }
         meeting.summary = summary
@@ -628,11 +630,11 @@ public final class RecordingSession {
         meetings = store.loadAll()
     }
 
-    /// Change le type de réunion d'une réunion déjà enregistrée — utilisé avant une
-    /// régénération, quand le type choisi initialement s'avère inadapté (ex. une
-    /// conversation personnelle enregistrée par erreur avec un type professionnel).
-    /// Ne redemande pas de compte rendu à lui seul : c'est à l'appelant de relancer
-    /// `generateSummary` ensuite si besoin.
+    /// Changes the meeting type of an already-recorded meeting — used before
+    /// a regeneration, when the type originally chosen turns out unsuitable
+    /// (e.g. a personal conversation recorded by mistake with a work-related
+    /// type). Doesn't request minutes on its own: it's up to the caller to
+    /// call `generateSummary` afterward if needed.
     public func setTemplate(_ templateID: String, for meeting: Meeting) {
         var updated = meeting
         updated.templateID = templateID
@@ -641,8 +643,8 @@ public final class RecordingSession {
         meetings = store.loadAll()
     }
 
-    /// Corrige l'interlocuteur d'un one-to-one après l'enregistrement — utile si le
-    /// calendrier ne le proposait pas ou si le mauvais nom a été sélectionné.
+    /// Corrects the other party of a one-to-one after recording — useful if
+    /// the calendar didn't suggest them or if the wrong name was selected.
     public func setOneToOneParticipant(name: String, email: String, for meeting: Meeting) {
         var updated = meeting
         updated.oneToOneParticipant = name.isEmpty ? nil : name
@@ -679,9 +681,9 @@ public final class RecordingSession {
             meeting.formattedDuration
         )
 
-        // Les tickets Jira sont toujours en anglais, quelle que soit la langue du
-        // compte rendu : on ne traduit que si nécessaire, pour éviter un appel LLM
-        // inutile quand le compte rendu est déjà en anglais.
+        // Jira tickets are always in English, regardless of the minutes'
+        // language: translation only happens if necessary, to avoid a
+        // needless LLM call when the minutes are already in English.
         let translateForJira: (@Sendable (String) async throws -> String)?
         if createJiraIssues, meeting.outputLanguage != .english {
             let provider = settings.makeProvider()
@@ -766,8 +768,8 @@ public final class RecordingSession {
         }
     }
 
-    /// Publie le compte rendu (sections seules, pas le transcript) comme page
-    /// Notion, enfant de la page configurée dans les réglages.
+    /// Publishes the minutes (sections only, not the transcript) as a Notion
+    /// page, a child of the page configured in settings.
     public func publishToNotion(_ meeting: Meeting) async {
         guard let summary = meeting.summary else {
             notionPublishState = .failed(L("Aucun compte rendu à publier."))
@@ -799,7 +801,7 @@ public final class RecordingSession {
         }
     }
 
-    // MARK: - Historique
+    // MARK: - History
 
     public func delete(_ meeting: Meeting) {
         try? store.delete(meeting.id)
@@ -807,7 +809,7 @@ public final class RecordingSession {
         if reviewedMeeting?.id == meeting.id { reviewedMeeting = nil }
     }
 
-    /// Vrai si l'audio brut de cette réunion est encore sur disque.
+    /// True if this meeting's raw audio is still on disk.
     public func transcript(for meeting: Meeting) -> String {
         store.transcriptMarkdown(for: meeting.id)
     }
@@ -816,9 +818,9 @@ public final class RecordingSession {
         store.hasRawRecording(for: meeting.id)
     }
 
-    /// Supprime l'audio et le transcript d'une réunion, en gardant le compte rendu.
-    /// Pensé pour l'utilisateur qui a relu son compte rendu, l'a jugé fidèle, et ne
-    /// veut plus garder l'enregistrement brut. Irréversible.
+    /// Deletes a meeting's audio and transcript, keeping the minutes.
+    /// Meant for a user who has reviewed their minutes, found them faithful,
+    /// and no longer wants to keep the raw recording. Irreversible.
     @discardableResult
     public func deleteRawRecording(for meeting: Meeting) -> String {
         do {
@@ -839,10 +841,11 @@ public final class RecordingSession {
         store.loadSegments(for: meeting.id)
     }
 
-    /// Réapplique la diarisation expérimentale de la piste micro sur une réunion
-    /// déjà enregistrée — utile pour les réunions capturées avant l'activation du
-    /// réglage, ou pour retenter après un échec. Réécrit `segments.json` et
-    /// `transcript.md` ; ne touche pas au compte rendu déjà généré ni à l'audio.
+    /// Reapplies experimental microphone-track diarization to an
+    /// already-recorded meeting — useful for meetings captured before the
+    /// setting was enabled, or to retry after a failure. Rewrites
+    /// `segments.json` and `transcript.md`; doesn't touch the already
+    /// generated minutes or the audio.
     @discardableResult
     public func rediarize(_ meeting: Meeting) async -> String {
         let existing = store.loadSegments(for: meeting.id)
@@ -927,10 +930,10 @@ public final class RecordingSession {
         L("Réunion du %@", date.formatted(date: .abbreviated, time: .shortened))
     }
 
-    /// Distingue jusqu'à deux locuteurs sur la piste micro, pour les réunions en
-    /// présentiel où plusieurs personnes parlent dans le même micro. Échoue en
-    /// silence (retourne les segments inchangés) : une diarisation ratée ne doit pas
-    /// faire perdre un enregistrement.
+    /// Distinguishes up to two speakers on the microphone track, for
+    /// in-person meetings where several people speak into the same mic.
+    /// Fails silently (returns the segments unchanged): a failed
+    /// diarization shouldn't cost a recording.
     private static func applyDiarization(
         to segments: [TranscriptSegment],
         recordingDirectory: URL,

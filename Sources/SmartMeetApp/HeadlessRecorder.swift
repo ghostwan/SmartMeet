@@ -5,8 +5,8 @@ import MeetingStore
 import Summarization
 import Transcription
 
-/// Mode sans interface : enregistre pendant N secondes, transcrit, sauvegarde, et
-/// imprime un rapport. Sert au test bout en bout et au diagnostic sur le terrain.
+/// UI-less mode: records for N seconds, transcribes, saves, and prints a
+/// report. Used for end-to-end testing and field diagnostics.
 ///
 ///     SmartMeet --headless <secondes> [dossier de rapport]
 @MainActor

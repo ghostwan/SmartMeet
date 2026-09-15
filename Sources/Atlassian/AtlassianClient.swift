@@ -1,8 +1,8 @@
 import Foundation
 
-/// Page Confluence servant de parent commun, typiquement la page qui agrège un sprint.
-/// Elle se fixe une fois en début de sprint : toutes les réunions du sprint s'y
-/// rattachent ensuite automatiquement.
+/// Confluence page acting as a common parent, typically the page that
+/// aggregates a sprint. It's set once at the start of a sprint: every meeting
+/// of the sprint then attaches to it automatically.
 public struct SprintPage: Codable, Sendable, Equatable {
     public var id: String
     public var title: String
@@ -16,10 +16,10 @@ public struct SprintPage: Codable, Sendable, Equatable {
         self.setAt = setAt
     }
 
-    /// Accepte un identifiant nu ou une URL Confluence copiée depuis le navigateur.
+    /// Accepts a bare identifier or a Confluence URL copied from the browser.
     ///
-    /// Les URL prennent plusieurs formes selon l'ancienneté de la page :
-    /// `/wiki/spaces/KEY/pages/12345/Titre`, `/wiki/pages/viewpage.action?pageId=12345`.
+    /// URLs take several forms depending on the page's age:
+    /// `/wiki/spaces/KEY/pages/12345/Title`, `/wiki/pages/viewpage.action?pageId=12345`.
     public static func extractPageID(from input: String) -> String? {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -42,19 +42,19 @@ public struct SprintPage: Codable, Sendable, Equatable {
     }
 }
 
-/// Réglages de publication. Les identifiants vivent dans le trousseau, jamais ici.
+/// Publication settings. Identifiers live in the keychain, never here.
 public struct AtlassianConfiguration: Codable, Sendable, Equatable {
     public var site: String
     public var email: String
     public var spaceKey: String
-    /// Page sous laquelle publier. Vide = page d'accueil de l'espace.
+    /// Page under which to publish. Empty = the space's home page.
     public var parentPageID: String
     public var jiraProjectKey: String
     public var jiraIssueType: String
-    /// Certains projets imposent un epic parent via un validateur de workflow, ce que
-    /// `/createmeta` ne déclare pas. Sans lui, la création échoue en 400.
+    /// Some projects require a parent epic via a workflow validator, which
+    /// `/createmeta` doesn't declare. Without it, creation fails with a 400.
     public var jiraParentKey: String
-    /// Page de sprint courante, parent commun des réunions qui s'y rattachent.
+    /// Current sprint page, the common parent for meetings attached to it.
     public var sprintPage: SprintPage?
 
     public init(
@@ -95,7 +95,8 @@ public enum AtlassianError: LocalizedError {
     case missingToken
     case http(status: Int, body: String)
     case unexpectedResponse
-    /// La page visée (sprint ou parent explicite) n'existe plus côté Confluence.
+    /// The targeted page (sprint or explicit parent) no longer exists on
+    /// Confluence's side.
     case pageNotFound(id: String)
 
     public var errorDescription: String? {
@@ -139,7 +140,7 @@ public enum AtlassianError: LocalizedError {
     }
 }
 
-/// Client HTTP commun à Confluence et Jira : même hôte, même authentification Basic.
+/// HTTP client common to Confluence and Jira: same host, same Basic authentication.
 public struct AtlassianClient: Sendable {
     let configuration: AtlassianConfiguration
     let token: String
@@ -159,8 +160,8 @@ public struct AtlassianClient: Sendable {
         }
         guard !token.isEmpty else { throw AtlassianError.missingToken }
 
-        // Concaténation explicite et non `appending(path:)` : cette dernière encode le
-        // « ? » en %3F et transforme la query en segment de chemin.
+        // Explicit concatenation rather than `appending(path:)`: the latter
+        // encodes "?" as %3F and turns the query into a path segment.
         guard let url = URL(string: baseURL.absoluteString + path) else {
             throw AtlassianError.notConfigured(String(format: NSLocalizedString("URL invalide : %@", bundle: .main, value: "URL invalide : %@", comment: ""), path))
         }

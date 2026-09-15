@@ -6,7 +6,7 @@ import Testing
 
 @Suite("Format du titre de page")
 struct TitleFormatTests {
-    // Lundi 7 septembre 2026, 14h30.
+    // Monday September 7, 2026, 2:30 PM.
     private let date = Calendar(identifier: .gregorian).date(
         from: DateComponents(
             timeZone: TimeZone(identifier: "Europe/Paris"),
@@ -84,7 +84,7 @@ struct TitleFormatTests {
                 date: date, participant: "Sandra"
             ) == "1:1 Sandra — 7 septembre 2026"
         )
-        // Sans interlocuteur renseigné, le séparateur ne laisse pas de double espace.
+        // Without a participant set, the separator doesn't leave a double space.
         #expect(
             TitleFormat.render(
                 "1:1 {participant} — {date}", summaryTitle: "x", templateName: "One to One",
@@ -144,7 +144,7 @@ struct DestinationTests {
         #expect(MeetingTemplate.daily.parent.isSprintPage)
         #expect(MeetingTemplate.retrospective.parent.isSprintPage)
         #expect(MeetingTemplate.synchro.parent.isSprintPage)
-        // Une réunion générique n'appartient pas à un sprint.
+        // A generic meeting doesn't belong to a sprint.
         #expect(!MeetingTemplate.generic.parent.isSprintPage)
     }
 
@@ -154,8 +154,8 @@ struct DestinationTests {
         var template = MeetingTemplate.daily
         template.spaceKeyOverride = "IGNORE"
 
-        // Publier dans un autre espace que celui de la page parente créerait une page
-        // orpheline : c'est la page de sprint qui gagne.
+        // Publishing to a different space than the parent page's would create
+        // an orphan page: the sprint page wins.
         let configuration = configuration(sprint: sprint)
         #expect(configuration.sprintPage?.spaceKey == "EQUIPE")
         #expect(template.parent.isSprintPage)

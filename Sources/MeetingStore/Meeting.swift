@@ -3,42 +3,43 @@ import Foundation
 import Summarization
 import Transcription
 
-/// Métadonnées d'une réunion enregistrée. L'audio et le transcript vivent à côté,
-/// dans le même dossier.
+/// Metadata of a recorded meeting. The audio and transcript live alongside it,
+/// in the same folder.
 public struct Meeting: Sendable, Codable, Identifiable, Equatable {
     public var id: UUID
     public var title: String
     public var startedAt: Date
     public var duration: TimeInterval
     public var locale: String
-    /// Décalage réel de démarrage de chaque piste, conservé pour pouvoir réaligner
-    /// un transcript recalculé a posteriori.
+    /// Actual start offset of each track, kept so a retroactively recomputed
+    /// transcript can be realigned.
     public var trackStartOffsets: [String: TimeInterval]
-    /// Participants issus du calendrier, injectés dans le prompt de génération.
+    /// Attendees sourced from the calendar, injected into the generation prompt.
     public var knownAttendees: [String]
-    /// Type de réunion retenu : pilote le schéma demandé au modèle et l'ordre de rendu.
+    /// Chosen meeting type: drives the schema requested from the model and the
+    /// rendering order.
     public var templateID: String
-    /// Langue du compte rendu, choisie avant l'enregistrement et indépendante de la
-    /// langue parlée pendant la réunion.
+    /// Summary language, chosen before recording and independent of the
+    /// language spoken during the meeting.
     public var outputLanguage: SummaryLanguage
-    /// Compte rendu généré, une fois disponible.
+    /// Generated summary, once available.
     public var summary: MeetingSummary?
-    /// Renseignés après publication.
+    /// Filled in after publication.
     public var confluencePageURL: String?
     public var jiraIssueKeys: [String]
-    /// Renseigné après publication sur Notion.
+    /// Filled in after publication to Notion.
     public var notionPageURL: String?
-    /// Consommation cumulée de tokens pour la génération du compte rendu (tous
-    /// appels confondus : découpage éventuel + réparations de JSON invalide).
+    /// Cumulative token consumption for generating the summary (across all
+    /// calls: any chunking + invalid-JSON repairs).
     public var tokenUsage: TokenUsage?
-    /// Lien Jira listant tous les tickets créés lors de la dernière publication.
+    /// Jira link listing all tickets created during the latest publication.
     public var jiraSearchURL: String?
-    /// Interlocuteur d'un one-to-one (type dont `requiresParticipant` est vrai).
-    /// `nil` pour tout autre type de réunion.
+    /// Counterpart of a one-to-one (a type where `requiresParticipant` is true).
+    /// `nil` for any other meeting type.
     public var oneToOneParticipant: String?
-    /// E-mail de cet interlocuteur, utilisé pour restreindre la page Confluence
-    /// publiée à ces deux seuls comptes. Optionnel : sans lui, la page reste
-    /// restreinte à l'utilisateur seul plutôt que rester ouverte à tout l'espace.
+    /// Email of that counterpart, used to restrict the published Confluence page
+    /// to those two accounts only. Optional: without it, the page stays
+    /// restricted to the user alone rather than being open to the whole space.
     public var oneToOneParticipantEmail: String?
 
     public init(
@@ -86,8 +87,8 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         case jiraSearchURL, oneToOneParticipant, oneToOneParticipantEmail
     }
 
-    // Décodage tolérant : les réunions enregistrées avant l'ajout du compte rendu
-    // doivent rester lisibles.
+    // Tolerant decoding: meetings recorded before the summary feature was added
+    // must remain readable.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
@@ -131,9 +132,9 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
     public var isPublishedToNotion: Bool { notionPageURL != nil }
     public var hasSummary: Bool { summary != nil }
 
-    /// Utilisé par la recherche dans l'historique. `transcript` est optionnel et
-    /// chargé par l'appelant (lecture disque via `MeetingStore`) : le contenu prononcé
-    /// en réunion, pas seulement les métadonnées, doit pouvoir être retrouvé.
+    /// Used by the history search. `transcript` is optional and loaded by the
+    /// caller (disk read via `MeetingStore`): the content spoken during the
+    /// meeting, not just the metadata, must be searchable.
     public func matches(_ query: String, transcript: String? = nil) -> Bool {
         guard !query.isEmpty else { return true }
         let needle = query.folding(

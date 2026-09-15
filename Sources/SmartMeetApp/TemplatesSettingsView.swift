@@ -2,10 +2,9 @@ import Atlassian
 import Summarization
 import SwiftUI
 
-/// Éditeur des types de réunion. Les modèles fournis restent toujours proposés mais
-/// peuvent être édités : l'édition est stockée comme une surcharge, réinitialisable
-/// via le bouton ↺. Les modèles personnalisés se modifient et se suppriment
-/// librement.
+/// Meeting-type editor. Built-in templates are always offered but can be
+/// edited: the edit is stored as an override, resettable via the ↺ button.
+/// Custom templates can be modified and deleted freely.
 struct TemplatesSettingsView: View {
     @Bindable var settings: AppSettings
     @Bindable var session: RecordingSession
@@ -15,8 +14,8 @@ struct TemplatesSettingsView: View {
         settings.template(id: selectedID)
     }
 
-    /// Vrai si le type fourni sélectionné a été édité (surcharge stockée dans les
-    /// types personnalisés, sous le même identifiant).
+    /// True if the selected built-in type has been edited (override stored
+    /// in custom templates, under the same identifier).
     private var hasOverride: Bool {
         settings.customTemplates.contains { $0.id == selectedID }
     }
@@ -73,8 +72,8 @@ struct TemplatesSettingsView: View {
         .frame(minWidth: 170, maxWidth: 220)
     }
 
-    /// Un type masqué reste dans cette liste (pour pouvoir le réafficher) mais
-    /// disparaît de la liste de sélection proposée avant un enregistrement.
+    /// A hidden type stays in this list (so it can be shown again) but
+    /// disappears from the selection list offered before a recording.
     private func row(for template: MeetingTemplate) -> some View {
         let enabled = settings.isTemplateEnabled(template)
         return Label(template.name, systemImage: template.symbol)
@@ -131,8 +130,9 @@ struct TemplatesSettingsView: View {
         }
     }
 
-    /// Le titre produit par le modèle varie d'une réunion à l'autre ; le format
-    /// impose une convention de nommage stable dans l'arborescence Confluence.
+    /// The title produced by the model varies from one meeting to another;
+    /// the format enforces a stable naming convention within the Confluence
+    /// tree.
     private var titleEditor: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Titre de la page publiée")
@@ -290,7 +290,7 @@ struct TemplatesSettingsView: View {
         }
     }
 
-    // MARK: - Édition
+    // MARK: - Editing
 
     private func binding<Value>(
         _ keyPath: WritableKeyPath<MeetingTemplate, Value>
@@ -325,7 +325,7 @@ struct TemplatesSettingsView: View {
     }
 }
 
-/// Liste compacte des jetons disponibles, sur plusieurs lignes.
+/// Compact list of available tokens, spread over several lines.
 private struct FlowText: View {
     let items: [String]
 

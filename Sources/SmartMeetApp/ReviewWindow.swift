@@ -2,8 +2,8 @@ import MeetingStore
 import Summarization
 import SwiftUI
 
-/// Fenêtre de relecture : le compte rendu généré reste éditable avant publication.
-/// Rien ne part sur Confluence sans être passé sous les yeux de l'utilisateur.
+/// Review window: the generated minutes stay editable before publication.
+/// Nothing goes to Confluence without passing under the user's eyes.
 struct ReviewWindow: View {
     @Bindable var session: RecordingSession
     @State private var draft = MeetingSummary()
@@ -65,9 +65,9 @@ struct ReviewWindow: View {
         }
     }
 
-    /// Demande toujours où créer les tickets, plutôt que de dépendre uniquement du
-    /// projet configuré dans les réglages : un compte rendu peut concerner un projet
-    /// différent de celui utilisé par défaut.
+    /// Always asks where to create the tickets, rather than relying solely
+    /// on the project configured in settings: a set of minutes can concern
+    /// a project different from the default one.
     private var jiraDestinationSheet: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Où créer les tickets Jira ?")
@@ -119,7 +119,7 @@ struct ReviewWindow: View {
 
     private func load(_ meeting: Meeting?) {
         guard let meeting, let summary = meeting.summary else { return }
-        // Ne pas écraser les corrections en cours si la réunion n'a pas changé.
+        // Don't overwrite ongoing edits if the meeting hasn't changed.
         guard loadedMeetingID != meeting.id || draft.title.isEmpty else { return }
         draft = summary
         loadedMeetingID = meeting.id
@@ -127,9 +127,9 @@ struct ReviewWindow: View {
 
     private func header(for meeting: Meeting) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            // Le titre et les métadonnées (type, date, durée, langue) sont l'info de
-            // contexte de la réunion : ils occupent toute la largeur disponible,
-            // les actions étant reléguées sur leur propre ligne en dessous.
+            // The title and metadata (type, date, duration, language) are the
+            // meeting's contextual info: they take up the whole available
+            // width, with the actions relegated to their own row below.
             VStack(alignment: .leading, spacing: 2) {
                 Text(meeting.title).font(.title3.weight(.semibold)).lineLimit(1)
                 HStack(spacing: 6) {
@@ -241,8 +241,8 @@ struct ReviewWindow: View {
         }
     }
 
-    /// Corrige l'interlocuteur d'un one-to-one après l'enregistrement — utile si le
-    /// calendrier ne le proposait pas ou si le mauvais nom a été retenu.
+    /// Corrects the other party of a one-to-one after recording — useful if
+    /// the calendar didn't suggest them or if the wrong name was picked up.
     private func oneToOneParticipantEditor(_ meeting: Meeting) -> some View {
         HStack(spacing: 8) {
             Text("👤").font(.caption)
@@ -314,8 +314,8 @@ struct ReviewWindow: View {
 
                     EditableList(title: "Participants", items: $draft.attendees)
 
-                    // L'ordre d'édition suit celui du rendu : ce qu'on voit ici est ce
-                    // qui sera publié, sections comprises.
+                    // Editing order follows the rendered order: what's seen here
+                    // is what gets published, sections included.
                     ForEach(template.sections) { section in
                         sectionEditor(section, language: meeting.outputLanguage)
                     }
@@ -428,8 +428,8 @@ struct ReviewWindow: View {
         }
     }
 
-    /// Partie nominative destinée aux managers : elle doit rester relisible et
-    /// corrigeable avant d'être transmise.
+    /// Nominative section intended for managers: it must remain readable
+    /// and correctable before being passed on.
     private func sprintWeatherSection(language: SummaryLanguage) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle(SummarySection.sprintWeather.displayName(in: language))
@@ -445,8 +445,8 @@ struct ReviewWindow: View {
                             .buttonStyle(.borderless)
                     }
 
-                    // Plusieurs icônes par personne : un sprint contrasté se raconte
-                    // rarement avec une seule image.
+                    // Several icons per person: a mixed-bag sprint is rarely
+                    // told with a single image.
                     HStack(spacing: 4) {
                         ForEach(WeatherIcon.allCases) { icon in
                             let isOn = entry.icons.contains(icon)
@@ -698,8 +698,8 @@ struct ReviewWindow: View {
             }
 
             HStack(spacing: 8) {
-                // La destination effective dépend du type de réunion et de la page de
-                // sprint : on la montre avant de publier, pas après.
+                // The effective destination depends on the meeting type and
+                // the sprint page: it's shown before publishing, not after.
                 Label(session.destinationSummary(for: template), systemImage: "tray.and.arrow.down")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -745,9 +745,9 @@ struct ReviewWindow: View {
                     guard let updated = session.reviewedMeeting else { return }
                     let hasSelectedItems = draft.actionItems.contains { $0.isSelected }
                     if createJiraIssues, session.settings.atlassian.isJiraReady, hasSelectedItems {
-                        // Toujours demander où créer les tickets, préremplis avec les
-                        // réglages par défaut : le projet cible peut varier d'une
-                        // réunion à l'autre.
+                        // Always ask where to create the tickets, pre-filled with
+                        // the default settings: the target project can vary
+                        // from one meeting to another.
                         jiraProjectKeyInput = session.settings.atlassian.jiraProjectKey
                         jiraParentKeyInput = session.settings.atlassian.jiraParentKey
                         pendingPublishMeeting = updated
@@ -782,8 +782,8 @@ struct ReviewWindow: View {
     }
 }
 
-/// Transcript brut de la réunion (celui qui a servi à générer le compte rendu),
-/// affiché en lecture seule depuis la fenêtre de relecture.
+/// Raw transcript of the meeting (the one used to generate the minutes),
+/// shown read-only from the review window.
 private struct TranscriptSheet: View {
     let meeting: Meeting
     let transcript: String
@@ -826,7 +826,7 @@ private struct TranscriptSheet: View {
     }
 }
 
-/// Liste de chaînes éditable, utilisée pour toutes les sections à puces.
+/// Editable list of strings, used for every bulleted section.
 struct EditableList: View {
     let title: String
     @Binding var items: [String]

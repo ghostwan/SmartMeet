@@ -1,11 +1,11 @@
 import Foundation
 
-/// Passe par le binaire `opencode`, qui est un client Copilot authentifié.
+/// Goes through the `opencode` binary, which is an authenticated Copilot client.
 ///
-/// Il n'existe pas d'API publique permettant de consommer un abonnement GitHub
-/// Copilot depuis une application tierce : l'endpoint `copilot_internal` est privé et
-/// renvoie 403, et GitHub Models est en cours de retrait. Déléguer à `opencode` est la
-/// seule voie qui exploite l'abonnement sans reverse-engineering.
+/// There is no public API that lets a third-party app consume a GitHub Copilot
+/// subscription: the `copilot_internal` endpoint is private and returns 403,
+/// and GitHub Models is being phased out. Delegating to `opencode` is the only
+/// way to make use of the subscription without reverse-engineering.
 public struct OpencodeProvider: SummaryProvider {
     public let model: String
     public let executableURL: URL
@@ -20,8 +20,8 @@ public struct OpencodeProvider: SummaryProvider {
         self.executableURL = executableURL ?? Self.locateExecutable()
     }
 
-    /// L'app tourne dans un bundle : le PATH hérité de LaunchServices est minimal et
-    /// ne contient ni Homebrew ni `~/.local/bin`.
+    /// The app runs inside a bundle: the PATH inherited from LaunchServices is
+    /// minimal and contains neither Homebrew nor `~/.local/bin`.
     static func locateExecutable() -> URL {
         let candidates = [
             "\(NSHomeDirectory())/.opencode/bin/opencode",
@@ -46,11 +46,11 @@ public struct OpencodeProvider: SummaryProvider {
 
         let process = Process()
         process.executableURL = executableURL
-        // `--format json` donne accès aux tokens/coût consommés (événement
-        // `step_finish`), invisibles en sortie texte par défaut.
+        // `--format json` gives access to the tokens/cost consumed (`step_finish`
+        // event), invisible in the default text output.
         process.arguments = ["run", "--format", "json", "--model", model, prompt]
-        // `opencode run` se comporte différemment selon le dossier courant (agents et
-        // réglages du projet) : on l'isole dans un répertoire neutre.
+        // `opencode run` behaves differently depending on the current directory
+        // (project agents and settings): it's isolated in a neutral directory.
         process.currentDirectoryURL = URL(filePath: NSTemporaryDirectory())
 
         var environment = ProcessInfo.processInfo.environment
@@ -62,9 +62,9 @@ public struct OpencodeProvider: SummaryProvider {
         return Self.parseEvents(raw)
     }
 
-    /// `opencode run --format json` émet une suite d'événements NDJSON (un objet JSON
-    /// par ligne). On assemble le texte des parts `type: "text"` et on cumule les
-    /// tokens/coût des parts `type: "step-finish"`.
+    /// `opencode run --format json` emits a stream of NDJSON events (one JSON
+    /// object per line). Text from `type: "text"` parts is concatenated, and
+    /// tokens/cost from `type: "step-finish"` parts are accumulated.
     static func parseEvents(_ raw: String) -> SummaryCompletion {
         var text = ""
         var usage: TokenUsage?
@@ -97,8 +97,8 @@ public struct OpencodeProvider: SummaryProvider {
             }
         }
 
-        // Le format JSON n'a pas pu être interprété (version d'opencode différente,
-        // sortie inattendue…) : on retombe sur le texte brut plutôt que d'échouer.
+        // The JSON format couldn't be parsed (different opencode version,
+        // unexpected output…): fall back to raw text rather than failing.
         guard !text.isEmpty else {
             return SummaryCompletion(text: raw, usage: usage)
         }
@@ -113,7 +113,7 @@ public struct OpencodeProvider: SummaryProvider {
 
         try process.run()
 
-        // Lecture concurrente : un pipe saturé bloquerait le processus fils.
+        // Concurrent reading: a saturated pipe would block the child process.
         async let stdout = readToEnd(output)
         async let stderr = readToEnd(errors)
         let (outputData, errorData) = await (stdout, stderr)

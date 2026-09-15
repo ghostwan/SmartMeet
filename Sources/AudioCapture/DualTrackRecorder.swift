@@ -1,26 +1,26 @@
 import AVFoundation
 
-/// Un tampon rapporté à l'horloge de la session : `offset` est le décalage en secondes
-/// depuis le début de l'enregistrement, commun aux deux pistes.
+/// A buffer indexed on the session clock: `offset` is the delay in seconds
+/// since the start of the recording, shared by both tracks.
 public struct TrackBuffer: @unchecked Sendable {
     public let track: AudioTrack
     public let buffer: AVAudioPCMBuffer
     public let offset: TimeInterval
 }
 
-/// Ce qu'il reste d'une session une fois l'enregistrement arrêté.
+/// What remains of a session once recording has stopped.
 public struct RecordingResult: Sendable {
     public let directory: URL
     public let duration: TimeInterval
-    /// Décalage réel du premier tampon de chaque piste. Les deux captures ne démarrent
-    /// pas au même instant (~180 ms d'écart mesurés) : sans cette correction, les
-    /// horodatages du transcript dérivent d'une piste à l'autre.
+    /// Actual start offset of the first buffer of each track. The two captures don't
+    /// start at exactly the same instant (~180ms gap measured): without this
+    /// correction, the transcript's timestamps drift from one track to the other.
     public let trackStartOffsets: [AudioTrack: TimeInterval]
     public let frameCounts: [AudioTrack: AVAudioFramePosition]
 }
 
-/// Pilote les deux captures, écrit les fichiers audio et expose un flux unifié
-/// pour la transcription temps réel.
+/// Drives both captures, writes the audio files, and exposes a unified stream
+/// for real-time transcription.
 public actor DualTrackRecorder {
     private let microphone = MicrophoneCapture()
     private let systemAudio = SystemAudioTap()
@@ -34,10 +34,10 @@ public actor DualTrackRecorder {
 
     public init() {}
 
-    /// Vrai si l'annulation d'écho a pu être activée sur la piste micro.
+    /// True if echo cancellation could be enabled on the microphone track.
     public var echoCancellationEnabled: Bool { microphone.echoCancellationEnabled }
 
-    /// Démarre les deux captures et renvoie le flux fusionné des tampons datés.
+    /// Starts both captures and returns the merged stream of timestamped buffers.
     public func start(directory: URL) throws -> AsyncStream<TrackBuffer> {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         self.directory = directory
@@ -45,10 +45,10 @@ public actor DualTrackRecorder {
         trackStartOffsets.removeAll()
         frameCounts.removeAll()
 
-        // Une seule référence temporelle, prise avant tout démarrage.
+        // A single time reference, taken before either capture starts.
         sessionStartHostTime = AudioClock.now
 
-        // Le tap système d'abord : c'est lui qui peut échouer (TCC, périphérique).
+        // The system tap first: it's the one that can fail (TCC, device).
         let systemStream = try systemAudio.start()
         let microphoneStream: AsyncStream<TimedAudioBuffer>
         do {
@@ -62,7 +62,7 @@ public actor DualTrackRecorder {
             bufferingPolicy: .bufferingNewest(1024)
         )
 
-        // Une tâche par piste : elles alimentent le même flux fusionné.
+        // One task per track: they both feed the same merged stream.
         let sources: [(AudioTrack, AsyncStream<TimedAudioBuffer>)] = [
             (.system, systemStream),
             (.microphone, microphoneStream),
@@ -85,7 +85,7 @@ public actor DualTrackRecorder {
         return merged
     }
 
-    /// Écrit le tampon sur disque et le rapporte à l'horloge de session.
+    /// Writes the buffer to disk and indexes it on the session clock.
     private func ingest(_ timed: TimedAudioBuffer, track: AudioTrack) -> TrackBuffer? {
         let offset = AudioClock.interval(from: sessionStartHostTime, to: timed.hostTime)
 
@@ -98,7 +98,7 @@ public actor DualTrackRecorder {
             try file.write(from: timed.buffer)
             frameCounts[track, default: 0] += AVAudioFramePosition(timed.buffer.frameLength)
         } catch {
-            // Une écriture ratée ne doit pas interrompre la transcription en cours.
+            // A failed write must not interrupt the ongoing transcription.
             NSLog("SmartMeet: écriture de la piste \(track.rawValue) impossible — \(error)")
         }
 
@@ -123,15 +123,15 @@ public actor DualTrackRecorder {
     public func stop() async -> RecordingResult {
         let duration = AudioClock.interval(from: sessionStartHostTime, to: AudioClock.now)
 
-        // Arrêter les captures clôt les flux ; les tâches de pompage s'achèvent alors
-        // d'elles-mêmes après avoir écrit les derniers tampons. Les annuler ici
-        // tronquait les fichiers à leur en-tête (constaté sur la piste système).
+        // Stopping the captures closes their streams; the pump tasks then finish
+        // on their own after writing the last buffers. Cancelling them here used
+        // to truncate the files down to their header (observed on the system track).
         microphone.stop()
         systemAudio.stop()
         for pump in pumps { await pump.value }
         pumps.removeAll()
 
-        // Libérer les AVAudioFile déclenche leur vidage sur disque.
+        // Releasing the AVAudioFile instances triggers their flush to disk.
         files.removeAll()
 
         return RecordingResult(
@@ -143,7 +143,7 @@ public actor DualTrackRecorder {
     }
 }
 
-/// Ne clôt le flux fusionné qu'une fois les deux pistes taries.
+/// Only closes the merged stream once both tracks have run dry.
 private actor FinishCounter {
     private var remaining: Int
     private let continuation: AsyncStream<TrackBuffer>.Continuation

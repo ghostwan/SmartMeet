@@ -10,7 +10,7 @@ struct MeetingTemplateTests {
     func dailyLeadsWithBlockers() {
         #expect(MeetingTemplate.daily.sections.first == .blockers)
         #expect(MeetingTemplate.daily.sections.contains(.participantReports))
-        // La synthèse existe mais passe après : ce n'est pas l'information utile.
+        // The summary exists but comes after: it's not the useful information.
         #expect(MeetingTemplate.daily.sections.last == .tldr)
     }
 
@@ -37,7 +37,7 @@ struct MeetingTemplateTests {
         let daily = SummaryPrompt.schema(for: .daily)
         #expect(daily.contains("blockers"))
         #expect(daily.contains("participantReports"))
-        // Un daily ne doit pas se voir proposer ces sections, sinon le modèle les remplit.
+        // A daily must not be offered these sections, otherwise the model fills them in.
         #expect(!daily.contains("moods"))
         #expect(!daily.contains("openQuestions"))
 
@@ -160,7 +160,7 @@ struct SpecialisedSectionDecodingTests {
         #expect(summary.blockers[0].severity == .blocking)
         #expect(summary.blockers[1].severity == .risk)
         #expect(summary.blockers[1].person == nil)
-        // Un daily sans synthèse reste exploitable.
+        // A daily without a summary remains usable.
         #expect(summary.isUsable)
     }
 
@@ -168,7 +168,7 @@ struct SpecialisedSectionDecodingTests {
     func unknownSeverityFallsBack() throws {
         let json = #"{"title":"D","blockers":[{"description":"X","severity":"critique"}]}"#
         let summary = try JSONDecoder().decode(MeetingSummary.self, from: Data(json.utf8))
-        // Le repli va vers le cas le plus coûteux à manquer.
+        // The fallback goes to the costliest case to get wrong.
         #expect(summary.blockers[0].severity == .blocking)
     }
 
@@ -223,7 +223,7 @@ struct TemplateRenderingTests {
         #expect(blockersIndex != nil)
         #expect(reportsIndex != nil)
         #expect(blockersIndex! < reportsIndex!)
-        // La synthèse existe mais arrive après.
+        // The summary exists but comes after.
         #expect(markdown.range(of: "Deux blocages.")!.lowerBound > reportsIndex!)
     }
 
@@ -251,8 +251,8 @@ struct TemplateRenderingTests {
 
     @Test("Le ressenti est rendu en tableau nominatif, avant les sujets")
     func moodsRenderAsTable() {
-        // `moods` reste disponible pour un type personnalisé, même si la
-        // rétrospective fournie lui préfère désormais la météo du sprint.
+        // `moods` remains available for a custom type, even though the
+        // provided retrospective now prefers the sprint weather instead.
         let template = MeetingTemplate(
             name: "Retro simple", sections: [.moods, .topics]
         )
@@ -267,14 +267,14 @@ struct TemplateRenderingTests {
         let moodIndex = html.range(of: "Sandra")?.lowerBound
         let topicIndex = html.range(of: "Charge de travail")?.lowerBound
         #expect(moodIndex != nil && topicIndex != nil)
-        // Le ressenti nominatif vient avant les sujets dépersonnalisés.
+        // The named mood comes before the depersonalized topics.
         #expect(moodIndex! < topicIndex!)
         #expect(html.contains("<table>"))
     }
 
     @Test("Une section hors du type de réunion n'est jamais rendue")
     func sectionsOutsideTemplateAreIgnored() {
-        // Le modèle a répondu avec des questions ouvertes que le daily ne demandait pas.
+        // The model responded with open questions that the daily didn't request.
         let summary = MeetingSummary(
             title: "D",
             openQuestions: ["Une question parasite"],
@@ -350,7 +350,7 @@ struct SanitizationTests {
         let cleaned = SummaryGenerator.sanitize(
             summary(), context: SummaryContext(userName: "Alex")
         )
-        // « Participants » disparaît, « Moi » devient Alex, Yoann reste.
+        // "Participants" disappears, "Moi" becomes Alex, Yoann remains.
         #expect(cleaned.participantReports.map(\.person) == ["Alex", "Yoann"])
         #expect(cleaned.moods.map(\.person) == ["Clément"])
     }

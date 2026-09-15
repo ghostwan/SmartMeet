@@ -1,14 +1,14 @@
 import Foundation
 import Summarization
 
-/// Rend le compte rendu au format *storage* de Confluence (XHTML).
+/// Renders the meeting minutes in Confluence's *storage* format (XHTML).
 ///
-/// Format retenu plutôt qu'ADF : il accepte les macros natives (`expand`, `jira`,
-/// `panel`) avec un balisage simple et stable, là où ADF impose une structure de
-/// nœuds bien plus verbeuse pour le même résultat.
+/// This format was chosen over ADF: it accepts native macros (`expand`, `jira`,
+/// `panel`) with simple, stable markup, whereas ADF imposes a much more
+/// verbose node structure for the same result.
 ///
-/// L'ordre des sections suit celui du type de réunion : un daily ouvre sur les points
-/// bloquants, une rétrospective sur le ressenti de l'équipe.
+/// The section order follows that of the meeting type: a daily opens on
+/// blockers, a retro on how the team is feeling.
 public enum ConfluenceStorageRenderer {
     public static func render(
         summary: MeetingSummary,
@@ -34,7 +34,7 @@ public enum ConfluenceStorageRenderer {
             parts.append(contentsOf: render(section: section, of: summary, language: language))
         }
 
-        // Le transcript intégral est utile mais encombrant : replié par défaut.
+        // The full transcript is useful but bulky: collapsed by default.
         let body = transcript
             .components(separatedBy: "\n")
             .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -66,8 +66,8 @@ public enum ConfluenceStorageRenderer {
             return ["<p><strong>TL;DR —</strong> \(escaped(summary.tldr))</p>"]
 
         case .blockers:
-            // Encadré d'alerte : dans un daily, c'est la seule information qui appelle
-            // une action immédiate, elle doit sauter aux yeux.
+            // Alert box: in a daily, this is the only information that calls for
+            // immediate action, it must jump out at you.
             return [panel(
                 type: summary.blockers.contains { $0.severity == .blocking } ? "warning" : "note",
                 title: heading,
@@ -115,8 +115,9 @@ public enum ConfluenceStorageRenderer {
             ]
 
         case .sprintWeather:
-            // Partie nominative transmise aux managers : chaque personne a son bloc,
-            // avec ses icônes, sa justification et ce qu'elle dit de son sprint.
+            // Section shared with managers, named per person: each person gets
+            // their own block, with their icons, justification, and their take
+            // on the sprint.
             return ["<h2>\(escaped(heading))</h2>"] + summary.sprintWeather.map { entry in
                 let icons = entry.icons
                     .map { "\($0.emoji) \(escaped($0.label(in: language)))" }
@@ -207,14 +208,14 @@ public enum ConfluenceStorageRenderer {
             + "</ac:structured-macro>"
     }
 
-    /// Le transcript est stocké en markdown ; on retire le balisage avant échappement.
+    /// The transcript is stored in markdown; markup is stripped before escaping.
     static func stripMarkdown(_ line: String) -> String {
         line.replacingOccurrences(of: "**", with: "")
             .replacingOccurrences(of: "^#+\\s*", with: "", options: .regularExpression)
     }
 
-    /// Échappement XML strict : le format storage rejette une entité mal formée et
-    /// fait échouer toute la page.
+    /// Strict XML escaping: the storage format rejects a malformed entity and
+    /// makes the whole page fail.
     public static func escaped(_ text: String) -> String {
         text.replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;")

@@ -1,10 +1,10 @@
 import EventKit
 import Foundation
 
-/// Un événement de calendrier susceptible de correspondre à la réunion en cours.
+/// A calendar event that may correspond to the ongoing meeting.
 public struct CalendarMeeting: Sendable, Equatable, Identifiable {
-    /// Un participant nommé, avec son e-mail quand EventKit le renseigne — utile
-    /// pour proposer un interlocuteur de one-to-one sans ressaisie manuelle.
+    /// A named attendee, with their e-mail when EventKit provides it — useful
+    /// for suggesting a one-to-one counterpart without manual re-entry.
     public struct Attendee: Sendable, Equatable, Identifiable {
         public let name: String
         public let email: String?
@@ -21,7 +21,7 @@ public struct CalendarMeeting: Sendable, Equatable, Identifiable {
     public let startDate: Date
     public let endDate: Date
     public let attendees: [String]
-    /// Mêmes participants que `attendees`, mais avec leur e-mail quand disponible.
+    /// Same attendees as `attendees`, but with their e-mail when available.
     public let attendeeDetails: [Attendee]
     public let hasVideoLink: Bool
 
@@ -44,14 +44,15 @@ public struct CalendarMeeting: Sendable, Equatable, Identifiable {
     }
 }
 
-/// Récupère la réunion en cours pour préremplir titre et participants.
+/// Retrieves the current meeting to prefill the title and attendees.
 ///
-/// Le transcript ne nomme pas les locuteurs : sans le calendrier, le compte rendu se
-/// résume à « Moi » et « Participants ». C'est ici que viennent les vrais noms.
+/// The transcript doesn't name the speakers: without the calendar, the
+/// meeting minutes are reduced to "Me" and "Attendees". This is where the
+/// real names come from.
 @MainActor
 public final class CalendarService {
-    // EKEventStore n'est pas Sendable : le service reste confiné au main actor,
-    // ce qui convient à un usage purement déclenché par l'interface.
+    // EKEventStore is not Sendable: the service stays confined to the main
+    // actor, which suits a use purely triggered by the interface.
     private let store = EKEventStore()
 
     public init() {}
@@ -64,7 +65,7 @@ public final class CalendarService {
         EKEventStore.authorizationStatus(for: .event) == .fullAccess
     }
 
-    /// Réunion couvrant l'instant présent, ou démarrant dans les minutes qui suivent.
+    /// Meeting covering the present moment, or starting within the next few minutes.
     public func currentMeeting(tolerance: TimeInterval = 300) -> CalendarMeeting? {
         guard isAuthorized else { return nil }
 
@@ -98,12 +99,12 @@ public final class CalendarService {
 
     private func meeting(from event: EKEvent) -> CalendarMeeting {
         let participants = (event.attendees ?? [])
-            // L'organisateur apparaît aussi dans la liste des participants.
+            // The organizer also appears in the attendee list.
             .filter { $0.name != nil && $0.name != event.organizer?.name }
         let attendees = participants.compactMap(\.name)
         let attendeeDetails = participants.compactMap { participant -> CalendarMeeting.Attendee? in
             guard let name = participant.name else { return nil }
-            // EventKit expose l'e-mail via une URL `mailto:`, pas un champ dédié.
+            // EventKit exposes the e-mail via a `mailto:` URL, not a dedicated field.
             let email = participant.url.scheme == "mailto"
                 ? String(participant.url.absoluteString.dropFirst("mailto:".count))
                 : nil

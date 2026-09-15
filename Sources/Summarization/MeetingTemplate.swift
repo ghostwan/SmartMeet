@@ -1,23 +1,23 @@
 import Foundation
 
-/// Une section possible du compte rendu. Le type de réunion choisit lesquelles
-/// demander au modèle, et dans quel ordre les rendre.
+/// A possible section of the meeting minutes. The meeting type chooses which
+/// sections to request from the model, and in what order to render them.
 public enum SummarySection: String, Codable, Sendable, CaseIterable, Identifiable {
-    /// Synthèse en quelques phrases.
+    /// Summary in a few sentences.
     case tldr
-    /// Ce qui bloque l'équipe, remonté en tête pour un daily.
+    /// What's blocking the team, surfaced first for a daily.
     case blockers
-    /// Un point par personne : ce qu'elle a fait, ce qu'elle prévoit.
+    /// One entry per person: what they did, what they plan next.
     case participantReports
-    /// Ressenti nominatif de chaque membre, pour une rétrospective.
+    /// Named mood of each member, for a retrospective.
     case moods
-    /// Météo du sprint : chaque membre choisit une ou plusieurs icônes, explique son
-    /// choix, et dit ce qu'il retient de son sprint. Partie nominative, destinée à
-    /// être transmise aux managers.
+    /// Sprint weather: each member picks one or more icons, explains their
+    /// choice, and shares what they take away from their sprint. Named section,
+    /// meant to be shared with managers.
     case sprintWeather
-    /// Format 4L d'une rétrospective : Liked, Learned, Lacked, Longed for.
+    /// 4L retrospective format: Liked, Learned, Lacked, Longed for.
     case fourL
-    /// Sujets abordés, regroupés par thème.
+    /// Topics covered, grouped by theme.
     case topics
     case decisions
     case actionItems
@@ -45,7 +45,7 @@ public enum SummarySection: String, Codable, Sendable, CaseIterable, Identifiabl
     }
 
 
-    /// Fragment de schéma JSON demandé au modèle pour cette section.
+    /// JSON schema fragment requested from the model for this section.
     var schemaFragment: String {
         switch self {
         case .tldr:
@@ -73,7 +73,7 @@ public enum SummarySection: String, Codable, Sendable, CaseIterable, Identifiabl
         }
     }
 
-    /// Consigne de remplissage propre à la section, dans la langue du compte rendu.
+    /// Section-specific fill-in guidance, in the minutes' language.
     func guidance(in language: SummaryLanguage) -> String? {
         switch self {
         case .blockers:
@@ -201,34 +201,33 @@ public enum SummarySection: String, Codable, Sendable, CaseIterable, Identifiabl
     }
 }
 
-/// Type de réunion : détermine les sections demandées, leur ordre, et les consignes
-/// de rédaction supplémentaires envoyées au modèle.
+/// Meeting type: determines the requested sections, their order, and the extra
+/// authoring guidance sent to the model.
 public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hashable {
     public var id: String
     public var name: String
     public var symbol: String
-    /// L'ordre fait foi, à la fois pour le schéma demandé et pour le rendu.
+    /// The order is authoritative, both for the requested schema and for rendering.
     public var sections: [SummarySection]
-    /// Consignes libres ajoutées au prompt.
+    /// Free-form instructions appended to the prompt.
     public var instructions: String
-    /// Composition du titre de la page publiée. Voir `TitleFormat.placeholders`.
+    /// Composition of the published page's title. See `TitleFormat.placeholders`.
     ///
-    /// Les parties littérales ne sont pas traduites : c'est une convention de nommage
-    /// choisie par l'équipe, pas du contenu. Seuls les jetons de date suivent la
-    /// langue du compte rendu. Préférer `{type}` à un libellé en dur permet au titre
-    /// de rester cohérent avec le nom du type affiché dans l'application.
+    /// Literal parts are not translated: it's a naming convention chosen by the
+    /// team, not content. Only date tokens follow the minutes' language. Preferring
+    /// `{type}` over a hardcoded label keeps the title consistent with the type
+    /// name displayed in the app.
     public var titleFormat: String
-    /// Espace Confluence de destination. Vide = espace par défaut des réglages.
+    /// Destination Confluence space. Empty = the default space from settings.
     public var spaceKeyOverride: String
-    /// Page sous laquelle publier.
+    /// Page under which to publish.
     public var parent: ParentPageReference
-    /// Vrai pour un type qui concerne exactement deux personnes (l'utilisateur et
-    /// un·e interlocuteur·rice unique) — un one-to-one, typiquement. Pilote deux
-    /// choses : l'UI propose de renseigner cet·te interlocuteur·rice avant
-    /// l'enregistrement, et la page publiée est restreinte à ces deux comptes plutôt
-    /// que visible par tout l'espace.
+    /// True for a type that involves exactly two people (the user and a single
+    /// counterpart) — a one-to-one, typically. This drives two things: the UI
+    /// asks for that counterpart before recording, and the published page is
+    /// restricted to those two accounts rather than visible to the whole space.
     public var requiresParticipant: Bool
-    /// Les modèles fournis ne sont pas supprimables, seulement dupliquables.
+    /// Built-in templates cannot be deleted, only duplicated.
     public var isBuiltIn: Bool
 
     public init(
@@ -260,8 +259,8 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
         case titleFormat, spaceKeyOverride, parent, requiresParticipant, isBuiltIn
     }
 
-    /// Décodage tolérant : les types enregistrés avant l'ajout de la destination
-    /// doivent rester utilisables.
+    /// Tolerant decoding: templates saved before the destination field was added
+    /// must remain usable.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
@@ -278,7 +277,7 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
         isBuiltIn = try container.decodeIfPresent(Bool.self, forKey: .isBuiltIn) ?? false
     }
 
-    /// Titre de la page publiée pour une réunion donnée.
+    /// Title of the published page for a given meeting.
     public func pageTitle(
         summaryTitle: String,
         date: Date,
@@ -311,8 +310,8 @@ public extension MeetingTemplate {
         id: "builtin.daily",
         name: "Daily",
         symbol: "sun.horizon",
-        // Les points bloquants passent avant tout le reste : c'est la seule
-        // information sur laquelle on agit dans l'heure qui suit un daily.
+        // Blockers come before everything else: it's the only information
+        // acted upon within the hour that follows a daily.
         sections: [.blockers, .participantReports, .actionItems, .tldr],
         instructions: """
         C'est un point quotidien d'équipe, court et opérationnel.
@@ -327,8 +326,8 @@ public extension MeetingTemplate {
 
         La synthèse `tldr` vient en dernier et tient en deux phrases.
         """,
-        // Un daily se retrouve par sa date, pas par un titre que le modèle
-        // reformule différemment chaque jour.
+        // A daily is identified by its date, not by a title the model
+        // rephrases differently every day.
         titleFormat: "Daily {Weekday} {date}",
         parent: .sprintPage,
         isBuiltIn: true
@@ -383,9 +382,9 @@ public extension MeetingTemplate {
         isBuiltIn: true
     )
 
-    /// Pour un échange sans rapport avec le travail (personnel, familial, amical,
-    /// administratif…) : mêmes sections que le type générique, mais sans vocabulaire
-    /// ni cadre professionnel imposé par le prompt.
+    /// For an exchange unrelated to work (personal, family, friends,
+    /// administrative…): same sections as the generic type, but without the
+    /// vocabulary or professional framing imposed by the prompt.
     static let personal = MeetingTemplate(
         id: "builtin.personal",
         name: "Conversation personnelle",
@@ -406,11 +405,10 @@ public extension MeetingTemplate {
         isBuiltIn: true
     )
 
-    /// Tête-à-tête entre l'utilisateur et une seule autre personne (manager, pair,
-    /// entretien récurrent…). Contrairement aux autres types, il concerne
-    /// nommément une personne précise : l'UI demande qui avant l'enregistrement, et
-    /// la page publiée lui est restreinte, ainsi qu'à l'utilisateur — pas le reste
-    /// de l'espace.
+    /// One-on-one between the user and a single other person (manager, peer,
+    /// recurring interview…). Unlike other types, it involves one specific named
+    /// person: the UI asks who before recording, and the published page is
+    /// restricted to them and the user — not the rest of the space.
     static let oneToOne = MeetingTemplate(
         id: "builtin.oneToOne",
         name: "One to One",
@@ -431,10 +429,10 @@ public extension MeetingTemplate {
 
     static let builtIns: [MeetingTemplate] = [generic, daily, synchro, retrospective, personal, oneToOne]
 
-    /// Retrouve un modèle par identifiant, avec repli sur le modèle générique.
-    /// Un modèle personnalisé prime sur un modèle fourni de même identifiant : c'est
-    /// ainsi qu'une édition d'un type fourni (voir `AppSettings.upsert`) est prise en
-    /// compte plutôt que la version d'origine codée en dur.
+    /// Looks up a template by identifier, falling back to the generic template.
+    /// A custom template takes priority over a built-in template with the same
+    /// identifier: this is how editing a built-in type (see `AppSettings.upsert`)
+    /// is honored rather than the original hardcoded version.
     static func resolve(id: String?, in custom: [MeetingTemplate]) -> MeetingTemplate {
         guard let id else { return .generic }
         return custom.first { $0.id == id } ?? builtIns.first { $0.id == id } ?? .generic

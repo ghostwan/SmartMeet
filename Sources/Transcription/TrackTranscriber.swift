@@ -3,13 +3,13 @@ import AudioCapture
 import Foundation
 import Speech
 
-/// Transcrit une piste au fil de l'eau avec `SpeechAnalyzer`.
+/// Transcribes a track on the fly with `SpeechAnalyzer`.
 ///
-/// Deux enseignements de la phase 0 sont câblés ici :
-/// - un unique `AVAudioConverter` maintenu sur toute la session ; en recréer un par
-///   tampon fait perdre la moitié des frames au rééchantillonnage ;
-/// - les horodatages renvoyés par l'analyseur partent de zéro au premier tampon reçu,
-///   d'où le `startOffset` ajouté pour revenir à l'horloge de session.
+/// Two lessons from phase 0 are wired in here:
+/// - a single `AVAudioConverter` maintained across the whole session; recreating
+///   one per buffer loses half the frames during resampling;
+/// - the timestamps returned by the analyzer start at zero on the first buffer
+///   received, hence the `startOffset` added to get back to the session clock.
 public actor TrackTranscriber {
     private let track: AudioTrack
     private let locale: Locale
@@ -22,7 +22,7 @@ public actor TrackTranscriber {
     private var continuation: AsyncStream<AnalyzerInput>.Continuation?
     private var resultsTask: Task<Void, Never>?
 
-    /// Décalage entre le début de la session et le premier tampon transcrit.
+    /// Offset between the start of the session and the first transcribed buffer.
     private var startOffset: TimeInterval?
 
     public init(track: AudioTrack, locale: Locale, vocabulary: [String] = []) {
@@ -31,7 +31,7 @@ public actor TrackTranscriber {
         self.vocabulary = vocabulary
     }
 
-    /// Prépare les modèles et démarre l'analyse. Renvoie le flux d'événements.
+    /// Prepares the models and starts the analysis. Returns the event stream.
     public func start() async throws -> AsyncStream<TranscriptEvent> {
         guard SpeechTranscriber.isAvailable else {
             throw TranscriptionError.unavailable
@@ -101,7 +101,7 @@ public actor TrackTranscriber {
         return events
     }
 
-    /// Pousse un tampon de la piste dans l'analyseur.
+    /// Pushes a buffer of the track into the analyzer.
     public func append(_ trackBuffer: TrackBuffer) {
         guard trackBuffer.track == track,
               let analysisFormat,
@@ -112,8 +112,8 @@ public actor TrackTranscriber {
 
         let sourceFormat = trackBuffer.buffer.format
         if converter == nil || converter?.inputFormat != sourceFormat {
-            // Le périphérique peut changer en cours de réunion : on reconstruit alors
-            // le convertisseur, en acceptant la discontinuité que cela implique.
+            // The device can change mid-meeting: we then rebuild the
+            // converter, accepting the discontinuity this implies.
             converter = AVAudioConverter(from: sourceFormat, to: analysisFormat)
         }
         guard let converter else { return }
@@ -177,8 +177,8 @@ public enum TranscriptionError: LocalizedError {
     }
 }
 
-/// `AVAudioConverter` réclame son tampon d'entrée une seule fois ; ce petit conteneur
-/// évite de capturer une variable mutable dans un bloc concurrent.
+/// `AVAudioConverter` requests its input buffer exactly once; this small
+/// container avoids capturing a mutable variable in a concurrent block.
 private final class PendingBuffer: @unchecked Sendable {
     private var buffer: AVAudioPCMBuffer?
     init(_ buffer: AVAudioPCMBuffer) { self.buffer = buffer }

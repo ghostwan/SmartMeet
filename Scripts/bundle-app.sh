@@ -1,26 +1,18 @@
 #!/usr/bin/env bash
-# Assemble et signe SmartMeet.app.
+# Assembles and signs SmartMeet.app.
 #
-# La signature utilise une identité stable : TCC lie les autorisations (micro,
-# capture audio système) à la signature du bundle. Re-signer en ad-hoc à chaque
-# build ferait révoquer l'autorisation à chaque fois.
+# The signature must use a stable identity: TCC ties permissions (microphone,
+# system audio capture) to the bundle's signature. Re-signing ad hoc on every
+# build would revoke the permission every time.
 set -euo pipefail
 
-CONFIGURATION="${SMARTMEET_CONFIGURATION:-debug}"
-# TCC lie les autorisations à la signature du bundle : l'identité doit rester stable
-# d'un build à l'autre, sinon macOS redemande micro et capture audio à chaque fois.
-# « ghostwan » est l'identité retenue pour ce dépôt ; repli sur la première identité
-# du trousseau si elle est absente.
-IDENTITY="${SMARTMEET_SIGN_IDENTITY:-$(security find-identity -v -p codesigning |
-	grep -i ghostwan | awk -F'"' '{print $2; exit}')}"
-IDENTITY="${IDENTITY:-$(security find-identity -v -p codesigning |
-	awk -F'"' '/[0-9]+\)/ {print $2; exit}')}"
-if [ -z "$IDENTITY" ]; then
-	echo "Aucune identité de signature trouvée. Définis SMARTMEET_SIGN_IDENTITY." >&2
-	exit 1
-fi
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+
+CONFIGURATION="${SMARTMEET_CONFIGURATION:-debug}"
+
+source Scripts/resolve-sign-identity.sh
+resolve_sign_identity
 
 swift build --product SmartMeet --configuration "$CONFIGURATION"
 BIN="$(swift build --product SmartMeet --configuration "$CONFIGURATION" --show-bin-path)/SmartMeet"
@@ -31,12 +23,12 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp Sources/SmartMeetApp/Info.plist "$APP/Contents/Info.plist"
 cp "$BIN" "$APP/Contents/MacOS/SmartMeet"
 
-# Localisation : dossiers .lproj classiques (pas de String Catalog SPM ici, le
-# bundle est assemblé à la main, donc Bundle.main les résout directement sans
-# plomberie de resource bundle supplémentaire).
+# Localization: plain .lproj folders (no String Catalog / SPM resource bundle
+# here — the bundle is assembled by hand, so Bundle.main resolves them
+# directly without any extra resource-bundle plumbing).
 cp -R Sources/SmartMeetApp/Resources/*.lproj "$APP/Contents/Resources/"
 
-# Icône : régénérée depuis le dessin vectoriel, jamais commitée en binaire.
+# Icon: regenerated from the vector artwork, never committed as a binary.
 swift Scripts/make-icon.swift >/dev/null
 iconutil -c icns build/SmartMeet.iconset -o "$APP/Contents/Resources/SmartMeet.icns"
 
@@ -48,5 +40,5 @@ codesign --force \
 	"$APP"
 
 codesign --verify --strict "$APP"
-echo "✅ $APP signé $(codesign -dv "$APP" 2>&1 | awk -F= '/^Identifier/ {print $2}')"
-echo "   lancement : open $APP"
+echo "✅ $APP signed $(codesign -dv "$APP" 2>&1 | awk -F= '/^Identifier/ {print $2}')"
+echo "   launch: open $APP"

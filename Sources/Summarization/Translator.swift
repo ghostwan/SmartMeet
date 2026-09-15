@@ -1,11 +1,11 @@
 import Foundation
 
-/// Traduit un texte court vers l'anglais avec le provider LLM déjà configuré pour la
-/// synthèse.
+/// Translates a short piece of text into English using the LLM provider
+/// already configured for summarization.
 ///
-/// Les tickets Jira sont toujours créés en anglais, quelle que soit la langue du
-/// compte rendu : une équipe distribuée partage un board Jira en anglais même quand
-/// le compte rendu lui-même est rédigé en français.
+/// Jira tickets are always created in English, regardless of the minutes'
+/// language: a distributed team shares an English-language Jira board even
+/// when the minutes themselves are written in French.
 public enum Translator {
     public static func toEnglish(
         _ text: String,

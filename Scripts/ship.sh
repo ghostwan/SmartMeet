@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Vérifie, commite et pousse.
+# Checks, commits, and pushes.
 #
-#     Scripts/ship.sh "Message de commit"
+#     Scripts/ship.sh "Commit message"
 #     Scripts/ship.sh --no-push "Message"
 #     Scripts/ship.sh --amend
 #
-# Rien n'est commité tant que le build, les tests et le contrôle de secrets ne
-# passent pas : un commit qui ne compile pas coûte plus cher à défaire qu'à éviter.
+# Nothing is committed unless the build, the tests, and the secret scan all
+# pass: a commit that doesn't build costs more to undo than to avoid.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -25,7 +25,7 @@ while [ $# -gt 0 ]; do
 		exit 0
 		;;
 	-*)
-		echo "Option inconnue : $1" >&2
+		echo "Unknown option: $1" >&2
 		exit 1
 		;;
 	*) MESSAGE="$1" ;;
@@ -39,58 +39,58 @@ fail() {
 	exit 1
 }
 
-# --- Y a-t-il quelque chose à faire ------------------------------------------
+# --- Is there anything to do? -------------------------------------------------
 
 if [ "$AMEND" = false ] && [ -z "$(git status --porcelain)" ]; then
-	step "Rien à commiter"
+	step "Nothing to commit"
 	if [ "$PUSH" = true ] && [ -n "$(git log '@{u}..' --oneline 2>/dev/null)" ]; then
-		echo "Des commits locaux restent à pousser."
+		echo "Local commits are still waiting to be pushed."
 	else
-		echo "L'arbre de travail est propre et à jour."
+		echo "Working tree is clean and up to date."
 		exit 0
 	fi
 fi
 
 if [ "$AMEND" = false ] && [ -z "$MESSAGE" ] && [ -n "$(git status --porcelain)" ]; then
-	fail "Message de commit manquant. Usage : Scripts/ship.sh \"Message\""
+	fail "Missing commit message. Usage: Scripts/ship.sh \"Message\""
 fi
 
-# --- Vérifications ------------------------------------------------------------
+# --- Checks --------------------------------------------------------------------
 
 step "Build"
-# `--warnings-as-errors` n'existe pas sur SwiftPM : on compte les warnings nous-mêmes.
+# `--warnings-as-errors` doesn't exist in SwiftPM: we count warnings ourselves.
 BUILD_LOG="$(mktemp)"
 trap 'rm -f "$BUILD_LOG"' EXIT
 if ! swift build 2>&1 | tee "$BUILD_LOG"; then
-	fail "Le build a échoué."
+	fail "Build failed."
 fi
 WARNINGS=$(grep -c "warning:" "$BUILD_LOG" || true)
 if [ "$WARNINGS" -gt 0 ]; then
 	grep "warning:" "$BUILD_LOG" | head -10
-	fail "$WARNINGS warning(s) de compilation. Corrige-les avant de commiter."
+	fail "$WARNINGS compiler warning(s). Fix them before committing."
 fi
-echo "✓ build sans warning"
+echo "✓ build with no warnings"
 
 step "Tests"
 TEST_LOG="$(mktemp)"
 trap 'rm -f "$BUILD_LOG" "$TEST_LOG"' EXIT
 if ! swift test 2>&1 | tee "$TEST_LOG" | grep -E "✔|✘|Test run"; then
-	fail "Les tests ont échoué."
+	fail "Tests failed."
 fi
-grep -q "✘" "$TEST_LOG" && fail "Au moins un test a échoué."
+grep -q "✘" "$TEST_LOG" && fail "At least one test failed."
 echo "✓ $(grep -o 'Test run with [0-9]* tests' "$TEST_LOG" | head -1)"
 
-step "Bundle signé"
-./Scripts/bundle-app.sh >/dev/null || fail "L'assemblage du bundle a échoué."
-codesign --verify --strict build/SmartMeet.app || fail "Signature invalide."
+step "Signed bundle"
+./Scripts/bundle-app.sh >/dev/null || fail "Bundle assembly failed."
+codesign --verify --strict build/SmartMeet.app || fail "Invalid signature."
 echo "✓ build/SmartMeet.app"
 
-# --- Contrôle de secrets ------------------------------------------------------
+# --- Secret scan -----------------------------------------------------------
 #
-# Le dépôt manipule des jetons Atlassian et des identifiants de compte : un
-# contrôle automatique vaut mieux qu'une relecture attentive un soir de rush.
+# This repo handles Atlassian tokens and account identifiers: an automated
+# check beats a careful read-through on a late-night rush commit.
 
-step "Contrôle de secrets"
+step "Secret scan"
 git add -A
 STAGED=$(git diff --cached --name-only --diff-filter=ACM)
 LEAKS=""
@@ -103,13 +103,13 @@ fi
 if [ -n "$LEAKS" ]; then
 	echo "$LEAKS" | sed 's/^/  /'
 	git reset >/dev/null
-	fail "Secret potentiel détecté dans les modifications. Rien n'a été commité."
+	fail "Potential secret detected in the changes. Nothing was committed."
 fi
-echo "✓ aucun secret détecté"
+echo "✓ no secret detected"
 
-# --- Commit -------------------------------------------------------------------
+# --- Commit ----------------------------------------------------------------
 
-step "Modifications"
+step "Changes"
 git diff --cached --stat | tail -20
 
 if [ "$AMEND" = true ]; then
@@ -125,11 +125,11 @@ fi
 step "Commit"
 git log --oneline -1
 
-# --- Push ---------------------------------------------------------------------
+# --- Push --------------------------------------------------------------------
 
 if [ "$PUSH" = false ]; then
 	echo
-	echo "Push ignoré (--no-push)."
+	echo "Push skipped (--no-push)."
 	exit 0
 fi
 
@@ -137,9 +137,9 @@ step "Push"
 BRANCH=$(git branch --show-current)
 if [ "$AMEND" = true ] && git log "@{u}.." --oneline >/dev/null 2>&1 &&
 	[ -z "$(git log '@{u}..' --oneline)" ]; then
-	# Amender un commit déjà poussé impose un push forcé : on ne le fait pas
-	# implicitement, la branche peut être partagée.
-	fail "Le commit amendé est déjà publié. Pousse explicitement si tu sais ce que tu fais."
+	# Amending an already-pushed commit requires a force-push: not done
+	# implicitly, since the branch may be shared.
+	fail "The amended commit is already published. Push explicitly if you know what you're doing."
 fi
 
 if git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
@@ -148,4 +148,4 @@ else
 	git push -u origin "$BRANCH"
 fi
 
-printf '\n\033[32m✓ %s poussé sur %s\033[0m\n' "$(git log --oneline -1)" "$BRANCH"
+printf '\n\033[32m✓ %s pushed to %s\033[0m\n' "$(git log --oneline -1)" "$BRANCH"

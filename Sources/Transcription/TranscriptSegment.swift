@@ -1,16 +1,16 @@
 import AudioCapture
 import Foundation
 
-/// Un morceau de transcript attribué à une piste, daté sur l'horloge de session.
+/// A piece of transcript attributed to a track, timestamped on the session clock.
 public struct TranscriptSegment: Sendable, Codable, Identifiable, Equatable {
     public let id: UUID
     public let track: AudioTrack
     public let start: TimeInterval
     public let end: TimeInterval
     public let text: String
-    /// Étiquette assignée a posteriori par la diarisation expérimentale de la piste
-    /// micro (voir le module `Diarization`), quand plusieurs personnes partagent le
-    /// même micro. `nil` : pas de diarisation, on retombe sur le libellé de la piste.
+    /// Label assigned retroactively by the experimental microphone-track
+    /// diarization (see the `Diarization` module), when several people share
+    /// the same microphone. `nil`: no diarization, falls back to the track's label.
     public var speakerOverride: String?
 
     public init(
@@ -33,8 +33,8 @@ public struct TranscriptSegment: Sendable, Codable, Identifiable, Equatable {
         case id, track, start, end, text, speakerOverride
     }
 
-    // Décodage tolérant : les transcripts enregistrés avant l'ajout de la
-    // diarisation doivent rester lisibles.
+    // Tolerant decoding: transcripts recorded before diarization was added
+    // must remain readable.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
@@ -53,7 +53,7 @@ public struct TranscriptSegment: Sendable, Codable, Identifiable, Equatable {
     }
 }
 
-/// Résultat courant d'une piste : le texte en cours de reconnaissance, non figé.
+/// Current result of a track: the text being recognized, not yet final.
 public struct VolatileTranscript: Sendable, Equatable {
     public let track: AudioTrack
     public let text: String
@@ -64,10 +64,10 @@ public struct VolatileTranscript: Sendable, Equatable {
     }
 }
 
-/// Ce que le transcripteur émet au fil de l'eau.
+/// What the transcriber emits as it goes.
 public enum TranscriptEvent: Sendable {
-    /// Segment finalisé, ne bougera plus.
+    /// Finalized segment, won't change anymore.
     case finalized(TranscriptSegment)
-    /// Texte provisoire, destiné à l'affichage live uniquement.
+    /// Provisional text, for live display only.
     case volatile(VolatileTranscript)
 }

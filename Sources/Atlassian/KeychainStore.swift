@@ -1,11 +1,11 @@
 import Foundation
 import Security
 
-/// Stockage du jeton d'API Atlassian dans le trousseau.
+/// Storage of the Atlassian API token in the keychain.
 ///
-/// Pas de variable d'environnement : une app lancée par LaunchServices n'hérite pas
-/// de l'environnement du shell, et un secret en clair dans un fichier de préférences
-/// n'est pas acceptable.
+/// No environment variable: an app launched by LaunchServices does not
+/// inherit the shell's environment, and a plaintext secret in a preferences
+/// file is not acceptable.
 public struct KeychainStore: Sendable {
     public let service: String
 
@@ -44,8 +44,8 @@ public struct KeychainStore: Sendable {
         return SecItemAdd(attributes as CFDictionary, nil) == errSecSuccess
     }
 
-    /// Reprend le jeton depuis l'environnement au premier lancement, s'il y est.
-    /// Confort de migration pour qui l'a déjà dans son shell.
+    /// Picks up the token from the environment on first launch, if it's there.
+    /// Migration convenience for anyone who already has it in their shell.
     public func seedFromEnvironmentIfNeeded(account: String, variable: String) {
         guard read(account: account) == nil,
               let value = ProcessInfo.processInfo.environment[variable],

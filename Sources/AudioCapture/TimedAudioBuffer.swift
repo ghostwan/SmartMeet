@@ -1,11 +1,11 @@
 import AVFoundation
 import CoreAudio
 
-/// Un tampon audio daté sur l'horloge système (host time), seule référence commune
-/// aux deux chaînes de capture : `AVAudioEngine` et l'IOProc Core Audio.
+/// An audio buffer timestamped on the system clock (host time), the only reference
+/// shared by both capture chains: `AVAudioEngine` and the Core Audio IOProc.
 public struct TimedAudioBuffer: @unchecked Sendable {
     public let buffer: AVAudioPCMBuffer
-    /// Date de la première frame, en host time Mach.
+    /// Timestamp of the first frame, in Mach host time.
     public let hostTime: UInt64
 
     public init(buffer: AVAudioPCMBuffer, hostTime: UInt64) {
@@ -15,12 +15,12 @@ public struct TimedAudioBuffer: @unchecked Sendable {
 }
 
 public enum AudioClock {
-    /// Convertit une durée en host time vers des secondes.
+    /// Converts a host time duration into seconds.
     public static func seconds(fromHostTimeDelta delta: UInt64) -> TimeInterval {
         TimeInterval(AudioConvertHostTimeToNanos(delta)) / 1_000_000_000
     }
 
-    /// Écart signé entre deux instants host time, en secondes.
+    /// Signed difference between two host time instants, in seconds.
     public static func interval(from start: UInt64, to end: UInt64) -> TimeInterval {
         end >= start
             ? seconds(fromHostTimeDelta: end - start)
@@ -30,13 +30,13 @@ public enum AudioClock {
     public static var now: UInt64 { AudioGetCurrentHostTime() }
 }
 
-/// Identifie l'origine d'une piste, ce qui tient lieu de diarisation :
-/// les deux sources sont physiquement séparées.
+/// Identifies the origin of a track, which stands in for diarization: the two
+/// sources are physically separate.
 public enum AudioTrack: String, Sendable, Codable, CaseIterable {
     case microphone
     case system
 
-    /// Libellé affiché dans le transcript.
+    /// Label shown in the transcript.
     public var speakerLabel: String {
         switch self {
         case .microphone: "Moi"

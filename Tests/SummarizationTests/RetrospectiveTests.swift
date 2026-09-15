@@ -150,7 +150,7 @@ struct FourLTests {
     func retroTemplateUsesFourL() {
         #expect(MeetingTemplate.retrospective.sections.first == .sprintWeather)
         #expect(MeetingTemplate.retrospective.sections.contains(.fourL))
-        // Le format 4L remplace les sujets libres.
+        // The 4L format replaces free-form topics.
         #expect(!MeetingTemplate.retrospective.sections.contains(.topics))
     }
 }

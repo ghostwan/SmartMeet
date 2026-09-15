@@ -1,13 +1,13 @@
 #!/usr/bin/env swift
 //
-// Génère le fond du .dmg de distribution : une flèche entre l'icône de l'app et
-// le raccourci vers /Applications, pour qu'ouvrir le .dmg suffise à comprendre
-// qu'il faut glisser-déposer plutôt que chercher un installeur.
+// Generates the distribution .dmg background: an arrow between the app icon
+// and the /Applications shortcut, so opening the .dmg is enough to understand
+// that you need to drag-and-drop rather than look for an installer.
 //
 //     swift Scripts/make-dmg-background.swift
 //
-// Dimensions et positions doivent rester cohérentes avec les coordonnées passées
-// à `create-dmg --icon` / `--app-drop-link` dans Scripts/release.sh.
+// Dimensions and positions must stay consistent with the coordinates passed
+// to `create-dmg --icon` / `--app-drop-link` in Scripts/release.sh.
 
 import AppKit
 import CoreGraphics
@@ -16,11 +16,11 @@ import Foundation
 
 let width = 660
 let height = 400
-// Coordonnées des deux icônes dans la fenêtre Finder du .dmg (mêmes valeurs que
-// celles passées à create-dmg), pour centrer la flèche entre les deux.
+// Coordinates of the two icons in the .dmg's Finder window (same values as
+// those passed to create-dmg), to center the arrow between the two.
 let appCenterX: CGFloat = 180
 let appDropCenterX: CGFloat = 480
-let iconCenterY: CGFloat = 400 - 190 // create-dmg compte depuis le bas de la fenêtre
+let iconCenterY: CGFloat = 400 - 190 // create-dmg counts from the bottom of the window
 
 guard let context = CGContext(
     data: nil,
@@ -31,17 +31,17 @@ guard let context = CGContext(
     space: CGColorSpaceCreateDeviceRGB(),
     bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
 ) else {
-    fatalError("contexte CoreGraphics indisponible")
+    fatalError("CoreGraphics context unavailable")
 }
 context.setShouldAntialias(true)
 context.interpolationQuality = .high
 
-// Fond clair et sobre, cohérent avec l'apparence par défaut du Finder.
+// Light, understated background, consistent with Finder's default look.
 context.setFillColor(CGColor(red: 0.965, green: 0.965, blue: 0.972, alpha: 1))
 context.fill(CGRect(x: 0, y: 0, width: width, height: height))
 
-// Flèche entre les deux icônes : tige + pointe, plutôt qu'un glyphe système pour
-// rester indépendant de la police installée.
+// Arrow between the two icons: shaft + head, rather than a system glyph, to
+// stay independent of the installed font.
 let arrowY = iconCenterY
 let shaftStartX = appCenterX + 60
 let shaftEndX = appDropCenterX - 70
@@ -63,7 +63,7 @@ head.closeSubpath()
 context.addPath(head)
 context.fillPath()
 
-// Légende sous la flèche.
+// Caption below the arrow.
 func drawCentered(_ text: String, at x: CGFloat, y: CGFloat, size: CGFloat, weight: NSFont.Weight, color: CGColor) {
     let font = NSFont.systemFont(ofSize: size, weight: weight)
     let attributes: [NSAttributedString.Key: Any] = [
@@ -77,19 +77,19 @@ func drawCentered(_ text: String, at x: CGFloat, y: CGFloat, size: CGFloat, weig
 }
 
 drawCentered(
-    "Glisse SmartMeet dans Applications",
+    "Drag SmartMeet into Applications",
     at: CGFloat(width) / 2, y: iconCenterY - 110,
     size: 15, weight: .medium,
     color: CGColor(red: 0.35, green: 0.35, blue: 0.38, alpha: 1)
 )
 
-guard let image = context.makeImage() else { fatalError("rendu impossible") }
+guard let image = context.makeImage() else { fatalError("unable to render image") }
 let representation = NSBitmapImageRep(cgImage: image)
 guard let data = representation.representation(using: .png, properties: [:]) else {
-    fatalError("encodage PNG impossible")
+    fatalError("unable to encode PNG")
 }
 
 let root = URL(filePath: FileManager.default.currentDirectoryPath)
 let output = root.appending(path: "build/dmg-background.png")
 try data.write(to: output)
-print("✅ fond du .dmg généré : \(output.path)")
+print("✅ .dmg background generated: \(output.path)")

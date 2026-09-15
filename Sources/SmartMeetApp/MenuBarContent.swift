@@ -34,10 +34,10 @@ struct MenuBarContent: View {
                 calendarHint(meeting)
             }
 
-            // Affiché seulement pendant l'enregistrement : une fois arrêté, `segments`
-            // reste peuplé (vidé au prochain démarrage, pas à l'arrêt) et un panneau
-            // de 240pt fixe masquerait sinon la liste des réunions en dessous, la
-            // fenêtre du menu bar ne défilant pas.
+            // Shown only while recording: once stopped, `segments` stays populated
+            // (cleared on the next start, not on stop) and a fixed 240pt panel
+            // would otherwise hide the meeting list below, since the menu bar
+            // window doesn't scroll.
             if session.isRecording {
                 TranscriptView(segments: session.segments, volatile: session.volatileText)
                     .frame(height: 240)
@@ -64,8 +64,8 @@ struct MenuBarContent: View {
         }
     }
 
-    /// Langues parlées déjà utilisées, dans l'ordre de récence — remontées en tête
-    /// du sélecteur plutôt que noyées dans la liste complète.
+    /// Spoken languages already used, in order of recency — bumped to the top
+    /// of the picker rather than lost in the full list.
     private var recentLocales: [(id: String, label: String)] {
         session.settings.recentTranscriptionLocales.compactMap { id in
             availableLocales.first { $0.id == id }
@@ -77,11 +77,11 @@ struct MenuBarContent: View {
         return availableLocales.filter { !recentIDs.contains($0.id) }
     }
 
-    /// Sans activer explicitement l'application, une fenêtre ouverte depuis le
-    /// popover reste sur le Space courant sans y attirer le focus : si l'utilisateur
-    /// est dans le Space plein écran d'une autre application, la fenêtre s'ouvre en
-    /// silence sur le bureau normal, sans bascule de Space ni mise au premier plan —
-    /// ça ressemble alors à un clic sans effet.
+    /// Without explicitly activating the app, a window opened from the
+    /// popover stays on the current Space without pulling focus to it: if
+    /// the user is in another app's full-screen Space, the window silently
+    /// opens on the regular desktop, with no Space switch or bring-to-front —
+    /// which then looks like a click that did nothing.
     private func openSettings() {
         openWindow(id: "settings")
         NSApp.activate(ignoringOtherApps: true)
@@ -118,8 +118,8 @@ struct MenuBarContent: View {
         .padding(12)
     }
 
-    /// Le type est choisi avant l'enregistrement : c'est lui qui détermine les
-    /// sections demandées au modèle, donc il doit être figé dès le départ.
+    /// The type is chosen before recording: it's what determines the
+    /// sections requested from the model, so it must be locked in from the start.
     private var templatePicker: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
@@ -137,8 +137,8 @@ struct MenuBarContent: View {
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
-                    // La destination dépend du type choisi : autant la voir maintenant,
-                    // pas au moment de publier.
+                    // The destination depends on the chosen type: better to see it
+                    // now than at publish time.
                     Text(session.destinationSummary(for: session.selectedTemplate))
                         .font(.caption2)
                         .foregroundStyle(
@@ -156,12 +156,12 @@ struct MenuBarContent: View {
                 oneToOneParticipantField
             }
 
-            // Langue « source » (celle parlée pendant la réunion, transcrite telle
-            // quelle) et langue de « destination » (celle du compte rendu généré) sont
-            // deux réglages distincts : le moteur de transcription ne gère pas le
-            // changement de langue en cours de réunion, elle doit donc être fixée
-            // avant de démarrer — indépendamment de la langue dans laquelle le
-            // compte rendu sera rédigé.
+            // The "source" language (the one spoken during the meeting, transcribed
+            // as-is) and the "destination" language (the one for the generated
+            // minutes) are two separate settings: the transcription engine doesn't
+            // handle a language change mid-meeting, so it must be fixed before
+            // starting — independently of the language the minutes will be
+            // written in.
             HStack(spacing: 6) {
                 Text("🗣️").font(.caption)
                 Picker("Langue parlée", selection: $session.selectedTranscriptionLocale) {
@@ -206,10 +206,10 @@ struct MenuBarContent: View {
         .padding(.vertical, 6)
     }
 
-    /// « Avec qui » pour un one-to-one : les candidats du calendrier remplissent
-    /// aussi l'e-mail d'un coup, nécessaire pour restreindre la page publiée à
-    /// cette seule personne. Une saisie libre reste possible si l'interlocuteur
-    /// n'a pas d'événement de calendrier (café improvisé, Slack huddle…).
+    /// "Who with" for a one-to-one: calendar candidates also fill in the
+    /// e-mail at once, needed to restrict the published page to that one
+    /// person. Free-text entry is still possible if the other party has no
+    /// calendar event (impromptu coffee chat, Slack huddle…).
     private var oneToOneParticipantField: some View {
         HStack(spacing: 6) {
             Text("👤").font(.caption)
@@ -254,7 +254,7 @@ struct MenuBarContent: View {
         return String(format: "%02d:%02d", total / 60, total % 60)
     }
 
-    /// Proposition d'enregistrement, quand une réunion est détectée.
+    /// Recording suggestion, shown when a meeting is detected.
     private func suggestionBanner(_ suggestion: MeetingSuggestion) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "record.circle")
@@ -284,9 +284,10 @@ struct MenuBarContent: View {
         .background(.red.opacity(0.10))
     }
 
-    /// Rappel visible dès le début d'un enregistrement : enregistrer des tiers exige
-    /// leur accord. C'est une obligation légale, pas un confort — donc affiché en
-    /// permanence pendant l'enregistrement plutôt qu'une seule fois au démarrage.
+    /// Reminder visible from the very start of a recording: recording third
+    /// parties requires their consent. This is a legal obligation, not a
+    /// nicety — hence shown persistently throughout the recording rather
+    /// than just once at startup.
     private var consentReminder: some View {
         HStack(spacing: 8) {
             Image(systemName: "person.2.wave.2").foregroundStyle(.blue)
@@ -463,12 +464,12 @@ struct MeetingListView: View {
                         }
                     }
                 }
-                // `maxHeight` seul laisse le ScrollView se rapporter à une hauteur
-                // idéale de 0 dans le popover `MenuBarExtra` (qui dimensionne la
-                // fenêtre sur la taille intrinsèque du contenu) : la liste
-                // disparaissait alors entièrement, même avec des réunions présentes.
-                // Une hauteur explicite, plafonnée au nombre réel de lignes, fixe
-                // un plancher que SwiftUI peut effectivement mesurer.
+                // `maxHeight` alone lets the ScrollView report an ideal height
+                // of 0 inside the `MenuBarExtra` popover (which sizes the window
+                // to the content's intrinsic size): the list would then disappear
+                // entirely, even with meetings present. An explicit height,
+                // capped at the actual number of rows, gives SwiftUI a floor it
+                // can actually measure.
                 .frame(height: min(CGFloat(session.filteredMeetings.prefix(10).count) * 44, 170))
             }
         }

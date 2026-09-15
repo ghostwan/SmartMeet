@@ -1,12 +1,12 @@
 import AVFoundation
 import CoreAudio
 
-/// Capture l'audio de tous les process sauf le nôtre, via un process tap Core Audio
-/// (macOS 14.2+). Pas de pilote virtuel type BlackHole.
+/// Captures the audio of every process except our own, via a Core Audio process tap
+/// (macOS 14.2+). No virtual driver like BlackHole.
 ///
-/// Prérequis impératif : l'exécutable doit vivre dans un bundle `.app` signé et être
-/// lancé par LaunchServices. Sinon TCC n'attribue pas `kTCCServiceAudioCapture` et le
-/// tap renvoie du **silence sans erreur** — vérifié en phase 0.
+/// Hard requirement: the executable must live in a signed `.app` bundle and be
+/// launched by LaunchServices. Otherwise TCC won't grant `kTCCServiceAudioCapture`
+/// and the tap returns **silence with no error** — verified during phase 0.
 public final class SystemAudioTap: @unchecked Sendable {
     private var tapID = CoreAudioSystem.unknown
     private var aggregateID = CoreAudioSystem.unknown
@@ -23,8 +23,8 @@ public final class SystemAudioTap: @unchecked Sendable {
 
         let description = CATapDescription(stereoGlobalTapButExcludeProcesses: [selfID])
         description.name = "SmartMeet"
-        description.isPrivate = true        // invisible des autres applications
-        description.muteBehavior = .unmuted // l'utilisateur continue d'entendre la réunion
+        description.isPrivate = true        // invisible to other applications
+        description.muteBehavior = .unmuted // the user keeps hearing the meeting
         try CoreAudioSystem.check(
             AudioHardwareCreateProcessTap(description, &tapID),
             "création du process tap"
@@ -77,7 +77,7 @@ public final class SystemAudioTap: @unchecked Sendable {
                 guard let source = AVAudioPCMBuffer(
                     pcmFormat: tapFormat, bufferListNoCopy: inputData, deallocator: nil
                 ) else { return }
-                // L'IOProc réutilise ses tampons : on copie avant de sortir du callback.
+                // The IOProc reuses its buffers: we copy before returning from the callback.
                 guard let copy = source.copied() else { return }
                 continuation.yield(
                     TimedAudioBuffer(buffer: copy, hostTime: inputTime.pointee.mHostTime)
@@ -117,8 +117,8 @@ public final class SystemAudioTap: @unchecked Sendable {
 }
 
 extension AVAudioPCMBuffer {
-    /// Copie profonde : indispensable avant de faire sortir un tampon d'un callback
-    /// temps réel, qui réutilise sa mémoire au cycle suivant.
+    /// Deep copy: required before letting a buffer escape a real-time callback,
+    /// which reuses its memory on the next cycle.
     func copied() -> AVAudioPCMBuffer? {
         guard let copy = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameLength) else {
             return nil

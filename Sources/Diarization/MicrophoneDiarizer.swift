@@ -3,46 +3,46 @@ import AVFoundation
 import Foundation
 import Transcription
 
-/// Diarisation expérimentale de la piste micro : distingue plusieurs locuteurs
-/// partageant un même micro, à partir de traits acoustiques classiques (hauteur,
-/// timbre) plutôt que d'un modèle de reconnaissance vocale.
+/// Experimental diarization of the microphone track: distinguishes between
+/// several speakers sharing the same microphone, based on classic acoustic
+/// features (pitch, timbre) rather than a voice recognition model.
 ///
-/// ## Ce que ce n'est pas
+/// ## What this is not
 ///
-/// Ce n'est **pas** une vraie diarisation au sens où l'entend la recherche (modèle
-/// d'embeddings de type d-vector/x-vector + clustering). Apple n'expose aucune API
-/// publique de ce type dans `Speech`/`SpeechAnalyzer` (vérifié sur macOS 26) : faire
-/// mieux demanderait d'embarquer un modèle tiers converti en CoreML, projet à part
-/// entière. Ceci est un premier jet, volontairement modeste :
+/// This is **not** real diarization in the research sense (an embeddings model of
+/// the d-vector/x-vector type + clustering). Apple exposes no public API of that
+/// kind in `Speech`/`SpeechAnalyzer` (verified on macOS 26): doing better would
+/// require embedding a third-party model converted to CoreML, a project of its
+/// own. This is a deliberately modest first pass:
 ///
-/// - fonctionne mieux quand les voix sont nettement différentes (par ex.
-///   grave/aiguë) que quand elles se ressemblent ;
-/// - le nombre de locuteurs n'est pas connu à l'avance : plusieurs valeurs de `k`
-///   sont essayées et la meilleure est retenue par score de silhouette, jusqu'à
-///   `maxSpeakers` — au-delà, deux traits acoustiques (hauteur, timbre) ne suffisent
-///   plus à séparer les gens de façon fiable ;
-/// - opère par segment de transcript déjà découpé, pas par tour de parole réel :
-///   un segment qui contiendrait déjà deux locuteurs sans coupure ne sera pas séparé.
+/// - works better when voices are clearly different (e.g. low/high pitched)
+///   than when they sound similar;
+/// - the number of speakers isn't known in advance: several values of `k` are
+///   tried and the best one is kept by silhouette score, up to `maxSpeakers` —
+///   beyond that, two acoustic features (pitch, timbre) are no longer enough to
+///   reliably tell people apart;
+/// - operates on already-cut transcript segments, not on actual speaking turns:
+///   a segment that already contains two speakers without a break won't be split.
 ///
-/// À valider sur de vraies réunions avant de lui faire confiance pour un compte
-/// rendu nominatif (rétrospective, météo du sprint).
+/// To be validated on real meetings before trusting it for a named-participant
+/// summary (retrospective, sprint weather report).
 public enum MicrophoneDiarizer {
-    /// Score de silhouette minimal en dessous duquel on préfère ne rien affirmer
-    /// plutôt que scinder à tort une session à un seul locuteur.
+    /// Minimum silhouette score below which we prefer to assert nothing rather
+    /// than wrongly split a single-speaker session.
     private static let minimumSilhouetteScore = 0.45
-    /// Au-delà, deux traits acoustiques grossiers (hauteur médiane, centroïde
-    /// spectral) ne discriminent plus assez de monde pour que ce soit crédible.
+    /// Beyond that, two coarse acoustic features (median pitch, spectral
+    /// centroid) no longer discriminate enough people for this to be credible.
     public static let defaultMaxSpeakers = 4
 
     /// - Parameters:
-    ///   - segments: uniquement les segments de la piste micro, dans l'ordre.
-    ///   - audioFileURL: le fichier `microphone.caf` de la réunion.
-    ///   - fileTimeOffset: décalage entre l'horloge de session des segments et le
-    ///     temps 0 du fichier (voir `Meeting.trackStartOffsets["microphone"]`).
-    ///   - maxSpeakers: borne haute du nombre de locuteurs recherchés.
-    /// - Returns: une étiquette par identifiant de segment, uniquement pour les
-    ///   segments assez fiables pour être classés. `nil` si aucune scission n'est
-    ///   jugée assez nette (probablement une seule personne).
+    ///   - segments: microphone track segments only, in order.
+    ///   - audioFileURL: the meeting's `microphone.caf` file.
+    ///   - fileTimeOffset: offset between the session clock of the segments and
+    ///     time 0 of the file (see `Meeting.trackStartOffsets["microphone"]`).
+    ///   - maxSpeakers: upper bound on the number of speakers searched for.
+    /// - Returns: one label per segment identifier, only for segments reliable
+    ///   enough to be classified. `nil` if no split is deemed clear enough
+    ///   (probably a single person).
     public static func diarize(
         segments: [TranscriptSegment],
         audioFileURL: URL,
@@ -74,11 +74,11 @@ public enum MicrophoneDiarizer {
         let points = features.map { [$0.feature.pitchHz, $0.feature.spectralCentroidHz] }
         let normalized = SpeakerClusterer.normalize(points)
 
-        // On essaie plusieurs nombres de locuteurs et on garde celui qui sépare le
-        // mieux les données (silhouette la plus haute), pas un k figé d'avance. On
-        // exige au moins 3 segments fiables par locuteur candidat : en dessous, le
-        // bruit de mesure sur 2-3 segments suffit à simuler une fausse séparation
-        // nette (observé en test avec une seule vraie voix).
+        // We try several speaker counts and keep the one that separates the
+        // data best (highest silhouette), not a `k` fixed in advance. We
+        // require at least 3 reliable segments per candidate speaker: below
+        // that, measurement noise on 2-3 segments is enough to fake a clean
+        // separation (observed in testing with a single real voice).
         let upperBound = min(maxSpeakers, features.count / 3)
         guard upperBound >= 2 else { return nil }
 
@@ -89,9 +89,9 @@ public enum MicrophoneDiarizer {
               best.silhouetteScore >= minimumSilhouetteScore
         else { return nil }
 
-        // Le premier cluster à parler devient « Locuteur 1 », le suivant à
-        // apparaître « Locuteur 2 », etc. — plus stable et plus lisible qu'un
-        // numéro de cluster arbitraire.
+        // The first cluster to speak becomes "Speaker 1", the next one to
+        // appear "Speaker 2", etc. — more stable and readable than an
+        // arbitrary cluster number.
         var labelByCluster: [Int: String] = [:]
         var nextLabelIndex = 1
         var mapping: [UUID: String] = [:]
@@ -106,8 +106,8 @@ public enum MicrophoneDiarizer {
         return mapping
     }
 
-    /// Lit les échantillons mono d'une plage temporelle, en moyennant les canaux si
-    /// le fichier n'est pas déjà mono.
+    /// Reads mono samples over a time range, averaging channels if the file
+    /// isn't already mono.
     private static func readMonoSamples(
         from file: AVAudioFile, start: TimeInterval, end: TimeInterval
     ) throws -> [Float]? {

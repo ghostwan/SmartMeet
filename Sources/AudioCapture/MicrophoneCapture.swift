@@ -1,13 +1,14 @@
 import AVFoundation
 
-/// Capture le micro via AVAudioEngine, en datant chaque tampon sur la même horloge
-/// host time que le tap système — c'est ce qui permet d'aligner les deux pistes.
+/// Captures the microphone via AVAudioEngine, timestamping each buffer on the same
+/// host time clock as the system tap — this is what makes it possible to align the
+/// two tracks.
 public final class MicrophoneCapture: @unchecked Sendable {
     private let engine = AVAudioEngine()
     private var continuation: AsyncStream<TimedAudioBuffer>.Continuation?
 
     public private(set) var format: AVAudioFormat?
-    /// Indique si l'annulation d'écho a pu être activée sur ce périphérique.
+    /// Indicates whether echo cancellation could be enabled on this device.
     public private(set) var echoCancellationEnabled = false
 
     public init() {}
@@ -23,12 +24,12 @@ public final class MicrophoneCapture: @unchecked Sendable {
     public func start() throws -> AsyncStream<TimedAudioBuffer> {
         let input = engine.inputNode
 
-        // Tentative écartée : `setVoiceProcessingEnabled(true)` annule bien l'écho des
-        // haut-parleurs dans le micro, mais le traitement de voix d'Apple s'approprie
-        // le périphérique de sortie et prive le périphérique agrégé de sa source — le
-        // tap système tombe à ~30 000 frames au lieu de 900 000 (mesuré).
-        // La diaphonie est donc traitée en aval, au niveau du transcript, par
-        // `CrossTalkFilter`.
+        // Attempt abandoned: `setVoiceProcessingEnabled(true)` does cancel the
+        // speaker echo in the microphone, but Apple's voice processing takes
+        // ownership of the output device and starves the aggregate device of its
+        // source — the system tap drops to ~30,000 frames instead of 900,000
+        // (measured). Cross-talk is therefore handled downstream, at the
+        // transcript level, by `CrossTalkFilter`.
         echoCancellationEnabled = false
 
         let inputFormat = input.outputFormat(forBus: 0)
@@ -44,8 +45,8 @@ public final class MicrophoneCapture: @unchecked Sendable {
 
         input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { buffer, time in
             guard let copy = buffer.copied() else { return }
-            // `time.hostTime` n'est renseigné que si l'horloge est valide ; sinon on
-            // retombe sur l'instant courant, au prix d'une imprécision de l'ordre du tampon.
+            // `time.hostTime` is only valid if the clock is valid; otherwise we
+            // fall back to the current instant, at the cost of buffer-sized imprecision.
             let hostTime = time.isHostTimeValid ? time.hostTime : AudioClock.now
             continuation.yield(TimedAudioBuffer(buffer: copy, hostTime: hostTime))
         }

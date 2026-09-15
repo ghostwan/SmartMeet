@@ -1,15 +1,16 @@
 import Foundation
 
-/// Convertit le markdown produit par `MeetingSummary.markdown(template:language:)` en
-/// blocs Notion (format attendu par `POST /v1/pages` et `PATCH .../children`).
+/// Converts the markdown produced by `MeetingSummary.markdown(template:language:)`
+/// into Notion blocks (the format expected by `POST /v1/pages` and `PATCH
+/// .../children`).
 ///
-/// Ce n'est pas un parseur markdown généraliste : seul le sous-ensemble
-/// effectivement produit par `MeetingSummary` est couvert (titres `#`/`##`/`###`,
-/// puces `- `, emphase `**gras**`, lignes `_italique :_`, paragraphes). Suffisant
-/// ici, insuffisant pour du markdown arbitraire.
+/// This is not a general-purpose markdown parser: only the subset actually
+/// produced by `MeetingSummary` is covered (headings `#`/`##`/`###`, bullets
+/// `- `, emphasis `**bold**`, `_italic:_` lines, paragraphs). Sufficient here,
+/// insufficient for arbitrary markdown.
 enum MarkdownToNotionBlocks {
-    /// Notion limite un appel à 100 blocs enfants ; au-delà, il faut les ajouter en
-    /// plusieurs requêtes `PATCH`. Voir `NotionClient.createPage`.
+    /// Notion limits a call to 100 child blocks; beyond that, they must be
+    /// added over several `PATCH` requests. See `NotionClient.createPage`.
     static let maxBlocksPerRequest = 100
 
     static func blocks(from markdown: String) -> [[String: Any]] {
@@ -19,8 +20,8 @@ enum MarkdownToNotionBlocks {
         for rawLine in markdown.components(separatedBy: "\n") {
             let line = rawLine.trimmingCharacters(in: .whitespaces)
 
-            // La première ligne (`# Titre`) redouble le titre de la page Notion,
-            // déjà posé via les propriétés de la page : on l'ignore ici.
+            // The first line (`# Title`) would duplicate the Notion page title,
+            // already set via the page's properties: it's ignored here.
             if isFirstLine {
                 isFirstLine = false
                 if line.hasPrefix("# ") { continue }
@@ -60,9 +61,9 @@ enum MarkdownToNotionBlocks {
          "paragraph": ["rich_text": richText(from: text, italic: italic)]]
     }
 
-    /// Découpe `**gras**` en segments alternés texte simple / texte en gras. Ne gère
-    /// ni l'imbrication ni les autres emphases : ce que produit `MeetingSummary`
-    /// n'en a jamais besoin.
+    /// Splits `**bold**` into alternating plain text / bold text segments.
+    /// Handles neither nesting nor other emphasis styles: what
+    /// `MeetingSummary` produces never needs them.
     private static func richText(from text: String, italic: Bool = false) -> [[String: Any]] {
         let parts = text.components(separatedBy: "**")
         guard parts.count > 1 else {

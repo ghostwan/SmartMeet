@@ -1,10 +1,10 @@
 import Foundation
 
-/// Icône météo choisie par un membre pour illustrer son sprint.
+/// Weather icon chosen by a member to illustrate their sprint.
 ///
-/// Vocabulaire contrôlé : le modèle produit du texte libre, on le ramène ici à un
-/// ensemble fini pour pouvoir l'afficher de façon homogène. Le parsing accepte le
-/// français, l'anglais et l'emoji, parce que les modèles varient.
+/// Controlled vocabulary: the model produces free-form text, which is mapped
+/// back here to a finite set so it can be displayed consistently. Parsing
+/// accepts French, English and emoji, because models vary.
 public enum WeatherIcon: String, Codable, Sendable, CaseIterable, Identifiable {
     case sun
     case partlySunny
@@ -64,12 +64,12 @@ public enum WeatherIcon: String, Codable, Sendable, CaseIterable, Identifiable {
         }
     }
 
-    /// Vocabulaire proposé au modèle dans le prompt.
+    /// Vocabulary offered to the model in the prompt.
     static var promptVocabulary: String {
         allCases.map(\.rawValue).joined(separator: ", ")
     }
 
-    /// Reconnaissance tolérante : identifiant, libellé français ou anglais, emoji.
+    /// Tolerant recognition: identifier, French or English label, emoji.
     public static func parse(_ raw: String) -> WeatherIcon? {
         let normalised = raw
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -94,7 +94,7 @@ public enum WeatherIcon: String, Codable, Sendable, CaseIterable, Identifiable {
             if candidates.contains(normalised) { return icon }
         }
 
-        // Variantes fréquentes des modèles.
+        // Common model variants.
         let aliases: [String: WeatherIcon] = [
             "soleil": .sun, "ensoleille": .sun, "sunny": .sun, "clear": .sun,
             "partlycloudy": .partlySunny, "eclaircies": .partlySunny,

@@ -1,16 +1,16 @@
 import Foundation
 
-/// Construit les prompts à partir du type de réunion et de la langue de sortie.
+/// Builds prompts from the meeting type and the output language.
 ///
-/// Le schéma n'est pas figé : chaque type de réunion demande ses propres sections, et
-/// uniquement celles-là. Envoyer un schéma complet puis espérer que le modèle ignore
-/// les sections inutiles produisait des sections vides polluant le compte rendu.
+/// The schema isn't fixed: each meeting type requests its own sections, and only
+/// those. Sending a full schema and hoping the model would ignore unneeded
+/// sections used to produce empty sections cluttering the minutes.
 ///
-/// Les consignes sont rédigées dans la langue de sortie. Une consigne en français
-/// suivie d'un « réponds en anglais » fait dériver les modèles locaux vers un mélange
-/// des deux ; formuler directement dans la langue cible tient beaucoup mieux.
+/// Guidance is written in the output language. Instructions in French followed
+/// by "answer in English" drift local models toward a mix of both; writing
+/// directly in the target language works much better.
 enum SummaryPrompt {
-    /// Schéma JSON limité aux sections du type de réunion, plus le titre toujours requis.
+    /// JSON schema limited to the meeting type's sections, plus the always-required title.
     static func schema(for template: MeetingTemplate) -> String {
         var fragments = [
             #""title": "string""#,
@@ -69,8 +69,8 @@ enum SummaryPrompt {
             en: "Meeting type: \(template.name).\nMeeting date: \(context.dateDescription(in: language))."
         )
 
-        // Le transcript n'identifie l'utilisateur que par « Moi » : sans cette
-        // consigne, ses engagements sortent avec « Moi » comme responsable.
+        // The transcript only identifies the user as "Moi": without this
+        // instruction, their commitments come out with "Moi" as the owner.
         if let userName = context.userName, !userName.isEmpty {
             text += "\n\n" + language.pick(
                 fr: "La personne qui enregistre, désignée par « Moi » dans le transcript, s'appelle \(userName). Utilise ce nom, jamais « Moi ».",
@@ -83,7 +83,7 @@ enum SummaryPrompt {
             )
         }
 
-        // Consignes propres aux sections demandées.
+        // Guidance specific to the requested sections.
         let guidance = template.sections.compactMap { $0.guidance(in: language) }
         if !guidance.isEmpty {
             text += "\n\n" + language.pick(fr: "Consignes par section :", en: "Section guidance:")
@@ -137,7 +137,7 @@ enum SummaryPrompt {
         )
     }
 
-    /// Prompt de génération directe, pour une réunion tenant dans la fenêtre de contexte.
+    /// Direct generation prompt, for a meeting that fits within the context window.
     static func single(
         transcript: String,
         context: SummaryContext,
@@ -155,10 +155,10 @@ enum SummaryPrompt {
         """
     }
 
-    /// Étape « map » : condense une tranche de réunion en notes brutes.
+    /// "Map" step: condenses a meeting slice into raw notes.
     ///
-    /// Les notes intermédiaires restent dans la langue de sortie : les traduire à
-    /// l'étape finale seulement ferait perdre des nuances à chaque passe.
+    /// Intermediate notes stay in the output language: translating only at the
+    /// final step would lose nuance with every pass.
     static func chunk(
         transcript: String,
         index: Int,
@@ -196,7 +196,7 @@ enum SummaryPrompt {
         )
     }
 
-    /// Étape « reduce » : synthétise les notes de toutes les tranches.
+    /// "Reduce" step: synthesizes the notes from all slices.
     static func reduce(
         notes: [String],
         context: SummaryContext,
@@ -233,7 +233,7 @@ enum SummaryPrompt {
         """
     }
 
-    /// Relance après un JSON invalide : on renvoie l'erreur au modèle.
+    /// Retry after invalid JSON: the error is sent back to the model.
     static func repair(
         previousOutput: String,
         error: String,
@@ -273,13 +273,13 @@ enum SummaryPrompt {
     }
 }
 
-/// Contexte injecté dans le prompt, au-delà du transcript lui-même.
+/// Context injected into the prompt, beyond the transcript itself.
 public struct SummaryContext: Sendable {
     public var date: Date
     public var knownAttendees: [String]
     public var vocabulary: [String]
-    /// Nom de la personne qui enregistre. Le transcript ne connaît que « Moi » pour
-    /// la piste micro ; sans ce nom, ses engagements restent anonymes.
+    /// Name of the person recording. The transcript only knows "Moi" for the mic
+    /// track; without this name, their commitments stay anonymous.
     public var userName: String?
 
     public init(

@@ -1,10 +1,11 @@
 import AudioCapture
 import Foundation
 
-/// Orchestre les deux transcripteurs et entretient le transcript fusionné.
+/// Orchestrates both transcribers and maintains the merged transcript.
 ///
-/// La séparation physique des pistes tient lieu de diarisation : tout ce qui vient du
-/// micro est l'utilisateur, tout ce qui vient du tap système est un participant distant.
+/// The physical separation of the tracks stands in for diarization: anything
+/// coming from the microphone is the user, anything coming from the system tap
+/// is a remote participant.
 public actor MeetingTranscriber {
     private let microphone: TrackTranscriber
     private let systemAudio: TrackTranscriber
@@ -40,7 +41,7 @@ public actor MeetingTranscriber {
     private func handle(_ event: TranscriptEvent) {
         switch event {
         case .finalized(let segment):
-            // Insertion ordonnée : les deux pistes arrivent de façon entrelacée.
+            // Ordered insertion: the two tracks arrive interleaved.
             let index = segments.firstIndex { $0.start > segment.start } ?? segments.endIndex
             segments.insert(segment, at: index)
             volatileByTrack[segment.track] = nil
@@ -60,11 +61,11 @@ public actor MeetingTranscriber {
         }
     }
 
-    /// Termine les analyses et renvoie le transcript définitif.
+    /// Ends the analyses and returns the final transcript.
     public func finish() async -> [TranscriptSegment] {
         await microphone.finish()
         await systemAudio.finish()
-        // Laisse les derniers résultats finalisés remonter avant de clore.
+        // Let the last finalized results come through before closing.
         try? await Task.sleep(for: .milliseconds(500))
         relays.forEach { $0.cancel() }
         relays.removeAll()
@@ -74,7 +75,7 @@ public actor MeetingTranscriber {
     }
 }
 
-/// Instantané du transcript envoyé à l'interface.
+/// Snapshot of the transcript sent to the UI.
 public struct TranscriptUpdate: Sendable {
     public let segments: [TranscriptSegment]
     public let volatile: [AudioTrack: String]
@@ -86,7 +87,7 @@ public struct TranscriptUpdate: Sendable {
 }
 
 public extension Array where Element == TranscriptSegment {
-    /// Rendu markdown du transcript, avec locuteur et horodatage.
+    /// Markdown rendering of the transcript, with speaker and timestamp.
     func markdown(title: String, date: Date) -> String {
         var output = "# \(title)\n\n"
         output += "Date : \(date.formatted(date: .abbreviated, time: .shortened))\n\n"

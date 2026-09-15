@@ -1,10 +1,11 @@
 import Foundation
 
-/// Langue de rédaction du compte rendu, indépendante de la langue parlée en réunion.
+/// Language the minutes are written in, independent of the language spoken in
+/// the meeting.
 ///
-/// Une équipe peut parler français et devoir livrer un compte rendu en anglais à sa
-/// direction. Le choix se fait avant l'enregistrement, parce qu'il conditionne le
-/// prompt, les libellés de sections et le format du titre.
+/// A team may speak French and need to deliver minutes in English to their
+/// leadership. The choice is made before recording, because it drives the
+/// prompt, the section labels and the title format.
 public enum SummaryLanguage: String, Codable, Sendable, CaseIterable, Identifiable {
     case french = "fr"
     case english = "en"
@@ -32,7 +33,7 @@ public enum SummaryLanguage: String, Codable, Sendable, CaseIterable, Identifiab
         }
     }
 
-    /// Choisit entre deux variantes rédactionnelles.
+    /// Picks between two authoring variants.
     public func pick(fr: String, en: String) -> String {
         switch self {
         case .french: fr

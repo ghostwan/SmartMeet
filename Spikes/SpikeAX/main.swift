@@ -2,26 +2,26 @@ import AppKit
 import ApplicationServices
 import Foundation
 
-// Spike de diagnostic, pas un composant de production : sert à vérifier si
-// Microsoft Teams expose dans son arbre d'accessibilité de quoi déduire qui parle
-// et le nom des participants, avant d'investir dans une vraie fonctionnalité.
+// Diagnostic spike, not a production component: checks whether Microsoft
+// Teams exposes enough in its accessibility tree to infer who's speaking and
+// participant names, before investing in a real feature.
 //
-// Usage : lance une vraie réunion Teams avec au moins deux personnes qui parlent
-// chacune leur tour, puis :
+// Usage: start a real Teams meeting with at least two people taking turns
+// speaking, then:
 //
 //     ./Scripts/bundle-spike.sh SpikeAX
 //     open build/SpikeAX.app --args 60 2 > /tmp/spikeax.log
-//     (rejoins la réunion, laisse plusieurs personnes parler à tour de rôle)
+//     (join the meeting, have several people speak in turn)
 //     cat /tmp/spikeax.log
 //
-// Ce qu'on cherche dans le log : un nœud dont le rôle/sous-rôle/valeur change
-// spécifiquement quand la personne qui parle change, à proximité d'un nœud portant
-// le nom d'un participant. Sans un tel signal stable, l'approche « accessibilité »
-// n'est pas exploitable et il faudra se rabattre sur autre chose.
+// What we're looking for in the log: a node whose role/subrole/value changes
+// specifically when the speaker changes, near a node carrying a participant's
+// name. Without such a stable signal, the "accessibility" approach isn't
+// usable and we'll have to fall back to something else.
 
 func ensureAccessibilityPermission() -> Bool {
-    // Chaîne littérale plutôt que la constante `kAXTrustedCheckOptionPrompt` : cette
-    // dernière est une variable C globale, jugée non concurrency-safe par Swift 6.
+    // Literal string rather than the `kAXTrustedCheckOptionPrompt` constant:
+    // the latter is a global C variable, deemed not concurrency-safe by Swift 6.
     let options: [String: Any] = ["AXTrustedCheckOptionPrompt": true]
     return AXIsProcessTrustedWithOptions(options as CFDictionary)
 }
@@ -75,9 +75,9 @@ func dump(
     let help = stringAttribute(element, kAXHelpAttribute as String)
     let identifier = stringAttribute(element, "AXIdentifier")
 
-    // Ne garde que les nœuds porteurs d'un texte : le reste (conteneurs de mise en
-    // page purs) n'aide pas à repérer un nom de participant ou un indicateur de
-    // parole, et gonflerait le dump de plusieurs milliers de lignes vides.
+    // Only keep nodes carrying text: the rest (pure layout containers) doesn't
+    // help spot a participant's name or a speaking indicator, and would bloat
+    // the dump with thousands of empty lines.
     let labels = [title, description, value, help, identifier].compactMap { $0 }
         .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     if !labels.isEmpty {
@@ -92,34 +92,34 @@ func dump(
     }
 }
 
-// MARK: - Entrée
+// MARK: - Entry point
 
 let arguments = CommandLine.arguments
 let duration = arguments.count > 1 ? (Double(arguments[1]) ?? 30) : 30
 let interval = arguments.count > 2 ? (Double(arguments[2]) ?? 2) : 2
 
 print("SmartMeet — SpikeAX")
-print("Diagnostic : dump périodique de l'arbre d'accessibilité de Microsoft Teams.")
-print("Lance une vraie réunion Teams AVANT de démarrer ce spike, avec au moins deux")
-print("participants qui parlent chacun leur tour, pour repérer ce qui change dans")
-print("le dump quand la personne qui parle change.")
+print("Diagnostic: periodic dump of Microsoft Teams' accessibility tree.")
+print("Start a real Teams meeting BEFORE running this spike, with at least two")
+print("participants taking turns speaking, to spot what changes in the dump")
+print("when the speaker changes.")
 print("")
 
 guard ensureAccessibilityPermission() else {
-    print("❌ Permission Accessibilité refusée ou pas encore accordée.")
-    print("   Réglages Système › Confidentialité et sécurité › Accessibilité › coche SpikeAX,")
-    print("   puis relance ce spike.")
+    print("❌ Accessibility permission denied or not yet granted.")
+    print("   System Settings › Privacy & Security › Accessibility › check SpikeAX,")
+    print("   then relaunch this spike.")
     exit(1)
 }
 
 guard let teams = findTeamsApp() else {
-    print("❌ Microsoft Teams introuvable parmi les applications en cours d'exécution.")
-    print("   Lance Teams et rejoins une réunion avant de démarrer ce spike.")
+    print("❌ Microsoft Teams not found among running applications.")
+    print("   Launch Teams and join a meeting before running this spike.")
     exit(1)
 }
 
-print("✅ Teams trouvé : pid \(teams.processIdentifier), bundle \(teams.bundleIdentifier ?? "?")")
-print("Durée : \(Int(duration)) s, intervalle : \(interval) s")
+print("✅ Teams found: pid \(teams.processIdentifier), bundle \(teams.bundleIdentifier ?? "?")")
+print("Duration: \(Int(duration)) s, interval: \(interval) s")
 print("")
 
 let appElement = AXUIElementCreateApplication(teams.processIdentifier)
@@ -137,13 +137,13 @@ while Date().timeIntervalSince(start) < duration {
     )
     let windows = (windowsResult == .success ? windowsValue as? [AXUIElement] : nil) ?? []
     if windows.isEmpty {
-        print("(aucune fenêtre trouvée — Teams a-t-il bien une fenêtre de réunion ouverte ?)")
+        print("(no window found — does Teams have a meeting window open?)")
     }
     for (index, window) in windows.enumerated() {
         var lines: [String] = []
         var nodeCount = 0
         dump(window, depth: 0, limits: DumpLimits(), nodeCount: &nodeCount, into: &lines)
-        print("--- fenêtre \(index) (\(nodeCount) nœuds visités, \(lines.count) avec texte) ---")
+        print("--- window \(index) (\(nodeCount) nodes visited, \(lines.count) with text) ---")
         for line in lines { print(line) }
     }
     print("")
@@ -151,4 +151,4 @@ while Date().timeIntervalSince(start) < duration {
     Thread.sleep(forTimeInterval: interval)
 }
 
-print("Terminé.")
+print("Done.")

@@ -7,7 +7,7 @@ import Transcription
 
 struct SettingsWindow: View {
     @Bindable var settings: AppSettings
-    /// Nécessaire pour résoudre la page de sprint, qui exige un appel réseau.
+    /// Needed to resolve the sprint page, which requires a network call.
     @Bindable var session: RecordingSession
     @State private var spaces: [ConfluenceSpaceSummary] = []
     @State private var issueTypes: [String] = []
@@ -40,13 +40,13 @@ struct SettingsWindow: View {
         .task { await loadLocales() }
     }
 
-    /// Construit la liste des langues à partir de ce que le framework `Speech`
-    /// sait effectivement transcrire sur cette machine, plutôt qu'une liste figée.
+    /// Builds the language list from what the `Speech` framework can
+    /// actually transcribe on this machine, rather than a fixed list.
     private func loadLocales() async {
         availableLocales = await SupportedTranscriptionLocales.all()
-        // Ancien format d'identifiant (ex. « fr-FR ») non présent tel quel dans la
-        // liste renvoyée par le framework (ex. « fr_FR ») : on migre silencieusement
-        // vers l'identifiant exact pour que le picker affiche la bonne sélection.
+        // Old identifier format (e.g. "fr-FR") not present as-is in the list
+        // returned by the framework (e.g. "fr_FR"): silently migrate to the
+        // exact identifier so the picker shows the correct selection.
         guard !availableLocales.contains(where: { $0.id == settings.localeIdentifier }) else { return }
         if let resolved = await SupportedTranscriptionLocales.resolvedIdentifier(for: settings.locale) {
             settings.localeIdentifier = resolved
@@ -151,6 +151,15 @@ struct SettingsWindow: View {
             case .opencode:
                 TextField("Modèle", text: $settings.opencodeModel)
                 Text("Passe par le binaire `opencode`, client Copilot authentifié. Aucune API publique ne permet d'utiliser un abonnement Copilot directement depuis une application tierce.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            case .copilotACP:
+                TextField("Modèle", text: $settings.copilotACPModel)
+                Text("Passe par le binaire `copilot --acp` (GitHub Copilot CLI), en protocole ACP plutôt qu'en sortie texte parsée : compte de tokens exact, sans dépendre d'`opencode`.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            case .appleOnDevice:
+                Text("Modèle embarqué d'Apple Intelligence : entièrement local, aucune donnée ne quitte la machine, aucune installation. Fenêtre de contexte réduite (~4096 tokens) : convient aux réunions courtes, moins bien aux réunions longues même découpées.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             case .ollama:
@@ -314,11 +323,11 @@ struct SettingsWindow: View {
         .padding()
     }
 
-    /// `NSWorkspace.shared.open(url)` respecte les liens universels : si l'app
-    /// desktop Notion est installée, elle intercepte tout lien `notion.so` — y
-    /// compris `/my-integrations`, une page qui n'existe que sur le web et que
-    /// l'app desktop ne sait pas afficher. On force donc explicitement le
-    /// navigateur par défaut plutôt que de laisser macOS router l'URL.
+    /// `NSWorkspace.shared.open(url)` honors universal links: if the Notion
+    /// desktop app is installed, it intercepts every `notion.so` link — including
+    /// `/my-integrations`, a page that only exists on the web and that the
+    /// desktop app can't display. So the default browser is forced explicitly
+    /// rather than letting macOS route the URL.
     private func openInBrowser(_ url: URL) {
         guard let browser = NSWorkspace.shared.urlForApplication(
             toOpen: URL(string: "https://apple.com")!
@@ -354,8 +363,8 @@ struct SettingsWindow: View {
         isVerifyingNotion = false
     }
 
-    /// La page de sprint se fixe une fois en début de sprint ; tous les types de
-    /// réunion qui la référencent suivent ensuite automatiquement.
+    /// The sprint page is set once at the start of a sprint; every meeting
+    /// type that references it then follows automatically.
     private var sprintSection: some View {
         Section("Page de sprint courante") {
             if let sprint = settings.sprintPage {

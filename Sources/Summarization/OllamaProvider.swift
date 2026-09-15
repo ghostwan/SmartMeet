@@ -1,11 +1,11 @@
 import Foundation
 
-/// Repli entièrement local. Aucune donnée ne quitte la machine — le bon choix pour
-/// une réunion sensible, au prix d'une qualité inférieure sur la résolution des dates
-/// relatives (mesuré en phase 0).
+/// Fully local fallback. No data leaves the machine — the right choice for a
+/// sensitive meeting, at the cost of lower quality on relative date resolution
+/// (measured in phase 0).
 ///
-/// On passe par l'API HTTP et non par `ollama run` : le CLI émet des séquences
-/// d'échappement ANSI et un bloc « Thinking » qui rendent la sortie inexploitable.
+/// We go through the HTTP API rather than `ollama run`: the CLI emits ANSI
+/// escape sequences and a "Thinking" block that make the output unusable.
 public struct OllamaProvider: SummaryProvider {
     public let model: String
     public let endpoint: URL
@@ -38,8 +38,8 @@ public struct OllamaProvider: SummaryProvider {
             "model": model,
             "prompt": prompt,
             "stream": false,
-            // `think: false` supprime le préambule de raisonnement des modèles récents,
-            // `format: json` contraint le décodage côté serveur.
+            // `think: false` suppresses recent models' reasoning preamble,
+            // `format: json` constrains decoding on the server side.
             "think": false,
             "format": "json",
             "options": ["temperature": 0.2, "num_ctx": 16384],
@@ -58,8 +58,8 @@ public struct OllamaProvider: SummaryProvider {
         else {
             throw SummaryProviderError.emptyResponse
         }
-        // Ollama ne fournit pas de coût (inférence locale) mais renvoie les comptes
-        // de tokens exacts dans la réponse non-streamée.
+        // Ollama doesn't provide a cost (local inference) but does return exact
+        // token counts in the non-streamed response.
         let usage = TokenUsage(
             input: payload["prompt_eval_count"] as? Int,
             output: payload["eval_count"] as? Int

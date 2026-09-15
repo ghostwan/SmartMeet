@@ -1,13 +1,13 @@
 import Foundation
 import Speech
 
-/// Expose les locales que le framework `Speech` sait transcrire nativement sur la
-/// machine, pour construire une liste dynamique plutôt qu'une liste figée dans
-/// l'interface — sans ça, une langue supportée par macOS mais oubliée du code reste
-/// invisible pour l'utilisateur.
+/// Exposes the locales that the `Speech` framework can natively transcribe on
+/// this machine, to build a dynamic list rather than one hardcoded in the UI —
+/// without this, a language supported by macOS but overlooked in the code
+/// would stay invisible to the user.
 public enum SupportedTranscriptionLocales {
-    /// Toutes les locales reconnues par `SpeechTranscriber`, triées par nom lisible
-    /// dans la locale de l'utilisateur (ex. « Chinois (Chine continentale) »).
+    /// All locales recognized by `SpeechTranscriber`, sorted by readable name
+    /// in the user's locale (e.g. "Chinese (Mainland China)").
     public static func all(displayIn uiLocale: Locale = .current) async -> [(id: String, label: String)] {
         let locales = await SpeechTranscriber.supportedLocales
         return locales
@@ -15,9 +15,9 @@ public enum SupportedTranscriptionLocales {
             .sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
     }
 
-    /// Identifiant exact reconnu par le framework pour une locale donnée, quand elle
-    /// existe (utilisé pour migrer un identifiant stocké dans un format différent,
-    /// ex. `fr-FR` vers `fr_FR`).
+    /// Exact identifier recognized by the framework for a given locale, when it
+    /// exists (used to migrate an identifier stored in a different format,
+    /// e.g. `fr-FR` to `fr_FR`).
     public static func resolvedIdentifier(for locale: Locale) async -> String? {
         await SpeechTranscriber.supportedLocale(equivalentTo: locale)?.identifier
     }

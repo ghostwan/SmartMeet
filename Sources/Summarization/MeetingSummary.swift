@@ -1,8 +1,8 @@
 import Foundation
 
-/// Compte rendu structuré produit par le LLM. C'est le contrat partagé par tous les
-/// providers : aucun ne dispose de sortie structurée native, le schéma est donc
-/// imposé par le prompt puis validé à la réception.
+/// Structured minutes produced by the LLM. This is the contract shared by every
+/// provider: none of them offers native structured output, so the schema is
+/// imposed through the prompt and then validated on receipt.
 public struct MeetingSummary: Codable, Sendable, Equatable {
     public var title: String
     public var tldr: String
@@ -13,21 +13,21 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
     public var openQuestions: [String]
     public var nextSteps: [String]
 
-    // Sections propres à certains types de réunion. Vides quand le modèle n'a pas
-    // été sollicité dessus.
+    // Sections specific to certain meeting types. Empty when the model wasn't
+    // asked about them.
 
-    /// Ce qui bloque l'équipe — un daily ouvre là-dessus.
+    /// What's blocking the team — a daily opens with this.
     public var blockers: [Blocker]
-    /// Un point par personne, pour un daily.
+    /// One entry per person, for a daily.
     public var participantReports: [ParticipantReport]
-    /// Ressenti nominatif, pour une rétrospective.
+    /// Named mood, for a retrospective.
     public var moods: [ParticipantMood]
-    /// Météo du sprint : icônes, justification et propos de chaque membre.
+    /// Sprint weather: icons, justification and comments from each member.
     public var sprintWeather: [SprintWeatherEntry]
-    /// Format 4L d'une rétrospective.
+    /// 4L format for a retrospective.
     public var fourL: FourL?
 
-    /// Type de réunion utilisé pour la génération, qui pilote aussi le rendu.
+    /// Meeting type used for generation, which also drives rendering.
     public var templateID: String?
 
     public init(
@@ -67,9 +67,9 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
         case blockers, participantReports, moods, sprintWeather, fourL, templateID
     }
 
-    /// Décodage tolérant : les modèles omettent régulièrement les sections vides.
-    /// Exiger toutes les clés faisait échouer la génération entière pour un `attendees`
-    /// manquant, alors que le compte rendu était par ailleurs exploitable.
+    /// Tolerant decoding: models regularly omit empty sections. Requiring every
+    /// key would fail the whole generation for a missing `attendees`, even
+    /// though the minutes were otherwise usable.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         title = try container.decodeIfPresent(String.self, forKey: .title) ?? ""
@@ -92,7 +92,7 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
         templateID = try container.decodeIfPresent(String.self, forKey: .templateID)
     }
 
-    /// Un obstacle signalé pendant la réunion.
+    /// A blocker reported during the meeting.
     public struct Blocker: Codable, Sendable, Equatable, Identifiable {
         public enum Severity: String, Codable, Sendable, CaseIterable {
             case blocking = "bloquant"
@@ -130,14 +130,14 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
             id = UUID()
             person = try container.decodeIfPresent(String.self, forKey: .person)
             description = try container.decodeIfPresent(String.self, forKey: .description) ?? ""
-            // Le modèle s'écarte parfois du vocabulaire imposé : on retombe sur
-            // « bloquant », le cas le plus coûteux à manquer.
+            // The model sometimes drifts from the imposed vocabulary: fall back to
+            // "bloquant", the costliest case to miss.
             let raw = try container.decodeIfPresent(String.self, forKey: .severity)?.lowercased()
             severity = raw.flatMap(Severity.init(rawValue:)) ?? .blocking
         }
     }
 
-    /// Le point d'une personne lors d'un daily.
+    /// One person's update during a daily.
     public struct ParticipantReport: Codable, Sendable, Equatable, Identifiable {
         public var id: UUID
         public var person: String
@@ -171,18 +171,18 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
         }
     }
 
-    /// Ce qu'une personne dit de son sprint, avec la météo qu'elle a choisie.
+    /// What a person says about their sprint, along with the weather icons they chose.
     ///
-    /// Partie nominative et volontairement peu résumée : elle est transmise au manager
-    /// de la personne, et doit refléter ce qu'elle a réellement exprimé.
+    /// Named section, deliberately not summarized: it's shared with the
+    /// person's manager, and must reflect what they actually expressed.
     public struct SprintWeatherEntry: Codable, Sendable, Equatable, Identifiable {
         public var id: UUID
         public var person: String
-        /// Un membre peut retenir plusieurs icônes pour un sprint contrasté.
+        /// A member may pick several icons for a mixed sprint.
         public var icons: [WeatherIcon]
-        /// Pourquoi ces icônes.
+        /// Why these icons.
         public var explanation: String
-        /// Ce que la personne raconte de son sprint.
+        /// What the person says about their sprint.
         public var sprintFeedback: [String]
 
         public init(
@@ -211,14 +211,14 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
             sprintFeedback = try container.decodeIfPresent(
                 [String].self, forKey: .sprintFeedback
             ) ?? []
-            // Le modèle rend du texte libre : on le ramène au vocabulaire contrôlé et
-            // on ignore ce qui n'est pas reconnu plutôt que d'échouer.
+            // The model returns free-form text: it's mapped back to the controlled
+            // vocabulary, ignoring anything unrecognized rather than failing.
             let raw = try container.decodeIfPresent([String].self, forKey: .icons) ?? []
             icons = raw.compactMap(WeatherIcon.parse).uniqued()
         }
     }
 
-    /// Rétrospective au format 4L, dépersonnalisée et regroupée par sujet.
+    /// 4L-format retrospective, depersonalized and grouped by topic.
     public struct FourL: Codable, Sendable, Equatable {
         public var liked: [Topic]
         public var learned: [Topic]
@@ -251,7 +251,7 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
             liked.isEmpty && learned.isEmpty && lacked.isEmpty && longedFor.isEmpty
         }
 
-        /// Les quatre axes dans l'ordre, avec leur libellé localisé.
+        /// The four axes in order, with their localized label.
         public func axes(in language: SummaryLanguage) -> [(label: String, symbol: String, topics: [Topic])] {
             [
                 (language.pick(fr: "Ce qui a plu", en: "Liked"), "hand.thumbsup", liked),
@@ -262,7 +262,7 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
         }
     }
 
-    /// Le ressenti d'une personne lors d'une rétrospective.
+    /// One person's mood during a retrospective.
     public struct ParticipantMood: Codable, Sendable, Equatable, Identifiable {
         public enum Tone: String, Codable, Sendable, CaseIterable {
             case positive = "positif"
@@ -334,10 +334,10 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
         }
     }
 
-    /// Nature du ticket qu'un action item deviendra dans Jira.
+    /// Nature of the ticket an action item will become in Jira.
     ///
-    /// Le modèle la propose à partir du contenu du compte rendu ; elle reste
-    /// modifiable dans la fenêtre de relecture avant publication.
+    /// Proposed by the model based on the minutes' content; it remains
+    /// editable in the review window before publication.
     public enum IssueType: String, Codable, Sendable, CaseIterable, Identifiable {
         case bug
         case task
@@ -370,10 +370,10 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
             }
         }
 
-        /// Nom du type d'issue Jira correspondant, tel qu'attendu par l'API.
-        /// Les projets Jira n'ont pas tous un type « Risk » : reste modifiable dans
-        /// les réglages ou directement dans la fenêtre de relecture si le projet
-        /// cible utilise un autre vocabulaire.
+        /// Name of the corresponding Jira issue type, as expected by the API.
+        /// Not every Jira project has a "Risk" type: stays editable in settings
+        /// or directly in the review window if the target project uses different
+        /// vocabulary.
         public var defaultJiraIssueTypeName: String {
             switch self {
             case .bug: "Bug"
@@ -385,8 +385,8 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
             }
         }
 
-        /// Reconnaît une valeur libre renvoyée par le modèle, en français ou en
-        /// anglais, avec quelques variantes orthographiques courantes.
+        /// Recognizes a free-form value returned by the model, in French or
+        /// English, with a few common spelling variants.
         public static func parse(_ raw: String?) -> IssueType? {
             guard let normalized = raw?
                 .lowercased()
@@ -404,9 +404,9 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
             }
         }
 
-        /// Classement de repli quand le modèle omet `issueType` ou renvoie une
-        /// valeur non reconnue : quelques mots-clés suffisent à orienter les cas
-        /// les plus fréquents, un `task` générique couvre le reste.
+        /// Fallback classification when the model omits `issueType` or returns
+        /// an unrecognized value: a few keywords are enough to steer the most
+        /// frequent cases, with a generic `task` covering the rest.
         public static func detect(from description: String) -> IssueType {
             let text = description
                 .lowercased()
@@ -435,12 +435,12 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
         public var owner: String?
         public var description: String
         public var dueDate: String?
-        /// Coché dans la fenêtre de relecture : seuls ces items deviennent des tickets.
+        /// Checked in the review window: only these items become tickets.
         public var isSelected: Bool
-        /// Nature du ticket à créer, proposée par le modèle et modifiable avant
-        /// publication.
+        /// Nature of the ticket to create, proposed by the model and editable
+        /// before publication.
         public var issueType: IssueType
-        /// Renseigné après publication.
+        /// Filled in after publication.
         public var jiraKey: String?
 
         public init(
@@ -480,11 +480,11 @@ public struct MeetingSummary: Codable, Sendable, Equatable {
 }
 
 public extension MeetingSummary {
-    /// Contrôle de cohérence minimal : un compte rendu sans titre signale une
-    /// génération ratée, même si le JSON est syntaxiquement valide.
+    /// Minimal consistency check: minutes without a title signal a failed
+    /// generation, even if the JSON is syntactically valid.
     ///
-    /// La synthèse n'est pas exigée : un daily met les points bloquants en tête et
-    /// relègue le `tldr` en fin, quand il le demande.
+    /// The summary isn't required: a daily puts blockers first and relegates
+    /// `tldr` to the end, when it requests one at all.
     var isUsable: Bool {
         guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         return !tldr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -498,7 +498,7 @@ public extension MeetingSummary {
             || !actionItems.isEmpty
     }
 
-    /// Vrai si la section contient quelque chose à afficher.
+    /// True if the section has something to display.
     func hasContent(_ section: SummarySection) -> Bool {
         switch section {
         case .tldr: !tldr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -515,7 +515,7 @@ public extension MeetingSummary {
         }
     }
 
-    /// Rendu markdown dans l'ordre des sections du type de réunion.
+    /// Markdown rendering in the order of the meeting type's sections.
     func markdown(
         template: MeetingTemplate = .generic,
         language: SummaryLanguage = .french
@@ -631,7 +631,7 @@ public extension MeetingSummary {
         return output
     }
 
-    /// Rendu avec le type de réunion enregistré dans le compte rendu.
+    /// Rendering using the meeting type stored in the minutes.
     var markdown: String {
         markdown(template: MeetingTemplate.resolve(id: templateID, in: []))
     }

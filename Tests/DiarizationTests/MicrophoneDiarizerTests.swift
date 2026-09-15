@@ -10,11 +10,11 @@ import Transcription
 struct MicrophoneDiarizerTests {
     private let sampleRate = 16_000.0
 
-    /// Écrit un fichier audio mono synthétique : une alternance de tons purs à des
-    /// fréquences distinctes, un par « locuteur ». Un ton pur n'est pas une voix
-    /// humaine, mais il a une fréquence fondamentale nette et stable, ce que
-    /// l'extracteur de hauteur peut mesurer sans ambiguïté — suffisant pour tester
-    /// la logique de clustering indépendamment de la qualité de l'estimation.
+    /// Writes a synthetic mono audio file: an alternation of pure tones at
+    /// distinct frequencies, one per "speaker". A pure tone isn't a human
+    /// voice, but it has a clean, stable fundamental frequency, which the
+    /// pitch extractor can measure unambiguously — enough to test the
+    /// clustering logic independently of the estimation quality.
     private func writeAudio(
         segmentDuration: TimeInterval, frequencies: [Double]
     ) throws -> URL {
@@ -54,7 +54,7 @@ struct MicrophoneDiarizerTests {
     @Test("Deux tons nettement différents sont séparés en deux locuteurs")
     func splitsTwoDistinctVoices() throws {
         let segmentDuration = 0.6
-        // Grave/aiguë alternées, comme deux personnes qui se répondent.
+        // Alternating low/high pitch, like two people responding to each other.
         let frequencies = [110.0, 220.0, 110.0, 220.0, 110.0, 220.0]
         let url = try writeAudio(segmentDuration: segmentDuration, frequencies: frequencies)
         defer { try? FileManager.default.removeItem(at: url) }
@@ -65,8 +65,8 @@ struct MicrophoneDiarizerTests {
         )
 
         let labels = try #require(mapping)
-        // Les segments graves (indices pairs) doivent tous porter la même étiquette,
-        // distincte de celle des segments aigus (indices impairs).
+        // The low-pitch segments (even indices) must all carry the same label,
+        // distinct from that of the high-pitch segments (odd indices).
         let lowLabels = Set([0, 2, 4].map { labels[segs[$0].id] })
         let highLabels = Set([1, 3, 5].map { labels[segs[$0].id] })
         #expect(lowLabels.count == 1)
@@ -77,7 +77,7 @@ struct MicrophoneDiarizerTests {
     @Test("Trois tons nettement différents sont séparés en trois locuteurs")
     func splitsThreeDistinctVoices() throws {
         let segmentDuration = 0.6
-        // Trois hauteurs bien espacées, comme trois personnes qui se relaient.
+        // Three well-spaced pitches, like three people taking turns.
         let frequencies = [100.0, 180.0, 300.0, 100.0, 180.0, 300.0, 100.0, 180.0, 300.0]
         let url = try writeAudio(segmentDuration: segmentDuration, frequencies: frequencies)
         defer { try? FileManager.default.removeItem(at: url) }
@@ -90,7 +90,7 @@ struct MicrophoneDiarizerTests {
         let labels = try #require(mapping)
         let distinctLabels = Set(labels.values)
         #expect(distinctLabels.count == 3)
-        // Chaque hauteur doit se retrouver seule dans son groupe.
+        // Each pitch must end up alone in its own group.
         for group in [[0, 3, 6], [1, 4, 7], [2, 5, 8]] {
             let groupLabels = Set(group.map { labels[segs[$0].id] })
             #expect(groupLabels.count == 1)

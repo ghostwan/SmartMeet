@@ -1,35 +1,35 @@
 import Accelerate
 import Foundation
 
-/// Traits acoustiques d'un segment, censés varier d'une personne à l'autre plus
-/// qu'au sein des propos d'une même personne.
+/// Acoustic features of a segment, expected to vary more between different
+/// people than within a single person's speech.
 ///
-/// Ce n'est **pas** une empreinte vocale au sens d'un modèle de reconnaissance du
-/// locuteur (type d-vector/x-vector) : juste deux grandeurs classiques du signal,
-/// bon marché à calculer sans dépendance externe ni modèle à embarquer.
-/// - `pitchHz` : fréquence fondamentale médiane, la grandeur la plus discriminante
-///   entre deux personnes (mais qui se recoupe entre deux voix proches) ;
-/// - `spectralCentroidHz` : « centre de gravité » du spectre, proxy grossier du
-///   timbre (une voix plus grave a un centroïde plus bas).
+/// This is **not** a voiceprint in the sense of a speaker recognition model
+/// (d-vector/x-vector type): just two classic signal quantities, cheap to
+/// compute with no external dependency or model to embed.
+/// - `pitchHz`: median fundamental frequency, the most discriminating quantity
+///   between two people (but which overlaps between two close voices);
+/// - `spectralCentroidHz`: "center of mass" of the spectrum, a coarse proxy for
+///   timbre (a deeper voice has a lower centroid).
 struct AcousticFeatures {
     var pitchHz: Double
     var spectralCentroidHz: Double
-    /// Vrai si suffisamment de fenêtres voisées ont pu être mesurées ; sinon les
-    /// valeurs ci-dessus sont peu fiables (segment court, chuchoté, ou bruité).
+    /// True if enough voiced windows could be measured; otherwise the values
+    /// above are unreliable (short, whispered, or noisy segment).
     var isReliable: Bool
 }
 
-/// Calcule les traits acoustiques d'une plage d'échantillons mono.
+/// Computes the acoustic features of a range of mono samples.
 enum AcousticFeatureExtractor {
     private static let windowSize = 1024
     private static let hopSize = 512
-    /// En dessous de ce seuil de corrélation normalisée, la fenêtre est jugée non
-    /// voisée (silence, souffle, consonne) et exclue de la médiane de hauteur.
+    /// Below this normalized correlation threshold, the window is deemed
+    /// unvoiced (silence, breath, consonant) and excluded from the pitch median.
     private static let voicingThreshold: Float = 0.35
 
     /// - Parameters:
-    ///   - samples: échantillons mono, déjà découpés sur la plage du segment.
-    ///   - sampleRate: fréquence d'échantillonnage des `samples`.
+    ///   - samples: mono samples, already trimmed to the segment's range.
+    ///   - sampleRate: sample rate of the `samples`.
     static func extract(samples: [Float], sampleRate: Double) -> AcousticFeatures {
         guard samples.count >= windowSize else {
             return AcousticFeatures(pitchHz: 0, spectralCentroidHz: 0, isReliable: false)
@@ -48,8 +48,9 @@ enum AcousticFeatureExtractor {
             offset += hopSize
         }
 
-        // Le centroïde se mesure même sur du bruit : toujours disponible dès qu'il y
-        // a au moins une fenêtre. La hauteur, elle, réclame des fenêtres voisées.
+        // The centroid can be measured even on noise: always available as soon
+        // as there's at least one window. Pitch, on the other hand, requires
+        // voiced windows.
         let medianCentroid = centroids.isEmpty ? 0 : median(centroids)
         guard pitches.count >= 2 else {
             return AcousticFeatures(
@@ -61,8 +62,8 @@ enum AcousticFeatureExtractor {
         )
     }
 
-    /// Détection de hauteur par autocorrélation : méthode classique, peu coûteuse,
-    /// suffisante pour distinguer deux voix nettement différentes.
+    /// Pitch detection via autocorrelation: classic, cheap method, sufficient
+    /// to distinguish two clearly different voices.
     private static func estimatePitch(window: [Float], sampleRate: Double) -> Double? {
         let minHz = 70.0
         let maxHz = 400.0
@@ -96,8 +97,8 @@ enum AcousticFeatureExtractor {
         return sampleRate / Double(bestLag)
     }
 
-    /// Moyenne des fréquences pondérée par l'amplitude du spectre : plus haute pour
-    /// un timbre clair, plus basse pour un timbre sombre.
+    /// Average of frequencies weighted by spectral amplitude: higher for a
+    /// bright timbre, lower for a dark timbre.
     private static func spectralCentroid(window: [Float], sampleRate: Double) -> Double {
         let log2n = vDSP_Length(log2(Double(window.count)))
         let fftSize = 1 << log2n

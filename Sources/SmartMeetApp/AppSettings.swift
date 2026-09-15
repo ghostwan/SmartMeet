@@ -4,13 +4,14 @@ import Notion
 import Observation
 import Summarization
 
-/// Réglages persistés dans `UserDefaults`, hors secrets qui vont au trousseau.
+/// Settings persisted in `UserDefaults`, excluding secrets which go to the keychain.
 @MainActor
 @Observable
 public final class AppSettings {
     private enum Key {
         static let provider = "summaryProvider"
         static let opencodeModel = "opencodeModel"
+        static let copilotACPModel = "copilotACPModel"
         static let ollamaModel = "ollamaModel"
         static let locale = "transcriptionLocale"
         static let vocabulary = "vocabulary"
@@ -45,86 +46,89 @@ public final class AppSettings {
     public var opencodeModel: String {
         didSet { defaults.set(opencodeModel, forKey: Key.opencodeModel) }
     }
+    public var copilotACPModel: String {
+        didSet { defaults.set(copilotACPModel, forKey: Key.copilotACPModel) }
+    }
     public var ollamaModel: String {
         didSet { defaults.set(ollamaModel, forKey: Key.ollamaModel) }
     }
     public var localeIdentifier: String {
         didSet { defaults.set(localeIdentifier, forKey: Key.locale) }
     }
-    /// Langues parlées récemment utilisées, la plus récente en tête — permet de les
-    /// remonter en haut du sélecteur plutôt que de les noyer dans la liste complète
-    /// des locales supportées par le framework.
+    /// Recently used spoken languages, most recent first — lets them surface
+    /// at the top of the picker instead of getting lost in the framework's
+    /// full list of supported locales.
     public var recentTranscriptionLocales: [String] {
         didSet { defaults.set(recentTranscriptionLocales, forKey: Key.recentTranscriptionLocales) }
     }
     public var vocabulary: [String] {
         didSet { defaults.set(vocabulary, forKey: Key.vocabulary) }
     }
-    /// Prénoms (et noms) des personnes avec qui l'utilisateur interagit régulièrement,
-    /// bien orthographiés. Séparé du vocabulaire métier pour rester lisible, mais
-    /// utilisé exactement pareil : injecté dans la reconnaissance vocale et dans le
-    /// prompt du compte rendu, pour qu'un prénom mal reconnu ou mal orthographié par
-    /// le modèle se corrige de lui-même.
+    /// First (and last) names of people the user regularly interacts with,
+    /// spelled correctly. Kept separate from the domain vocabulary to stay
+    /// readable, but used exactly the same way: injected into speech
+    /// recognition and into the minutes prompt, so that a name misheard or
+    /// misspelled by the model corrects itself.
     public var knownPeople: [String] {
         didSet { defaults.set(knownPeople, forKey: Key.knownPeople) }
     }
-    /// Nom de l'utilisateur : le transcript ne le connaît que sous le libellé « Moi ».
+    /// User's name: the transcript only knows them by the label "Moi" ("Me").
     public var userName: String {
         didSet { defaults.set(userName, forKey: Key.userName) }
     }
-    /// Langue proposée par défaut pour le compte rendu.
+    /// Default language proposed for the minutes.
     public var defaultOutputLanguage: SummaryLanguage {
         didSet { defaults.set(defaultOutputLanguage.rawValue, forKey: Key.outputLanguage) }
     }
-    /// Propose d'enregistrer quand une réunion est détectée.
+    /// Suggests recording when a meeting is detected.
     public var detectMeetings: Bool {
         didSet { defaults.set(detectMeetings, forKey: Key.detectMeetings) }
     }
-    /// Démarre sans demander. Volontairement désactivé par défaut : enregistrer des
-    /// personnes à leur insu n'est pas un comportement qu'on active pour elles.
+    /// Starts without asking. Deliberately off by default: recording people
+    /// without their knowledge isn't a behavior you turn on on their behalf.
     public var autoStartOnDetection: Bool {
         didSet { defaults.set(autoStartOnDetection, forKey: Key.autoStartOnDetection) }
     }
-    /// Propose (jamais n'impose) d'arrêter et de générer le compte rendu quand
-    /// l'application de visio suivie ne capte plus le micro depuis un moment.
-    /// Activé par défaut : ce n'est qu'une notification, symétrique à
-    /// `detectMeetings` — contrairement à `autoStartOnDetection`, rien n'est arrêté
-    /// sans que l'utilisateur ne le demande explicitement en tapant l'action.
+    /// Suggests (never forces) stopping and generating the minutes when the
+    /// tracked video-conferencing app has stopped picking up the microphone
+    /// for a while. On by default: it's just a notification, symmetric to
+    /// `detectMeetings` — unlike `autoStartOnDetection`, nothing is stopped
+    /// without the user explicitly requesting it by tapping the action.
     public var detectMeetingEnd: Bool {
         didSet { defaults.set(detectMeetingEnd, forKey: Key.detectMeetingEnd) }
     }
     public var autoSummarize: Bool {
         didSet { defaults.set(autoSummarize, forKey: Key.autoSummarize) }
     }
-    /// Publie sur Confluence sans relecture. Désactivé par défaut : le compte rendu
-    /// est généré par un modèle, il mérite un coup d'œil avant d'atterrir sur un
-    /// espace d'équipe.
+    /// Publishes to Confluence without review. Off by default: the minutes
+    /// are generated by a model, they deserve a look before landing on a
+    /// team space.
     public var autoPublish: Bool {
         didSet { defaults.set(autoPublish, forKey: Key.autoPublish) }
     }
-    /// Crée aussi les tickets Jira lors d'une publication automatique.
+    /// Also creates Jira tickets during an automatic publication.
     public var autoCreateJiraIssues: Bool {
         didSet { defaults.set(autoCreateJiraIssues, forKey: Key.autoCreateJiraIssues) }
     }
     public var useCalendar: Bool {
         didSet { defaults.set(useCalendar, forKey: Key.useCalendar) }
     }
-    /// Diarisation expérimentale de la piste micro : distingue jusqu'à deux
-    /// locuteurs partageant le même micro (réunion en présentiel), à partir de
-    /// traits acoustiques classiques — pas un modèle de reconnaissance vocale.
-    /// Désactivé par défaut : la séparation peut se tromper, notamment si les deux
-    /// voix se ressemblent.
+    /// Experimental microphone-track diarization: distinguishes up to two
+    /// speakers sharing the same microphone (in-person meeting), based on
+    /// classic acoustic features — not a speech-recognition model. Off by
+    /// default: the separation can get it wrong, especially if the two
+    /// voices sound alike.
     public var diarizeMicrophoneTrack: Bool {
         didSet { defaults.set(diarizeMicrophoneTrack, forKey: Key.diarizeMicrophoneTrack) }
     }
-    /// Types de réunion créés par l'utilisateur, en plus des modèles fournis.
+    /// Meeting types created by the user, in addition to the built-in templates.
     public var customTemplates: [MeetingTemplate] {
         didSet {
             guard let data = try? JSONEncoder().encode(customTemplates) else { return }
             defaults.set(data, forKey: Key.customTemplates)
         }
     }
-    /// Type proposé par défaut au démarrage d'un enregistrement.
+    /// Template proposed by default when starting a recording.
     public var defaultTemplateID: String {
         didSet { defaults.set(defaultTemplateID, forKey: Key.defaultTemplate) }
     }
@@ -136,7 +140,7 @@ public final class AppSettings {
         }
     }
 
-    /// Jeton d'API : lu et écrit dans le trousseau, jamais dans les préférences.
+    /// API token: read from and written to the keychain, never to the preferences.
     public var atlassianToken: String {
         didSet { keychain.write(atlassianToken, account: Self.tokenAccount) }
     }
@@ -148,15 +152,15 @@ public final class AppSettings {
         }
     }
 
-    /// Jeton d'intégration Notion : trousseau, jamais les préférences.
+    /// Notion integration token: keychain, never the preferences.
     public var notionToken: String {
         didSet { notionKeychain.write(notionToken, account: Self.notionTokenAccount) }
     }
 
-    /// Types de réunion (fournis ou personnalisés) volontairement masqués de la
-    /// liste de sélection. Pas supprimés — juste absents de `allTemplates` — pour
-    /// rester réversible et ne rien casser dans l'historique des réunions déjà
-    /// enregistrées avec ce type.
+    /// Meeting types (built-in or custom) deliberately hidden from the
+    /// selection list. Not deleted — just absent from `allTemplates` — to
+    /// stay reversible and not break anything in the history of meetings
+    /// already recorded with this type.
     public var disabledTemplateIDs: Set<String> {
         didSet {
             defaults.set(Array(disabledTemplateIDs), forKey: Key.disabledTemplateIDs)
@@ -168,6 +172,7 @@ public final class AppSettings {
             rawValue: defaults.string(forKey: Key.provider) ?? ""
         ) ?? .opencode
         opencodeModel = defaults.string(forKey: Key.opencodeModel) ?? "github-copilot/claude-sonnet-5"
+        copilotACPModel = defaults.string(forKey: Key.copilotACPModel) ?? "claude-sonnet-5"
         ollamaModel = defaults.string(forKey: Key.ollamaModel) ?? "gemma4"
         localeIdentifier = defaults.string(forKey: Key.locale) ?? "fr-FR"
         recentTranscriptionLocales = defaults.stringArray(forKey: Key.recentTranscriptionLocales) ?? []
@@ -228,13 +233,16 @@ public final class AppSettings {
 
     public var locale: Locale { Locale(identifier: localeIdentifier) }
 
-    /// Vocabulaire métier et prénoms combinés : c'est ce qui doit être injecté dans
-    /// la reconnaissance vocale et dans le prompt, pas seulement l'un ou l'autre.
+    /// Domain vocabulary and names combined: this is what needs to be
+    /// injected into speech recognition and into the prompt, not just one
+    /// or the other.
     public var contextualVocabulary: [String] { vocabulary + knownPeople }
 
     public func makeProvider() -> any SummaryProvider {
         switch providerKind {
         case .opencode: OpencodeProvider(model: opencodeModel)
+        case .copilotACP: CopilotACPProvider(model: copilotACPModel)
+        case .appleOnDevice: AppleFoundationModelProvider()
         case .ollama: OllamaProvider(model: ollamaModel)
         }
     }
@@ -247,22 +255,22 @@ public final class AppSettings {
         !notionToken.isEmpty
     }
 
-    /// Page de sprint courante, parent commun des réunions du sprint.
+    /// Current sprint page, common parent of the sprint's meetings.
     public var sprintPage: SprintPage? {
         get { atlassian.sprintPage }
         set { atlassian.sprintPage = newValue }
     }
 
-    /// Vrai si au moins un type de réunion s'appuie sur la page de sprint.
+    /// True if at least one meeting type relies on the sprint page.
     public var usesSprintPage: Bool {
         allTemplates.contains { $0.parent.isSprintPage }
     }
 
-    /// Modèles fournis puis modèles personnalisés, dans l'ordre d'affichage. Un type
-    /// fourni édité est représenté par sa version en vigueur (l'éventuelle
-    /// surcharge dans `customTemplates`), pas la version d'origine codée en dur.
-    /// Les types masqués (`disabledTemplateIDs`) n'apparaissent pas ici : c'est la
-    /// liste proposée à la sélection, pas l'inventaire complet.
+    /// Built-in templates then custom templates, in display order. An edited
+    /// built-in type is represented by its current version (the possible
+    /// override in `customTemplates`), not the original hardcoded version.
+    /// Hidden types (`disabledTemplateIDs`) don't appear here: this is the
+    /// list offered for selection, not the full inventory.
     public var allTemplates: [MeetingTemplate] {
         let effectiveBuiltIns = MeetingTemplate.builtIns.map { template(id: $0.id) }
         let trueCustoms = customTemplates.filter { custom in
@@ -271,8 +279,8 @@ public final class AppSettings {
         return (effectiveBuiltIns + trueCustoms).filter { !disabledTemplateIDs.contains($0.id) }
     }
 
-    /// Tous les types, y compris masqués — pour l'écran de réglages qui doit
-    /// permettre de les réafficher.
+    /// All types, including hidden ones — for the settings screen which
+    /// must allow showing them again.
     public var allTemplatesIncludingDisabled: [MeetingTemplate] {
         let effectiveBuiltIns = MeetingTemplate.builtIns.map { template(id: $0.id) }
         let trueCustoms = customTemplates.filter { custom in
@@ -285,9 +293,9 @@ public final class AppSettings {
         !disabledTemplateIDs.contains(template.id)
     }
 
-    /// Masque ou réaffiche un type dans la liste de sélection. Si le type masqué
-    /// était le type par défaut, on retombe sur le générique pour ne pas proposer un
-    /// type introuvable au prochain démarrage.
+    /// Hides or shows a type again in the selection list. If the hidden type
+    /// was the default type, falls back to the generic one so as not to
+    /// propose an unreachable type on the next startup.
     public func setTemplateEnabled(_ enabled: Bool, for template: MeetingTemplate) {
         if enabled {
             disabledTemplateIDs.remove(template.id)
@@ -301,18 +309,18 @@ public final class AppSettings {
         MeetingTemplate.resolve(id: id, in: customTemplates)
     }
 
-    /// Fait remonter une langue parlée en tête des « récentes », pour qu'elle
-    /// apparaisse en haut du sélecteur la prochaine fois. Appelé quand la langue est
-    /// réellement utilisée (début d'enregistrement), pas à chaque changement de
-    /// sélection dans le picker.
+    /// Bumps a spoken language to the front of the "recent" list, so it
+    /// appears at the top of the picker next time. Called when the language
+    /// is actually used (start of recording), not on every selection change
+    /// in the picker.
     public func recordTranscriptionLocaleUsed(_ identifier: String) {
         var recents = recentTranscriptionLocales.filter { $0 != identifier }
         recents.insert(identifier, at: 0)
         recentTranscriptionLocales = Array(recents.prefix(5))
     }
 
-    /// Duplique un modèle pour créer une variante indépendante, avec un nouvel
-    /// identifiant.
+    /// Duplicates a template to create an independent variant, with a new
+    /// identifier.
     public func duplicate(_ template: MeetingTemplate) -> MeetingTemplate {
         var copy = template
         copy.id = UUID().uuidString
@@ -322,8 +330,8 @@ public final class AppSettings {
         return copy
     }
 
-    /// Enregistre un modèle, qu'il soit personnalisé ou une édition d'un type fourni :
-    /// dans les deux cas c'est une surcharge stockée par identifiant.
+    /// Saves a template, whether it's custom or an edit of a built-in type:
+    /// in both cases it's an override stored by identifier.
     public func upsert(_ template: MeetingTemplate) {
         if let index = customTemplates.firstIndex(where: { $0.id == template.id }) {
             customTemplates[index] = template
@@ -332,8 +340,8 @@ public final class AppSettings {
         }
     }
 
-    /// Pour un type personnalisé, suppression définitive. Pour un type fourni édité,
-    /// retire la surcharge et fait donc revenir à la version d'origine.
+    /// For a custom type, permanent deletion. For an edited built-in type,
+    /// removes the override and thus reverts to the original version.
     public func remove(_ template: MeetingTemplate) {
         customTemplates.removeAll { $0.id == template.id }
         if defaultTemplateID == template.id { defaultTemplateID = MeetingTemplate.generic.id }

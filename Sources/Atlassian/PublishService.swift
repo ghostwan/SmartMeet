@@ -8,18 +8,18 @@ public struct PublicationResult: Sendable, Equatable {
     public let spaceKey: String
     public let issues: [String: String]
     public let failures: [String]
-    /// Lien Jira listant tous les tickets créés lors de cette publication, une fois
-    /// qu'il y en a au moins un.
+    /// Jira link listing every ticket created during this publication, once
+    /// there's at least one.
     public let jiraSearchURL: URL?
 }
 
-/// Espace et page parente effectivement retenus, une fois le type de réunion et les
-/// réglages combinés.
+/// Space and parent page actually chosen, once the meeting type and settings
+/// have been combined.
 public struct ResolvedDestination: Sendable, Equatable {
     public let spaceKey: String
     public let spaceID: String
     public let parentPageID: String
-    /// Description lisible, affichée avant publication.
+    /// Human-readable description, shown before publication.
     public let description: String
 }
 
@@ -31,11 +31,11 @@ public enum PublishStep: Sendable, Equatable {
     case done
 }
 
-/// Enchaîne la publication Confluence puis Jira.
+/// Chains the Confluence publication followed by Jira.
 ///
-/// Ordre retenu : page d'abord (sans les clés), tickets ensuite avec un lien vers
-/// elle, puis réécriture de la page avec les clés. C'est le seul ordre qui donne un
-/// lien dans les deux sens ; l'inverse laisserait les tickets orphelins.
+/// Order chosen: page first (without the keys), tickets next with a link back
+/// to it, then the page is rewritten with the keys. This is the only order
+/// that produces a two-way link; the reverse would leave the tickets orphaned.
 public struct PublishService: Sendable {
     private let configuration: AtlassianConfiguration
     private let confluence: ConfluenceClient
@@ -47,17 +47,18 @@ public struct PublishService: Sendable {
         self.jira = JiraClient(configuration: configuration, token: token)
     }
 
-    /// Combine type de réunion et réglages pour déterminer où publier.
+    /// Combines the meeting type and settings to determine where to publish.
     ///
-    /// Priorité : espace du type de réunion, sinon espace par défaut. Pour le parent,
-    /// une page de sprint non définie retombe sur la page d'accueil de l'espace
-    /// plutôt que d'échouer — mieux vaut un compte rendu mal rangé que perdu.
+    /// Priority: the meeting type's space, falling back to the default space.
+    /// For the parent, an unset sprint page falls back to the space's home
+    /// page rather than failing outright — a poorly filed report beats a lost
+    /// one.
     public func resolveDestination(for template: MeetingTemplate) async throws -> ResolvedDestination {
         let sprintPage = configuration.sprintPage
 
         let spaceKey: String = if template.parent.isSprintPage, let sprintPage {
-            // La page de sprint dicte son propre espace : publier ailleurs créerait
-            // une page orpheline, hors de l'arborescence du sprint.
+            // The sprint page dictates its own space: publishing elsewhere would
+            // create an orphan page, outside the sprint's tree.
             sprintPage.spaceKey
         } else if !template.spaceKeyOverride.isEmpty {
             template.spaceKeyOverride
@@ -73,9 +74,9 @@ public struct PublishService: Sendable {
         switch template.parent {
         case .sprintPage:
             if let sprintPage {
-                // La page peut avoir été supprimée côté Confluence depuis qu'elle a été
-                // retenue ; mieux vaut échouer clairement ici qu'à la création de page,
-                // avec un message qui pointe vers les réglages.
+                // The page may have been deleted on Confluence's side since it was
+                // recorded; better to fail clearly here than at page creation,
+                // with a message that points to the settings.
                 _ = try await confluence.page(id: sprintPage.id)
                 return ResolvedDestination(
                     spaceKey: spaceKey,
@@ -119,21 +120,21 @@ public struct PublishService: Sendable {
         template: MeetingTemplate = .generic,
         meetingDate: Date = .now,
         language: SummaryLanguage = .french,
-        /// Destination choisie pour cette publication précise (typiquement demandée
-        /// à l'utilisateur juste avant de créer les tickets). `nil` retombe sur les
-        /// réglages globaux.
+        /// Destination chosen for this specific publication (typically asked of
+        /// the user right before creating the tickets). `nil` falls back to the
+        /// global settings.
         jiraProjectKey: String? = nil,
         jiraParentKey: String? = nil,
-        /// Traduit un texte vers l'anglais avant de créer un ticket : les tickets
-        /// Jira sont toujours en anglais, indépendamment de la langue du compte
-        /// rendu. `nil` laisse le texte tel quel.
+        /// Translates a text into English before creating a ticket: Jira tickets
+        /// are always in English, regardless of the meeting minutes' language.
+        /// `nil` leaves the text as is.
         translateForJira: (@Sendable (String) async throws -> String)? = nil,
-        /// Nom de l'interlocuteur d'un one-to-one, substitué au jeton `{participant}`
-        /// du titre. Ignoré pour tout autre type.
+        /// Name of the one-to-one's counterpart, substituted for the
+        /// `{participant}` token in the title. Ignored for any other type.
         participantName: String = "",
-        /// E-mail de l'interlocuteur d'un one-to-one (`template.requiresParticipant`
-        /// vrai). Ignoré pour tout autre type. Sert à restreindre la page publiée à
-        /// l'utilisateur et cette seule personne.
+        /// E-mail of the one-to-one's counterpart (`template.requiresParticipant`
+        /// true). Ignored for any other type. Used to restrict the published
+        /// page to the user and that one person only.
         restrictToParticipantEmail: String? = nil,
         onStep: @Sendable (PublishStep) -> Void = { _ in }
     ) async throws -> PublicationResult {
@@ -233,7 +234,7 @@ public struct PublishService: Sendable {
                     enriched.actionItems[index].jiraKey = issue.key
                     createdKeys[item.id.uuidString] = issue.key
                 } catch {
-                    // Un ticket refusé ne doit pas faire perdre la page déjà publiée.
+                    // A rejected ticket must not cost the already-published page.
                     failures.append(String(
                         format: NSLocalizedString(
                             "« %@ » — %@", bundle: .main, value: "« %@ » — %@", comment: ""
@@ -271,7 +272,7 @@ public struct PublishService: Sendable {
         )
     }
 
-    /// Lien Jira listant tous les tickets créés, affichable et partageable tel quel.
+    /// Jira link listing every created ticket, displayable and shareable as is.
     private static func searchURL<S: Sequence>(for keys: S, baseURL: URL?) -> URL? where S.Element == String {
         let keys = Array(keys)
         guard !keys.isEmpty, let baseURL else { return nil }
@@ -283,12 +284,12 @@ public struct PublishService: Sendable {
         return components?.url
     }
 
-    /// Confluence refuse deux pages de même titre dans un espace.
+    /// Confluence refuses two pages with the same title in a space.
     ///
-    /// Les titres sont désormais déterministes (« Daily Lundi 7 septembre 2026 ») :
-    /// republier après correction, ou tenir deux réunions du même type le même jour,
-    /// se heurte à ce refus. Plutôt que d'échouer et de perdre le compte rendu, on
-    /// suffixe le titre.
+    /// Titles are now deterministic ("Daily Monday September 7, 2026"):
+    /// republishing after a correction, or holding two meetings of the same
+    /// type on the same day, runs into this rejection. Rather than failing and
+    /// losing the meeting minutes, the title is suffixed.
     private func createPageResolvingTitleConflict(
         baseTitle: String,
         storageBody: String,

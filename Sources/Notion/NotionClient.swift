@@ -42,9 +42,9 @@ public enum NotionError: LocalizedError {
     }
 }
 
-/// Client minimal pour l'API Notion (une intégration interne, un jeton, une page
-/// parente). Pas de gestion de base de données Notion : uniquement des pages, en
-/// enfant d'une page déjà partagée avec l'intégration.
+/// Minimal client for the Notion API (an internal integration, a token, a
+/// parent page). No Notion database handling: only pages, as children of a
+/// page already shared with the integration.
 public struct NotionClient: Sendable {
     private let configuration: NotionConfiguration
     private let token: String
@@ -56,12 +56,12 @@ public struct NotionClient: Sendable {
         self.token = token
     }
 
-    /// Crée une page sous la page parente configurée, avec le markdown converti en
-    /// blocs Notion. Sans page parente configurée, la page est créée à la racine de
-    /// l'espace connecté à l'intégration (les « pages privées » du point de vue de
-    /// l'intégration — visibles selon les droits accordés à celle-ci). Notion limite
-    /// la création initiale à 100 blocs enfants ; le reste est ajouté par appels
-    /// `PATCH` successifs.
+    /// Creates a page under the configured parent page, with the markdown
+    /// converted to Notion blocks. Without a configured parent page, the page
+    /// is created at the root of the space connected to the integration (the
+    /// integration's "private pages" — visible depending on the rights
+    /// granted to it). Notion limits the initial creation to 100 child
+    /// blocks; the rest is added via successive `PATCH` calls.
     public func createPage(title: String, markdown: String) async throws -> NotionPage {
         guard !token.isEmpty else { throw NotionError.missingToken }
 
@@ -97,10 +97,10 @@ public struct NotionClient: Sendable {
         return NotionPage(id: id, url: url)
     }
 
-    /// Vérifie que le jeton est valide — et, si une page parente est configurée,
-    /// qu'elle est bien accessible à l'intégration. Sans page parente, seul le
-    /// jeton est vérifié : la création se fera à la racine de l'espace. Utilisé pour
-    /// valider les réglages sans rien créer.
+    /// Verifies that the token is valid — and, if a parent page is configured,
+    /// that it's accessible to the integration. Without a parent page, only
+    /// the token is verified: creation will happen at the root of the space.
+    /// Used to validate the settings without creating anything.
     public func verifyAccess() async throws {
         guard !token.isEmpty else { throw NotionError.missingToken }
         if configuration.isConfigured {

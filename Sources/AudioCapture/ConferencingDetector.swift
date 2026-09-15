@@ -1,13 +1,13 @@
 import CoreAudio
 import Foundation
 
-/// Application de visioconférence identifiée comme active.
+/// Video conferencing application detected as currently active.
 public struct ConferencingApp: Sendable, Equatable, Identifiable {
     public let bundleID: String
     public let name: String
-    /// Vrai pour les applications dédiées à la visioconférence. Un navigateur qui
-    /// capte le micro est un indice plus faible : ce peut être une réunion web comme
-    /// un simple test de micro.
+    /// True for applications dedicated to video conferencing. A browser that
+    /// captures the microphone is a weaker signal: it could be a web meeting as
+    /// much as a simple mic test.
     public let isDedicated: Bool
 
     public var id: String { bundleID }
@@ -36,16 +36,16 @@ public struct ConferencingApp: Sendable, Equatable, Identifiable {
     ]
 }
 
-/// Repère les applications de visioconférence en train de capter le micro.
+/// Detects video conferencing applications currently capturing the microphone.
 ///
-/// Le calendrier seul ne suffit pas : une réunion peut être annulée, décalée, ou
-/// tenue sans invitation. Le micro qui s'allume dans Teams est le signal le plus
-/// franc qu'une réunion a réellement commencé.
+/// The calendar alone isn't enough: a meeting can be cancelled, rescheduled, or
+/// held without an invite. The microphone lighting up in Teams is the most
+/// straightforward signal that a meeting has actually started.
 public enum ConferencingDetector {
-    /// Applications de visioconférence captant actuellement l'entrée audio.
+    /// Video conferencing applications currently capturing audio input.
     ///
-    /// SmartMeet s'exclut lui-même : il capte le micro pendant un enregistrement, et
-    /// se prendrait sinon pour une réunion en cours.
+    /// SmartMeet excludes itself: it captures the microphone during a recording,
+    /// and would otherwise mistake itself for an ongoing meeting.
     public static func activeApps() -> [ConferencingApp] {
         let ownBundleID = Bundle.main.bundleIdentifier
         let detected: [ConferencingApp] = processObjectIDs().compactMap { objectID in
@@ -58,13 +58,13 @@ public enum ConferencingDetector {
                 bundleID: bundleID, name: known.name, isDedicated: known.dedicated
             )
         }
-        // Une même application expose plusieurs objets audio : une entrée suffit.
+        // The same application can expose several audio objects: one match is enough.
         return detected.reduce(into: [ConferencingApp]()) { result, app in
             if !result.contains(where: { $0.name == app.name }) { result.append(app) }
         }
     }
 
-    /// Tous les process captant l'entrée audio, connus ou non. Sert au diagnostic.
+    /// All processes capturing audio input, known or not. Used for diagnostics.
     public static func allInputCapturingBundleIDs() -> [String] {
         processObjectIDs()
             .filter(isRunningInput)

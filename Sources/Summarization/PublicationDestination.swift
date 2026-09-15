@@ -1,13 +1,13 @@
 import Foundation
 
-/// Où publier le compte rendu, relativement à l'espace Confluence retenu.
+/// Where to publish the minutes, relative to the chosen Confluence space.
 public enum ParentPageReference: Codable, Sendable, Equatable, Hashable {
-    /// Page d'accueil de l'espace.
+    /// The space's home page.
     case spaceHome
-    /// Page fixe, désignée par son identifiant Confluence.
+    /// A fixed page, identified by its Confluence ID.
     case page(id: String)
-    /// Page de sprint courante, définie une fois en début de sprint dans les réglages.
-    /// Toutes les réunions rattachées au sprint suivent automatiquement.
+    /// The current sprint page, set once at the start of the sprint in settings.
+    /// Every meeting attached to the sprint follows it automatically.
     case sprintPage
 
     public var isSprintPage: Bool {
@@ -21,13 +21,13 @@ public enum ParentPageReference: Codable, Sendable, Equatable, Hashable {
     }
 }
 
-/// Composition du titre de la page publiée.
+/// Composition of the published page's title.
 ///
-/// Le titre produit par le modèle est trop variable pour servir de convention de
-/// nommage : deux dailys consécutifs sortent avec des libellés différents, ce qui rend
-/// l'arborescence Confluence illisible. Le format reprend donc la main dessus.
+/// The title produced by the model is too variable to serve as a naming
+/// convention: two consecutive dailys come out with different labels, which
+/// makes the Confluence tree hard to read. The format takes over control of it.
 public struct TitleFormat: Sendable {
-    /// Jetons reconnus, documentés dans l'interface des réglages.
+    /// Recognized tokens, documented in the settings UI.
     public static let placeholders: [(token: String, description: String)] = [
         ("{summary}", "titre proposé par le modèle"),
         ("{type}", "nom du type de réunion"),
@@ -67,7 +67,7 @@ public struct TitleFormat: Sendable {
             result = result.replacingOccurrences(of: token, with: value)
         }
 
-        // Un `{summary}` vide laisse des séparateurs orphelins en début ou fin de titre.
+        // An empty `{summary}` leaves orphaned separators at the start or end of the title.
         result = result
             .replacingOccurrences(of: #"\s*[—–-]\s*$"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: #"^\s*[—–-]\s*"#, with: "", options: .regularExpression)
@@ -79,8 +79,8 @@ public struct TitleFormat: Sendable {
 }
 
 extension String {
-    /// Les noms de jours sont en minuscules en français ; on ne capitalise que
-    /// l'initiale, sans toucher au reste.
+    /// Day names are lowercase in French; only the initial is capitalized,
+    /// leaving the rest untouched.
     var capitalizedFirst: String {
         guard let first else { return self }
         return first.uppercased() + dropFirst()

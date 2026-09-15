@@ -40,8 +40,8 @@ struct CrossTalkFilterTests {
 
     @Test("Détecte l'écho même quand la piste système regroupe plusieurs phrases")
     func detectsEchoInsideLongerSegment() {
-        // Cas réel : la piste système fusionne deux phrases, la piste micro les sépare.
-        // Un indice de Jaccard échouerait ici, la mesure de recouvrement non.
+        // Real-world case: the system track merges two sentences, the mic track
+        // separates them. A Jaccard index would fail here, the overlap measure won't.
         let long = "Bonjour à tous je propose qu'on commence par la migration. "
             + "D'accord j'ai terminé l'intégration il reste la validation des traductions pour vendredi"
         let segments = [

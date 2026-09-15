@@ -15,9 +15,14 @@ Requirements: macOS 26+, Apple Silicon, Xcode 26, Swift Package Manager.
 
 ## Language and style
 
-- **Commits and code comments are written in English.** Identifiers (types,
-  functions, variables) are English by Swift convention, and so are comments,
-  docs and commit messages.
+- **Everything is written in English: commits, code comments, doc comments,
+  and shell script comments — no exception, no French.** This mirrors
+  `README.md`, which is English-only. Identifiers (types, functions,
+  variables) are English by Swift convention, and so is every comment,
+  including in `Scripts/*.sh`. User-facing strings are the only exception:
+  they're localized (`Resources/*.lproj/Localizable.strings`), and the base
+  value passed to `NSLocalizedString` may legitimately be French since it's
+  the source language for translation — that's content, not a comment.
 - Comments explain the **why**, not the what — the repository's source code is
   dense with justifications ("why this order", "why this fallback") rather than
   descriptions of what the code obviously already does.
@@ -51,12 +56,14 @@ no legitimate reason to bypass it.
 
 ## Code signing
 
-Identity used for this repository: **ghostwan**
-(`Apple Development: ghostwan+apple@gmail.com`). `Scripts/bundle-app.sh` and
-`Scripts/bundle-spike.sh` pick it automatically from the keychain (substring
-match on `ghostwan`), falling back to the first available identity if it is
-missing. `SMARTMEET_SIGN_IDENTITY` still takes priority to override it on a
-one-off basis.
+`Scripts/bundle-app.sh` and `Scripts/bundle-spike.sh` share
+`Scripts/resolve-sign-identity.sh`: it lists the codesigning identities found
+in the keychain and, if there's more than one, prompts interactively which one
+to use. The choice is cached in `build/.sign-identity` (gitignored) so it's
+only asked once per machine, not on every build — `Scripts/ship.sh` calls
+`bundle-app.sh` on every commit and must not hang waiting for input.
+`SMARTMEET_SIGN_IDENTITY` always takes priority over both the cache and the
+prompt, for a one-off override or a non-interactive environment.
 
 Never change the signing identity without a reason: TCC (microphone, system
 audio capture) ties permissions to the bundle's exact signature — changing it

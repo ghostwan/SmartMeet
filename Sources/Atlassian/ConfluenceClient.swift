@@ -15,8 +15,8 @@ public struct ConfluenceSpaceSummary: Sendable, Identifiable, Equatable {
 
 /// Confluence Cloud, API v2.
 ///
-/// `acli` n'expose que `confluence page view` : la création passe obligatoirement
-/// par l'API REST.
+/// `acli` only exposes `confluence page view`: creation necessarily goes
+/// through the REST API.
 public struct ConfluenceClient: Sendable {
     private let client: AtlassianClient
     private let configuration: AtlassianConfiguration
@@ -73,16 +73,16 @@ public struct ConfluenceClient: Sendable {
         let id = string(payload["id"])
         guard !id.isEmpty else { throw AtlassianError.unexpectedResponse }
 
-        // L'espace peut différer de celui des réglages : un type de réunion peut
-        // publier ailleurs, et la page de sprint impose le sien.
+        // The space may differ from the settings' one: a meeting type can
+        // publish elsewhere, and the sprint page imposes its own.
         let key = spaceKey ?? configuration.spaceKey
         let url = configuration.baseURL
             .map { $0.appending(path: "wiki/spaces/\(key)/pages/\(id)") }
         return ConfluencePage(id: id, title: title, url: url)
     }
 
-    /// Relit une page pour confirmer qu'elle existe et récupérer son titre. Sert à
-    /// valider la page de sprint saisie par l'utilisateur.
+    /// Re-reads a page to confirm it exists and retrieve its title. Used to
+    /// validate the sprint page entered by the user.
     public func page(id: String) async throws -> ConfluencePage {
         let payload: [String: Any]
         do {
@@ -97,8 +97,8 @@ public struct ConfluenceClient: Sendable {
         return ConfluencePage(id: id, title: title, url: url)
     }
 
-    /// Espace auquel appartient une page, pour rattacher la page de sprint au bon
-    /// espace sans obliger l'utilisateur à le saisir.
+    /// Space a page belongs to, used to attach the sprint page to the right
+    /// space without requiring the user to enter it.
     public func spaceKey(forPage id: String) async throws -> String {
         let payload = try await client.request("GET", "/wiki/api/v2/pages/\(id)")
         let spaceID = string(payload["spaceId"])
@@ -111,9 +111,9 @@ public struct ConfluenceClient: Sendable {
         _ = try await client.request("DELETE", "/wiki/api/v2/pages/\(id)")
     }
 
-    /// Compte associé au jeton API utilisé pour publier — la façon la plus fiable de
-    /// résoudre « moi » en `accountId`, sans dépendre d'une recherche par e-mail
-    /// potentiellement bridée (voir `accountID(forEmail:)`).
+    /// Account tied to the API token used to publish — the most reliable way to
+    /// resolve "me" into an `accountId`, without relying on an e-mail search
+    /// that could potentially be restricted (see `accountID(forEmail:)`).
     public func currentUserAccountID() async throws -> String {
         let payload = try await client.request("GET", "/wiki/rest/api/user/current")
         let id = payload["accountId"] as? String ?? ""
@@ -121,14 +121,14 @@ public struct ConfluenceClient: Sendable {
         return id
     }
 
-    /// Résout un e-mail en `accountId` Confluence Cloud, pour restreindre une page à
-    /// une personne précise.
+    /// Resolves an e-mail into a Confluence Cloud `accountId`, to restrict a
+    /// page to a specific person.
     ///
-    /// Non garanti : certains sites Cloud bornent la recherche d'utilisateurs par
-    /// e-mail pour des raisons de confidentialité (RGPD), en particulier si le jeton
-    /// utilisé n'a pas de droits d'administration. On renvoie alors `nil` plutôt que
-    /// de faire échouer toute la publication — restreindre la page à l'utilisateur
-    /// seul reste préférable à ne pas la restreindre du tout.
+    /// Not guaranteed: some Cloud sites limit user search by e-mail for
+    /// privacy reasons (GDPR), especially if the token used lacks admin
+    /// rights. `nil` is then returned rather than failing the whole
+    /// publication — restricting the page to the user alone is still
+    /// preferable to not restricting it at all.
     public func accountID(forEmail email: String) async throws -> String? {
         guard let encodedCQL = "user.emailAddress=\"\(email)\""
             .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
@@ -142,9 +142,9 @@ public struct ConfluenceClient: Sendable {
         return user["accountId"] as? String
     }
 
-    /// Restreint la lecture d'une page aux seuls comptes indiqués — le reste de
-    /// l'espace ne la voit plus. Utilisé pour les types « one-to-one », dont la
-    /// page n'a de sens que pour l'utilisateur et un·e seul·e interlocuteur·rice.
+    /// Restricts read access of a page to the given accounts only — the rest
+    /// of the space no longer sees it. Used for "one-to-one" types, whose
+    /// page only makes sense for the user and a single counterpart.
     public func restrictReadAccess(pageID: String, accountIDs: [String]) async throws {
         let users = accountIDs.map { ["type": "known", "accountId": $0] }
         let body: [String: Any] = [
@@ -163,8 +163,8 @@ public struct ConfluenceClient: Sendable {
         )
     }
 
-    /// Réécrit le corps d'une page. Confluence exige le numéro de version suivant,
-    /// d'où la relecture préalable.
+    /// Rewrites a page's body. Confluence requires the next version number,
+    /// hence the preliminary re-read.
     public func updatePage(id: String, title: String, storageBody: String) async throws {
         let current = try await client.request("GET", "/wiki/api/v2/pages/\(id)")
         let version = (current["version"] as? [String: Any])?["number"] as? Int ?? 1
@@ -182,7 +182,7 @@ public struct ConfluenceClient: Sendable {
         )
     }
 
-    /// L'API v2 renvoie les identifiants tantôt en nombre, tantôt en chaîne.
+    /// The v2 API returns identifiers sometimes as a number, sometimes as a string.
     private func string(_ value: Any?) -> String {
         if let text = value as? String { return text }
         if let number = value as? NSNumber { return number.stringValue }

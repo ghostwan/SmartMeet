@@ -10,6 +10,17 @@ notes, then resets it to this template once the release is published.
 
 ### Added
 
+- New summary provider: `Apple Intelligence (local)`, using Apple's on-device
+  `FoundationModels` framework (macOS 26+). Fully local, no external binary or
+  network call — but with a much narrower context window (~4096 tokens,
+  measured empirically), so `SummaryGenerator` now lets a provider advertise
+  its own map-reduce chunk-size limit (`maxPromptCharacters`) instead of
+  always using the generic 48 000-character threshold.
+- New summary provider: `copilot (ACP)`, talking to the `copilot` CLI
+  (GitHub Copilot CLI) over the Agent Client Protocol (`copilot --acp`,
+  JSON-RPC over stdio) instead of the `opencode` client. Gives an exact
+  token count per completion without depending on `opencode`'s NDJSON
+  output format.
 - The app UI (menu bar, settings, review window, notifications) and all
   user-facing error messages are now localized in French, English, Spanish,
   Portuguese and Italian, following the system language. macOS permission

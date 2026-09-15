@@ -1,14 +1,14 @@
 #!/usr/bin/env swift
 //
-// Génère l'icône de SmartMeet.
+// Generates the SmartMeet icon.
 //
-// Dessin vectoriel plutôt qu'un fichier binaire : l'icône reste modifiable,
-// diffable, et se régénère à toutes les tailles requises par macOS.
+// Vector drawing rather than a binary file: the icon stays editable, diffable,
+// and regenerates at every size macOS requires.
 //
 //     swift Scripts/make-icon.swift && iconutil -c icns build/SmartMeet.iconset
 //
-// Motif : une bulle de conversation dont l'intérieur est une onde sonore qui se
-// résout en lignes de texte — capter la parole, en produire un écrit.
+// Motif: a speech bubble whose interior is a sound wave that resolves into
+// lines of text — capturing speech, producing a written record.
 
 import AppKit
 import CoreGraphics
@@ -19,7 +19,7 @@ let sizes: [(dimension: Int, scale: Int)] = [
     (256, 1), (256, 2), (512, 1), (512, 2),
 ]
 
-/// Dégradé de fond, dans les teintes d'accent de macOS.
+/// Background gradient, in macOS's accent tones.
 let backgroundColors = [
     CGColor(red: 0.45, green: 0.36, blue: 0.96, alpha: 1),
     CGColor(red: 0.30, green: 0.62, blue: 0.99, alpha: 1),
@@ -29,12 +29,12 @@ func drawIcon(in context: CGContext, side: CGFloat) {
     context.setShouldAntialias(true)
     context.interpolationQuality = .high
 
-    // macOS attend une marge autour du gabarit : l'icône ne remplit pas le carré.
+    // macOS expects a margin around the template: the icon doesn't fill the square.
     let inset = side * 0.085
     let rect = CGRect(x: inset, y: inset, width: side - inset * 2, height: side - inset * 2)
-    let corner = rect.width * 0.2237 // rayon du squircle des icônes système
+    let corner = rect.width * 0.2237 // system icon squircle radius
 
-    // Fond arrondi avec dégradé diagonal.
+    // Rounded background with a diagonal gradient.
     let squircle = CGPath(
         roundedRect: rect, cornerWidth: corner, cornerHeight: corner, transform: nil
     )
@@ -54,7 +54,7 @@ func drawIcon(in context: CGContext, side: CGFloat) {
         )
     }
 
-    // Voile lumineux en haut à gauche, pour éviter un aplat plat.
+    // Light sheen in the top-left corner, to avoid a flat, uniform fill.
     if let sheen = CGGradient(
         colorsSpace: CGColorSpaceCreateDeviceRGB(),
         colors: [
@@ -74,7 +74,7 @@ func drawIcon(in context: CGContext, side: CGFloat) {
     }
     context.restoreGState()
 
-    // Bulle de conversation blanche.
+    // White speech bubble.
     let bubbleWidth = rect.width * 0.66
     let bubbleHeight = rect.height * 0.50
     let bubble = CGRect(
@@ -89,8 +89,8 @@ func drawIcon(in context: CGContext, side: CGFloat) {
     bubblePath.addRoundedRect(
         in: bubble, cornerWidth: bubbleCorner, cornerHeight: bubbleCorner
     )
-    // Queue de la bulle, en bas à gauche. Large à sa base pour se fondre dans le
-    // corps de la bulle plutôt que d'y être collée.
+    // Bubble tail, at the bottom left. Wide at its base to blend into the
+    // bubble's body rather than looking stuck onto it.
     let tailX = bubble.minX + bubble.width * 0.24
     let tailWidth = bubble.height * 0.34
     let tailDrop = bubble.height * 0.26
@@ -113,8 +113,8 @@ func drawIcon(in context: CGContext, side: CGFloat) {
     context.fillPath()
     context.restoreGState()
 
-    // Contenu de la bulle : à gauche une onde sonore, à droite des lignes de texte.
-    // La transition de l'une à l'autre est le propos de l'application.
+    // Bubble content: a sound wave on the left, lines of text on the right.
+    // The transition from one to the other is the app's whole point.
     let contentRect = bubble.insetBy(dx: bubble.width * 0.14, dy: bubble.height * 0.24)
     let accent = CGColor(red: 0.36, green: 0.33, blue: 0.93, alpha: 1)
     context.setFillColor(accent)
@@ -122,7 +122,7 @@ func drawIcon(in context: CGContext, side: CGFloat) {
     let barCount = 5
     let barWidth = contentRect.width * 0.055
     let barGap = contentRect.width * 0.055
-    // Hauteurs relatives : une onde qui s'apaise vers la droite.
+    // Relative heights: a wave that settles down toward the right.
     let heights: [CGFloat] = [0.42, 0.86, 1.0, 0.62, 0.30]
     for index in 0..<barCount {
         let height = contentRect.height * heights[index]
@@ -139,7 +139,7 @@ func drawIcon(in context: CGContext, side: CGFloat) {
     }
     context.fillPath()
 
-    // Lignes de texte, de longueur décroissante comme un paragraphe.
+    // Lines of text, decreasing in length like a paragraph.
     let textStartX = contentRect.minX + CGFloat(barCount) * (barWidth + barGap) + barGap * 0.4
     let textWidth = contentRect.maxX - textStartX
     let lineHeight = contentRect.height * 0.155
@@ -164,7 +164,7 @@ func drawIcon(in context: CGContext, side: CGFloat) {
     context.setFillColor(accent.copy(alpha: 0.55) ?? accent)
     context.fillPath()
 
-    // Pastille d'enregistrement, qui signe la fonction principale.
+    // Recording dot, the icon's signature of the app's core function.
     let dotRadius = rect.width * 0.078
     let dotCenter = CGPoint(
         x: bubble.maxX - dotRadius * 0.15, y: bubble.maxY - dotRadius * 0.15
@@ -184,7 +184,7 @@ func drawIcon(in context: CGContext, side: CGFloat) {
     ))
     context.restoreGState()
 
-    // Anneau blanc pour détacher la pastille du fond.
+    // White ring, to detach the dot from the background.
     context.setStrokeColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
     context.setLineWidth(rect.width * 0.022)
     context.strokeEllipse(in: CGRect(
@@ -231,4 +231,4 @@ for (dimension, scale) in sizes {
         .write(to: iconset.appending(path: name))
 }
 
-print("✅ \(sizes.count) tailles générées dans \(iconset.path)")
+print("✅ \(sizes.count) sizes generated in \(iconset.path)")

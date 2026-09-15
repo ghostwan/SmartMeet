@@ -1,7 +1,7 @@
 import CoreAudio
 import Foundation
 
-/// Erreur Core Audio avec son code à quatre caractères, bien plus lisible que l'entier brut.
+/// Core Audio error with its four-character code, far more readable than the raw integer.
 public struct CoreAudioError: LocalizedError {
     public let status: OSStatus
     public let context: String
@@ -16,7 +16,7 @@ public struct CoreAudioError: LocalizedError {
             let text = String(raw.map { Character(UnicodeScalar($0)) })
             return text.allSatisfy { $0.isLetter || $0.isNumber || $0 == " " } ? "'\(text)'" : "\(status)"
         }
-        return "\(context) a échoué (\(code))"
+        return "\(context) failed (\(code))"
     }
 }
 
@@ -62,8 +62,8 @@ enum CoreAudioSystem {
     ) throws -> String {
         var propertyAddress = address(selector)
         var size = UInt32(MemoryLayout<CFString?>.size)
-        // Core Audio dépose une CFStringRef possédée par l'appelant : on passe par
-        // Unmanaged pour en reprendre la propriété sans fuite.
+        // Core Audio hands back a CFStringRef owned by the caller: we go through
+        // Unmanaged to take ownership of it without leaking.
         var cfValue: Unmanaged<CFString>?
         try check(
             withUnsafeMutablePointer(to: &cfValue) { pointer in
@@ -77,7 +77,7 @@ enum CoreAudioSystem {
         return value as String
     }
 
-    /// Périphérique de sortie courant, qui sert d'horloge au périphérique agrégé.
+    /// Current output device, which serves as the clock for the aggregate device.
     static func defaultOutputDevice() throws -> (id: AudioObjectID, uid: String) {
         let deviceID: AudioObjectID = try value(
             object,
@@ -89,7 +89,7 @@ enum CoreAudioSystem {
         return (deviceID, uid)
     }
 
-    /// AudioObjectID du process courant, pour l'exclure du tap et éviter un larsen.
+    /// AudioObjectID of the current process, so it can be excluded from the tap and avoid feedback.
     static func currentProcessObjectID() throws -> AudioObjectID {
         var pid = getpid()
         var propertyAddress = address(kAudioHardwarePropertyTranslatePIDToProcessObject)

@@ -8,10 +8,10 @@ struct SmartMeetApp: App {
             MenuBarContent(session: session)
                 .frame(width: 440)
         } label: {
-            // Vue d'étiquette : toujours instanciée tant que l'icône est dans la
-            // barre de menus. C'est le seul point de l'application où `openWindow`
-            // est disponible en permanence, donc là que les demandes d'ouverture
-            // venues des notifications sont honorées.
+            // Label view: instantiated for as long as the icon is present in the
+            // menu bar. This is the only place in the app where `openWindow` is
+            // always available, so it's where window-opening requests coming
+            // from notifications get honored.
             MenuBarLabel(session: session)
         }
         .menuBarExtraStyle(.window)
@@ -43,8 +43,8 @@ private struct MenuBarLabel: View {
             }
     }
 
-    /// Trois états lisibles d'un coup d'œil : au repos, réunion détectée,
-    /// enregistrement en cours.
+    /// Three states readable at a glance: idle, meeting detected,
+    /// recording in progress.
     private var symbol: String {
         if session.isRecording { return "record.circle.fill" }
         if session.suggestion != nil { return "waveform.badge.exclamationmark" }

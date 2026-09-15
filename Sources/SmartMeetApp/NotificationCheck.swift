@@ -2,48 +2,49 @@ import AppKit
 import Foundation
 import UserNotifications
 
-/// Vérifie que les notifications sont autorisées et réellement délivrées.
+/// Checks that notifications are authorized and actually delivered.
 ///
-/// ⚠️ TRAVAIL EN COURS — les notifications ne fonctionnent pas encore sur cette
-/// machine. `requestAuthorization` échoue avec « Notifications are not allowed for
-/// this application » et l'application n'apparaît jamais dans
+/// ⚠️ WORK IN PROGRESS — notifications don't work yet on this machine.
+/// `requestAuthorization` fails with "Notifications are not allowed for
+/// this application" and the app never shows up in
 /// `~/Library/Preferences/com.apple.ncprefs.plist`.
 ///
-/// Ce qui a été écarté par l'expérience :
-/// - la localisation seule : l'échec persiste depuis `/Applications` ;
-/// - le hardened runtime, l'identité de signature (Apple Development, ad-hoc) ;
-/// - l'absence de `NSApplication` : le diagnostic en démarre une vraie désormais ;
-/// - une politique MDM : le profil `com.apple.notificationsettings` présent ne
-///   liste que deux bundles Microsoft et ne restreint pas les autres.
+/// What experimentation has ruled out:
+/// - localization alone: the failure persists when launched from `/Applications`;
+/// - the hardened runtime, the signing identity (Apple Development, ad-hoc);
+/// - the absence of `NSApplication`: the diagnostic now starts a real one;
+/// - an MDM policy: the `com.apple.notificationsettings` profile present only
+///   lists two Microsoft bundles and doesn't restrict others.
 ///
-/// Fait notable : un bundle minimal, **sans `LSUIElement` et en politique
-/// d'activation `.regular`**, lancé depuis `/Applications`, obtient l'autorisation.
-/// Deux pistes ont été identifiées :
-/// 1. le mode agent (`LSUIElement`) empêcherait l'enregistrement auprès de
-///    `usernoted` — **testé** : `MeetingNotifier.prepare()` bascule désormais en
-///    `.regular` pour la seule durée de `requestAuthorization`, avant de revenir en
-///    `.accessory`. Sur une machine sans identité de signature stable (signature
-///    ad-hoc, qui change à chaque build), le refus persiste malgré tout — donc soit
-///    l'hypothèse est fausse, soit la signature instable invalide toute mémorisation
-///    d'autorisation avant même de poser la question. À revérifier sur la machine
-///    de développement avec une identité stable ;
-/// 2. le premier refus pour `com.smartmeet.app` est mémorisé et colle au bundle,
-///    auquel cas il faut réinitialiser l'état ou changer d'identifiant pour tester.
+/// Notable finding: a minimal bundle, **without `LSUIElement` and with
+/// `.regular` activation policy**, launched from `/Applications`, gets the
+/// authorization. Two leads have been identified:
+/// 1. agent mode (`LSUIElement`) would prevent registration with
+///    `usernoted` — **tested**: `MeetingNotifier.prepare()` now switches to
+///    `.regular` for the duration of `requestAuthorization` only, then reverts
+///    to `.accessory`. On a machine without a stable signing identity (ad-hoc
+///    signature, which changes on every build), the denial persists regardless —
+///    so either the hypothesis is wrong, or the unstable signature invalidates
+///    any authorization memory before the prompt is even shown. Needs
+///    re-checking on the development machine with a stable identity;
+/// 2. the first denial for `com.smartmeet.app` is remembered and sticks to the
+///    bundle, in which case the state needs resetting or the identifier
+///    changing to test again.
 ///
-/// À reprendre en isolant ces deux variables une par une.
+/// To be resumed by isolating these two variables one at a time.
 ///
 ///     open build/SmartMeet.app --args --check-notifications /tmp/rapport.txt
 ///
-/// Lancer l'exécutable depuis un terminal ne suffit pas : l'application ne serait
-/// pas enregistrée auprès de LaunchServices, et la demande d'autorisation ne
-/// parviendrait jamais à l'utilisateur — même piège que la capture audio.
+/// Running the executable from a terminal isn't enough: the app wouldn't be
+/// registered with LaunchServices, and the authorization request would never
+/// reach the user — same trap as audio capture.
 ///
-/// Les autorisations de notification sont une source classique de « ça ne marche
-/// pas chez moi » : ce diagnostic distingue un refus d'autorisation d'un problème
-/// de code, sans avoir à enregistrer une vraie réunion.
+/// Notification authorizations are a classic source of "works on my machine":
+/// this diagnostic distinguishes an authorization denial from a code issue,
+/// without having to record an actual meeting.
 @MainActor
 enum NotificationCheck {
-    /// Lancé par `open`, stdout part dans le vide : tout est aussi écrit sur disque.
+    /// Launched by `open`, stdout goes nowhere: everything is also written to disk.
     private static var reportURL: URL?
     private static var lines: [String] = []
 
@@ -55,14 +56,14 @@ enum NotificationCheck {
             .write(to: reportURL, atomically: true, encoding: .utf8)
     }
 
-    /// `UNUserNotificationCenter` exige une `NSApplication` réellement lancée : une
-    /// simple `RunLoop` ne suffit pas et fait échouer la demande d'autorisation avec
-    /// « Notifications are not allowed for this application ».
+    /// `UNUserNotificationCenter` requires an actually running `NSApplication`: a
+    /// plain `RunLoop` isn't enough and makes the authorization request fail with
+    /// "Notifications are not allowed for this application".
     static func boot(reportPath: String?) {
         let application = NSApplication.shared
         let delegate = CheckDelegate(reportPath: reportPath)
         application.delegate = delegate
-        // Agent : pas d'icône dans le Dock, comme l'application réelle.
+        // Agent: no Dock icon, just like the real app.
         application.setActivationPolicy(.accessory)
         application.run()
     }
@@ -113,7 +114,7 @@ enum NotificationCheck {
             issues: ["TEST-1", "TEST-2"]
         )
 
-        // Laisse le temps au centre de notifications de les enregistrer.
+        // Gives the notification center time to register them.
         try? await Task.sleep(for: .seconds(2))
         let delivered = await center.deliveredNotifications()
 
@@ -152,7 +153,7 @@ enum NotificationCheck {
     }
 }
 
-/// Maintient le délégué en vie le temps du diagnostic.
+/// Keeps the delegate alive for the duration of the diagnostic.
 @MainActor
 private final class CheckDelegate: NSObject, NSApplicationDelegate {
     private let reportPath: String?

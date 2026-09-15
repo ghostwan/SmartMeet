@@ -3,17 +3,17 @@ import Foundation
 import Summarization
 import Transcription
 
-/// Stockage sur disque, un dossier par réunion :
+/// On-disk storage, one folder per meeting:
 ///
 ///     ~/Library/Application Support/SmartMeet/Meetings/<uuid>/
-///         meeting.json      métadonnées
-///         segments.json     transcript structuré
-///         transcript.md     transcript lisible
-///         microphone.caf    piste utilisateur
-///         system.caf        piste participants
+///         meeting.json      metadata
+///         segments.json     structured transcript
+///         transcript.md     readable transcript
+///         microphone.caf    user track
+///         system.caf        participants track
 ///
-/// Format fichier plutôt que base de données : inspectable, sauvegardable, et un
-/// enregistrement interrompu reste exploitable.
+/// File-based format rather than a database: inspectable, backupable, and an
+/// interrupted recording remains usable.
 public struct MeetingStore: Sendable {
     public let root: URL
 
@@ -63,10 +63,9 @@ public struct MeetingStore: Sendable {
         try writeSummary(meeting, customTemplates: customTemplates, to: directory)
     }
 
-    /// Réécrit les seules métadonnées, sans toucher au transcript ni à l'audio.
-    /// `customTemplates` est pris au moment de l'appel, pas mémorisé, pour que la
-    /// modification d'un type de réunion se répercute sur les comptes rendus déjà
-    /// enregistrés.
+    /// Rewrites the metadata only, without touching the transcript or the audio.
+    /// `customTemplates` is taken at call time, not memorized, so that modifying a
+    /// meeting type is reflected in already-saved summaries.
     public func update(_ meeting: Meeting, customTemplates: [MeetingTemplate] = []) throws {
         let directory = try prepareDirectory(for: meeting.id)
         try Self.encoder.encode(meeting)
@@ -74,7 +73,7 @@ public struct MeetingStore: Sendable {
         try writeSummary(meeting, customTemplates: customTemplates, to: directory)
     }
 
-    /// Le markdown du compte rendu suit l'ordre de sections du type de réunion.
+    /// The summary's markdown follows the meeting type's section order.
     private func writeSummary(
         _ meeting: Meeting, customTemplates: [MeetingTemplate], to directory: URL
     ) throws {
@@ -87,9 +86,9 @@ public struct MeetingStore: Sendable {
         )
     }
 
-    /// Réécrit le transcript (segments structurés + markdown lisible) sans toucher
-    /// aux métadonnées ni à l'audio. Utilisé pour appliquer a posteriori la
-    /// diarisation expérimentale de la piste micro sur une réunion déjà enregistrée.
+    /// Rewrites the transcript (structured segments + readable markdown) without
+    /// touching the metadata or the audio. Used to retroactively apply the
+    /// experimental microphone-track diarization to an already-recorded meeting.
     public func updateSegments(
         _ segments: [TranscriptSegment], for id: UUID, title: String, date: Date
     ) throws {
@@ -138,7 +137,7 @@ public struct MeetingStore: Sendable {
         try FileManager.default.removeItem(at: directory(for: id))
     }
 
-    /// Vrai si l'audio brut (au moins une des deux pistes) est encore présent.
+    /// True if the raw audio (at least one of the two tracks) is still present.
     public func hasRawRecording(for id: UUID) -> Bool {
         let directory = directory(for: id)
         return AudioTrack.allCases.contains {
@@ -146,13 +145,13 @@ public struct MeetingStore: Sendable {
         }
     }
 
-    /// Supprime l'audio et le transcript d'une réunion, en conservant les métadonnées
-    /// et le compte rendu déjà généré (`meeting.json`, `summary.md`). Pensé pour
-    /// l'utilisateur qui a relu son compte rendu, l'a jugé fidèle, et ne veut plus
-    /// conserver l'enregistrement brut — pour l'espace disque ou la confidentialité.
+    /// Deletes the audio and transcript of a meeting, keeping the metadata and
+    /// the already-generated summary (`meeting.json`, `summary.md`). Intended for
+    /// a user who has reviewed their summary, found it faithful, and no longer
+    /// wants to keep the raw recording — for disk space or privacy reasons.
     ///
-    /// Irréversible : sans l'audio, plus de réanalyse (diarisation) ni de nouvelle
-    /// génération de compte rendu possible pour cette réunion.
+    /// Irreversible: without the audio, no further re-analysis (diarization) or
+    /// new summary generation is possible for this meeting.
     public func deleteRawRecording(for id: UUID) throws {
         let directory = directory(for: id)
         let names = AudioTrack.allCases.map(\.fileName) + ["segments.json", "transcript.md"]

@@ -1,11 +1,11 @@
 import Foundation
 
-/// Réglages de publication Notion. Le jeton d'intégration vit dans le trousseau,
-/// jamais ici.
+/// Notion publication settings. The integration token lives in the keychain,
+/// never here.
 public struct NotionConfiguration: Codable, Sendable, Equatable {
-    /// Page Notion sous laquelle créer les comptes rendus.
+    /// Notion page under which to create the meeting minutes.
     public var parentPageID: String
-    /// Libellé lisible, affiché dans les réglages (titre de la page collée).
+    /// Human-readable label, shown in the settings (title of the pasted page).
     public var parentPageTitle: String
 
     public init(parentPageID: String = "", parentPageTitle: String = "") {
@@ -15,14 +15,14 @@ public struct NotionConfiguration: Codable, Sendable, Equatable {
 
     public var isConfigured: Bool { !parentPageID.isEmpty }
 
-    /// Accepte un identifiant nu (avec ou sans tirets) ou une URL Notion copiée
-    /// depuis le navigateur.
+    /// Accepts a bare identifier (with or without dashes) or a Notion URL
+    /// copied from the browser.
     ///
-    /// Les URL Notion terminent par un identifiant de 32 caractères hexadécimaux,
-    /// avec ou sans tirets : `.../Titre-de-la-page-2ac1f5c4a1b34e6c9a9d8f6f6f6f6f6f`.
-    /// On prend les 32 derniers caractères hexadécimaux du dernier segment de
-    /// chemin : plus simple et plus robuste qu'un découpage sur les tirets, qui
-    /// casserait un identifiant déjà tiré (format UUID standard).
+    /// Notion URLs end with a 32-character hex identifier, with or without
+    /// dashes: `.../Page-Title-2ac1f5c4a1b34e6c9a9d8f6f6f6f6f6f`. We take the
+    /// last 32 hex characters of the last path segment: simpler and more
+    /// robust than splitting on dashes, which would break an identifier
+    /// that's already dashed (standard UUID format).
     public static func extractPageID(from input: String) -> String? {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -39,8 +39,8 @@ public struct NotionConfiguration: Codable, Sendable, Equatable {
         return format(String(hexOnly.suffix(32)))
     }
 
-    /// Notion accepte l'identifiant avec ou sans tirets ; on le formate en UUID
-    /// standard, plus lisible dans les réglages.
+    /// Notion accepts the identifier with or without dashes; it's formatted
+    /// as a standard UUID, more readable in the settings.
     private static func format(_ hex: String) -> String {
         let chars = Array(hex)
         let groups = [8, 4, 4, 4, 12]

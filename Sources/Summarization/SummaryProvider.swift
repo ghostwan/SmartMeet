@@ -1,18 +1,29 @@
 import Foundation
 
-/// Un moteur de complétion de texte. L'abstraction est volontairement minimale :
-/// aucun provider retenu n'offre de sortie structurée native, tous reçoivent un
-/// prompt et rendent du texte dont on extrait le JSON.
+/// A text completion engine. The abstraction is deliberately minimal: none of
+/// the chosen providers offer native structured output, they all receive a
+/// prompt and return text from which the JSON is extracted.
 public protocol SummaryProvider: Sendable {
     var displayName: String { get }
-    /// Vrai si le provider est utilisable sur cette machine (binaire présent,
-    /// serveur joignable…).
+    /// True if the provider is usable on this machine (binary present,
+    /// server reachable…).
     func isAvailable() async -> Bool
     func complete(prompt: String) async throws -> SummaryCompletion
+    /// Maximum size (in transcript characters) beyond which `SummaryGenerator`
+    /// must switch to map-reduce chunking, when the provider's context window
+    /// is narrower than its generic threshold. `nil` (the default) lets
+    /// `SummaryGenerator` use its own threshold.
+    var maxPromptCharacters: Int? { get }
+}
+
+extension SummaryProvider {
+    public var maxPromptCharacters: Int? { nil }
 }
 
 public enum SummaryProviderKind: String, Codable, Sendable, CaseIterable, Identifiable {
     case opencode
+    case copilotACP
+    case appleOnDevice
     case ollama
 
     public var id: String { rawValue }
@@ -20,6 +31,8 @@ public enum SummaryProviderKind: String, Codable, Sendable, CaseIterable, Identi
     public var displayName: String {
         switch self {
         case .opencode: "opencode (Copilot)"
+        case .copilotACP: "copilot (ACP)"
+        case .appleOnDevice: "Apple Intelligence (local)"
         case .ollama: "ollama (local)"
         }
     }

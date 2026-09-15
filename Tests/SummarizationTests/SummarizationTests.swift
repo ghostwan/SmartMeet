@@ -87,7 +87,7 @@ struct MeetingSummaryDecodingTests {
         #expect(summary.actionItems[0].owner == "Sandra")
         #expect(summary.actionItems[1].owner == nil)
         #expect(summary.actionItems[0].id != summary.actionItems[1].id)
-        // Coché par défaut : l'utilisateur décoche ce qu'il ne veut pas en Jira.
+        // Checked by default: the user unchecks whatever they don't want in Jira.
         #expect(summary.actionItems.allSatisfy { $0.isSelected })
     }
 
@@ -139,7 +139,7 @@ struct TranscriptSplittingTests {
         let chunks = SummaryGenerator.split(transcript, maxLength: 250)
 
         #expect(chunks.count > 1)
-        // Aucun paragraphe ne doit avoir été coupé en deux.
+        // No paragraph should have been split in two.
         for chunk in chunks {
             for part in chunk.components(separatedBy: "\n\n") {
                 #expect(part.count == 100)
@@ -198,7 +198,7 @@ struct ConfluenceRendererTests {
             audioNote: nil
         )
         #expect(html.contains(#"ac:name="expand""#))
-        // Le balisage markdown est retiré avant publication.
+        // Markdown markup is stripped before publishing.
         #expect(!html.contains("**"))
         #expect(html.contains("[00:01] Moi : Bonjour"))
     }

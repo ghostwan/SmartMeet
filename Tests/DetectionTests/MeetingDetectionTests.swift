@@ -44,7 +44,7 @@ struct MeetingDetectionTests {
 
     @Test("Un navigateur seul ne déclenche rien")
     func browserAloneIsIgnored() {
-        // Trop ambigu : test de micro, vidéo, dictée…
+        // Too ambiguous: could be a mic test, video, dictation…
         #expect(MeetingSuggestion.decide(apps: [chrome], event: nil) == nil)
     }
 
@@ -65,13 +65,13 @@ struct MeetingDetectionTests {
         #expect(suggestion.trigger == .both(app: "Microsoft Teams"))
         #expect(suggestion.title == "Point hebdo")
         #expect(suggestion.attendees == ["Sandra", "Martin"])
-        // L'identifiant vient de l'événement : une même réunion ne se propose qu'une fois.
+        // The identifier comes from the event: the same meeting is only suggested once.
         #expect(suggestion.id == "evt-1")
     }
 
     @Test("Un événement sans lien de visio ne déclenche pas seul")
     func calendarWithoutVideoLink() {
-        // Sinon toute réunion physique ou tout créneau bloqué déclencherait.
+        // Otherwise any in-person meeting or blocked time slot would trigger.
         #expect(MeetingSuggestion.decide(apps: [], event: event(video: false)) == nil)
     }
 
@@ -106,7 +106,7 @@ struct MeetingDetectionTests {
     @MainActor
     func dismissedSuggestionDoesNotReturn() {
         let detector = MeetingDetector()
-        // Injection directe : `refresh()` dépend d'EventKit, inutilisable en test.
+        // Direct injection: `refresh()` depends on EventKit, unusable in tests.
         detector.applyForTesting(MeetingSuggestion.decide(apps: [teams], event: event()))
         #expect(detector.suggestion != nil)
 
@@ -116,7 +116,7 @@ struct MeetingDetectionTests {
         detector.applyForTesting(MeetingSuggestion.decide(apps: [teams], event: event()))
         #expect(detector.suggestion == nil)
 
-        // Après un enregistrement, les propositions se réarment.
+        // After a recording, suggestions become eligible again.
         detector.resetDismissals()
         detector.applyForTesting(MeetingSuggestion.decide(apps: [teams], event: event()))
         #expect(detector.suggestion != nil)

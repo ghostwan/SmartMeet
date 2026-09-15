@@ -1,27 +1,18 @@
 #!/usr/bin/env bash
-# Assemble un spike en bundle .app signé.
+# Assembles a spike into a signed .app bundle.
 #
-# Pourquoi un bundle et pas un simple binaire : TCC (kTCCServiceAudioCapture)
-# n'attribue de permission qu'à un client identifié par bundle ID. Un exécutable
-# en ligne de commande nu n'obtient jamais de prompt — le tap renvoie du silence
-# sans la moindre erreur.
+# Why a bundle and not a plain binary: TCC (kTCCServiceAudioCapture) only
+# grants permission to a client identified by bundle ID. A bare command-line
+# executable never gets a prompt — the tap silently returns silence instead.
 set -euo pipefail
 
-TARGET="${1:-SpikeTap}"
-# TCC lie les autorisations à la signature du bundle : l'identité doit rester stable
-# d'un build à l'autre, sinon macOS redemande micro et capture audio à chaque fois.
-# « ghostwan » est l'identité retenue pour ce dépôt ; repli sur la première identité
-# du trousseau si elle est absente.
-IDENTITY="${SMARTMEET_SIGN_IDENTITY:-$(security find-identity -v -p codesigning |
-	grep -i ghostwan | awk -F'"' '{print $2; exit}')}"
-IDENTITY="${IDENTITY:-$(security find-identity -v -p codesigning |
-	awk -F'"' '/[0-9]+\)/ {print $2; exit}')}"
-if [ -z "$IDENTITY" ]; then
-	echo "Aucune identité de signature trouvée. Définis SMARTMEET_SIGN_IDENTITY." >&2
-	exit 1
-fi
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+
+TARGET="${1:-SpikeTap}"
+
+source Scripts/resolve-sign-identity.sh
+resolve_sign_identity
 
 swift build --product "$TARGET"
 BIN="$(swift build --product "$TARGET" --show-bin-path)/$TARGET"

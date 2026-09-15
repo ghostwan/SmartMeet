@@ -2,15 +2,15 @@ import AudioCapture
 import Foundation
 import Observation
 
-/// Une réunion détectée, proposée à l'enregistrement.
+/// A detected meeting, offered for recording.
 public struct MeetingSuggestion: Sendable, Equatable, Identifiable {
-    /// Origine de la détection, qui détermine la confiance qu'on lui accorde.
+    /// Origin of the detection, which determines how much confidence to give it.
     public enum Trigger: Sendable, Equatable {
-        /// Une application de visioconférence capte le micro : la réunion a commencé.
+        /// A video-conferencing app is capturing the microphone: the meeting has started.
         case conferencingApp(String)
-        /// Un événement de calendrier vient de commencer.
+        /// A calendar event has just started.
         case calendar
-        /// Les deux signaux concordent.
+        /// Both signals agree.
         case both(app: String)
     }
 
@@ -19,7 +19,7 @@ public struct MeetingSuggestion: Sendable, Equatable, Identifiable {
     public let attendees: [String]
     public let trigger: Trigger
     public let detectedAt: Date
-    /// Événement de calendrier associé, s'il y en a un.
+    /// Associated calendar event, if there is one.
     public let calendarMeeting: CalendarMeeting?
 
     public var appName: String? {
@@ -52,18 +52,19 @@ public struct MeetingSuggestion: Sendable, Equatable, Identifiable {
     }
 }
 
-/// Surveille l'arrivée d'une réunion et propose de l'enregistrer.
+/// Watches for the arrival of a meeting and offers to record it.
 ///
-/// Deux signaux, délibérément combinés : le calendrier dit ce qui *devrait* avoir
-/// lieu, l'application de visio qui capte le micro dit ce qui a *réellement*
-/// commencé. Le calendrier seul déclenche sur des réunions annulées ou décalées ;
-/// l'audio seul ne connaît ni le titre ni les participants.
+/// Two signals, deliberately combined: the calendar says what *should*
+/// happen, the video-conferencing app capturing the microphone says what
+/// *actually* started. The calendar alone would trigger on canceled or
+/// rescheduled meetings; the audio alone knows neither the title nor the
+/// attendees.
 @MainActor
 @Observable
 public final class MeetingDetector {
     public private(set) var suggestion: MeetingSuggestion?
 
-    /// Suggestions écartées par l'utilisateur, pour ne pas le relancer en boucle.
+    /// Suggestions dismissed by the user, to avoid re-prompting in a loop.
     private var dismissedIDs: Set<String> = []
     private var monitorTask: Task<Void, Never>?
 
@@ -91,25 +92,25 @@ public final class MeetingDetector {
         suggestion = nil
     }
 
-    /// Écarte la suggestion courante sans la refaire apparaître pour la même réunion.
+    /// Dismisses the current suggestion without bringing it back for the same meeting.
     public func dismissCurrent() {
         if let suggestion { dismissedIDs.insert(suggestion.id) }
         suggestion = nil
     }
 
-    /// Marque la suggestion comme traitée : l'enregistrement a démarré.
+    /// Marks the suggestion as handled: recording has started.
     public func acceptCurrent() {
         if let suggestion { dismissedIDs.insert(suggestion.id) }
         suggestion = nil
     }
 
-    /// Réarme les suggestions, par exemple après un arrêt d'enregistrement.
+    /// Re-arms suggestions, for example after recording has stopped.
     public func resetDismissals() {
         dismissedIDs.removeAll()
     }
 
-    /// Applique une suggestion sans passer par EventKit. Réservé aux tests : la
-    /// logique de décision est pure, mais la boucle de surveillance ne l'est pas.
+    /// Applies a suggestion without going through EventKit. Reserved for
+    /// tests: the decision logic is pure, but the monitoring loop is not.
     func applyForTesting(_ candidate: MeetingSuggestion?) {
         guard let candidate else {
             suggestion = nil
@@ -126,27 +127,27 @@ public final class MeetingDetector {
         )
 
         guard let candidate else {
-            // La réunion s'est terminée : la proposition disparaît d'elle-même.
+            // The meeting has ended: the suggestion disappears on its own.
             suggestion = nil
             return
         }
         guard !dismissedIDs.contains(candidate.id) else { return }
-        // Ne pas réémettre la même suggestion à chaque cycle, ce qui relancerait une
-        // notification toutes les vingt secondes.
+        // Don't re-emit the same suggestion on every cycle, which would
+        // relaunch a notification every twenty seconds.
         if suggestion?.id != candidate.id { suggestion = candidate }
     }
 }
 
 public extension MeetingSuggestion {
-    /// Combine les deux signaux en une proposition, ou rien.
+    /// Combines the two signals into a proposal, or nothing.
     ///
-    /// Règles, par ordre de confiance décroissante :
-    /// - une application dédiée à la visio capte le micro : la réunion a commencé, on
-    ///   propose même sans événement au calendrier ;
-    /// - un navigateur capte le micro : trop ambigu seul (test de micro, vidéo), on
-    ///   n'y croit que si le calendrier confirme ;
-    /// - un événement seul : on ne propose que s'il porte un lien de visio, sinon
-    ///   toute réunion physique déclencherait une proposition.
+    /// Rules, in decreasing order of confidence:
+    /// - a dedicated video-conferencing app is capturing the microphone: the
+    ///   meeting has started, it's proposed even without a calendar event;
+    /// - a browser is capturing the microphone: too ambiguous alone (mic
+    ///   test, video), it's only trusted if the calendar confirms it;
+    /// - an event alone: it's only proposed if it carries a video link,
+    ///   otherwise any physical meeting would trigger a proposal.
     static func decide(apps: [ConferencingApp], event: CalendarMeeting?) -> MeetingSuggestion? {
         let dedicated = apps.first(where: \.isDedicated)
         let browser = apps.first(where: { !$0.isDedicated })

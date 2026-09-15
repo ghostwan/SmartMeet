@@ -2,8 +2,8 @@ import Atlassian
 import Foundation
 import Summarization
 
-/// Génère un compte rendu à partir d'un transcript sur disque, sans enregistrer.
-/// Permet de tester providers, prompt et publication sans mobiliser le micro.
+/// Generates meeting minutes from a transcript on disk, without recording.
+/// Lets you test providers, prompt, and publication without tying up the microphone.
 ///
 ///     SmartMeet --summarize-file <transcript.md> [--publish]
 @MainActor
