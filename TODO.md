@@ -88,6 +88,7 @@ In decreasing order of likely bad surprises:
 | **Deleted Confluence page** | The `AtlassianError.pageNotFound` fallback (see `PublishService.resolveDestination`) has only been exercised by reading the code, never against an actually deleted page. |
 | **Consent reminder** | The banner shown while recording (`MenuBarContent.consentReminder`) has never been seen by a real participant; its placement and wording deserve an outside opinion. |
 | **Editing built-in types** | The four base types (`Daily`, `Sync`, `Retrospective`, `Generic`) are now directly editable (stored as an override in `customTemplates`, resettable). Never tested beyond compilation and existing unit tests — no test dedicated to this override mechanism. |
+| **End-of-meeting detection** | `RecordingSession.observeMeetingEnd()` polls `ConferencingDetector.activeApps()` during recording and proposes stopping after a 90 s absence. The grace period, the "still active" match by app name, and the snooze delay are all guesses, never checked against a real Teams/Zoom call with a real network hiccup or a deliberately muted app. |
 
 ---
 

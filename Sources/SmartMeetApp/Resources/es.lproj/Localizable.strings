@@ -276,3 +276,24 @@
 "Réponse Atlassian inattendue." = "Respuesta inesperada de Atlassian.";
 "Réponse Notion inattendue." = "Respuesta inesperada de Notion.";
 "Serveur injoignable : %@" = "Servidor inaccesible: %@";
+
+/* ============================================================
+   One to One (MenuBarContent.swift, ReviewWindow.swift, restricción de Confluence)
+   ============================================================ */
+"Choisir…" = "Elegir…";
+"Avec qui" = "Con quién";
+"Avec qui ?" = "¿Con quién?";
+"E-mail (restreint la page)" = "Correo (restringe la página)";
+"La page publiée ne sera visible que de toi et de cette personne, si son compte Confluence est trouvé." = "La página publicada solo será visible para ti y para esta persona, si se encuentra su cuenta de Confluence.";
+"Le compte Confluence de l'interlocuteur n'a pas été trouvé — la page reste restreinte à toi seul." = "No se encontró la cuenta de Confluence de la otra persona — la página permanece restringida solo a ti.";
+"Aucun e-mail renseigné pour l'interlocuteur — la page reste restreinte à toi seul." = "No se indicó ningún correo para la otra persona — la página permanece restringida solo a ti.";
+"La page n'a pas pu être restreinte : %@" = "No se pudo restringir la página: %@";
+
+/* ============================================================
+   Detección de fin de reunión (MeetingNotifier.swift, SettingsWindow.swift)
+   ============================================================ */
+"Proposer de générer le compte rendu quand la réunion semble terminée" = "Proponer generar el acta cuando la reunión parece haber terminado";
+"Basé sur l'application de visioconférence qui n'utilise plus le micro depuis un moment — une simple proposition, jamais un arrêt automatique : une coupure passagère (réseau, micro coupé volontairement…) ne doit pas arrêter l'enregistrement à ta place." = "Basado en que la aplicación de videoconferencia ya no usa el micrófono desde hace un rato — solo una sugerencia, nunca una parada automática: un corte pasajero (red, micrófono silenciado a propósito…) no debe detener la grabación en tu lugar.";
+"Continuer l'enregistrement" = "Seguir grabando";
+"La réunion semble terminée" = "La reunión parece haber terminado";
+"Générer le compte rendu, ou continuer l'enregistrement ?" = "¿Generar el acta, o seguir grabando?";

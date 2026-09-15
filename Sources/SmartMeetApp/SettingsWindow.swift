@@ -112,6 +112,14 @@ struct SettingsWindow: View {
                 Text("La détection combine le calendrier et l'application de visioconférence qui capte le micro. Le démarrage automatique reste désactivé par défaut : enregistrer des personnes sans les prévenir n'est pas un comportement à activer à leur place.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                Toggle(
+                    "Proposer de générer le compte rendu quand la réunion semble terminée",
+                    isOn: $settings.detectMeetingEnd
+                )
+                Text("Basé sur l'application de visioconférence qui n'utilise plus le micro depuis un moment — une simple proposition, jamais un arrêt automatique : une coupure passagère (réseau, micro coupé volontairement…) ne doit pas arrêter l'enregistrement à ta place.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Diarisation (expérimental)") {

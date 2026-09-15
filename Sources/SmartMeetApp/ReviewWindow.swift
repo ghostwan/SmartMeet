@@ -15,6 +15,8 @@ struct ReviewWindow: View {
     @State private var showDeleteRawConfirmation = false
     @State private var showTranscript = false
     @State private var templateSelection: String = ""
+    @State private var oneToOneNameInput: String = ""
+    @State private var oneToOneEmailInput: String = ""
     @State private var showJiraDestinationSheet = false
     @State private var jiraProjectKeyInput = ""
     @State private var jiraParentKeyInput = ""
@@ -54,6 +56,8 @@ struct ReviewWindow: View {
         .onChange(of: session.reviewedMeeting?.id, initial: true) {
             load(meeting)
             templateSelection = meeting.templateID
+            oneToOneNameInput = meeting.oneToOneParticipant ?? ""
+            oneToOneEmailInput = meeting.oneToOneParticipantEmail ?? ""
         }
         .onChange(of: session.summaryState) { load(session.reviewedMeeting ?? meeting) }
         .sheet(isPresented: $showJiraDestinationSheet) {
@@ -217,6 +221,9 @@ struct ReviewWindow: View {
                     }
                 }
             }
+            if session.settings.template(id: templateSelection).requiresParticipant {
+                oneToOneParticipantEditor(meeting)
+            }
             if let diarizationStatus {
                 Text(diarizationStatus)
                     .font(.caption)
@@ -232,6 +239,31 @@ struct ReviewWindow: View {
         .sheet(isPresented: $showTranscript) {
             TranscriptSheet(meeting: meeting, transcript: session.transcript(for: meeting))
         }
+    }
+
+    /// Corrige l'interlocuteur d'un one-to-one après l'enregistrement — utile si le
+    /// calendrier ne le proposait pas ou si le mauvais nom a été retenu.
+    private func oneToOneParticipantEditor(_ meeting: Meeting) -> some View {
+        HStack(spacing: 8) {
+            Text("👤").font(.caption)
+            TextField("Avec qui ?", text: $oneToOneNameInput)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 150)
+            TextField("E-mail (restreint la page)", text: $oneToOneEmailInput)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 220)
+            Button("Définir") {
+                session.setOneToOneParticipant(
+                    name: oneToOneNameInput, email: oneToOneEmailInput, for: meeting
+                )
+            }
+            .disabled(
+                oneToOneNameInput == (meeting.oneToOneParticipant ?? "")
+                    && oneToOneEmailInput == (meeting.oneToOneParticipantEmail ?? "")
+            )
+            Spacer()
+        }
+        .help("La page publiée ne sera visible que de toi et de cette personne, si son compte Confluence est trouvé.")
     }
 
     private func progress(_ message: String) -> some View {

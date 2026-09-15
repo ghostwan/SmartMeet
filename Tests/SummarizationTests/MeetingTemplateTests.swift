@@ -125,6 +125,24 @@ struct MeetingTemplateTests {
         let candidates = MeetingTemplate.builtIns + [custom]
         #expect(MeetingTemplate.infer(fromTitle: "Point IT hebdomadaire", in: candidates) == nil)
     }
+
+    @Test("The one-to-one template requires a participant, unlike the others")
+    func oneToOneRequiresParticipant() {
+        #expect(MeetingTemplate.oneToOne.requiresParticipant)
+        #expect(!MeetingTemplate.generic.requiresParticipant)
+        #expect(!MeetingTemplate.daily.requiresParticipant)
+        #expect(!MeetingTemplate.synchro.requiresParticipant)
+        #expect(!MeetingTemplate.retrospective.requiresParticipant)
+        #expect(!MeetingTemplate.personal.requiresParticipant)
+    }
+
+    @Test("A title suggests the one-to-one, in various spellings")
+    func inferMatchesOneToOne() {
+        let candidates = MeetingTemplate.builtIns
+        #expect(MeetingTemplate.infer(fromTitle: "1:1 avec Sandra", in: candidates) == .oneToOne)
+        #expect(MeetingTemplate.infer(fromTitle: "One to one Martin", in: candidates) == .oneToOne)
+        #expect(MeetingTemplate.infer(fromTitle: "One-to-one hebdo", in: candidates) == .oneToOne)
+    }
 }
 
 @Suite("Décodage des sections spécialisées")

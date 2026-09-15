@@ -24,6 +24,7 @@ public final class AppSettings {
         static let outputLanguage = "outputLanguage"
         static let detectMeetings = "detectMeetings"
         static let autoStartOnDetection = "autoStartOnDetection"
+        static let detectMeetingEnd = "detectMeetingEnd"
         static let autoPublish = "autoPublish"
         static let autoCreateJiraIssues = "autoCreateJiraIssues"
         static let diarizeMicrophoneTrack = "diarizeMicrophoneTrack"
@@ -83,6 +84,14 @@ public final class AppSettings {
     /// personnes à leur insu n'est pas un comportement qu'on active pour elles.
     public var autoStartOnDetection: Bool {
         didSet { defaults.set(autoStartOnDetection, forKey: Key.autoStartOnDetection) }
+    }
+    /// Propose (jamais n'impose) d'arrêter et de générer le compte rendu quand
+    /// l'application de visio suivie ne capte plus le micro depuis un moment.
+    /// Activé par défaut : ce n'est qu'une notification, symétrique à
+    /// `detectMeetings` — contrairement à `autoStartOnDetection`, rien n'est arrêté
+    /// sans que l'utilisateur ne le demande explicitement en tapant l'action.
+    public var detectMeetingEnd: Bool {
+        didSet { defaults.set(detectMeetingEnd, forKey: Key.detectMeetingEnd) }
     }
     public var autoSummarize: Bool {
         didSet { defaults.set(autoSummarize, forKey: Key.autoSummarize) }
@@ -172,6 +181,7 @@ public final class AppSettings {
         ) ?? .french
         detectMeetings = defaults.object(forKey: Key.detectMeetings) as? Bool ?? true
         autoStartOnDetection = defaults.object(forKey: Key.autoStartOnDetection) as? Bool ?? false
+        detectMeetingEnd = defaults.object(forKey: Key.detectMeetingEnd) as? Bool ?? true
         autoSummarize = defaults.object(forKey: Key.autoSummarize) as? Bool ?? true
         autoPublish = defaults.object(forKey: Key.autoPublish) as? Bool ?? false
         autoCreateJiraIssues = defaults.object(forKey: Key.autoCreateJiraIssues) as? Bool ?? false

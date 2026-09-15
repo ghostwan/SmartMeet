@@ -152,6 +152,10 @@ struct MenuBarContent: View {
                 Spacer()
             }
 
+            if session.selectedTemplate.requiresParticipant {
+                oneToOneParticipantField
+            }
+
             // Langue « source » (celle parlée pendant la réunion, transcrite telle
             // quelle) et langue de « destination » (celle du compte rendu généré) sont
             // deux réglages distincts : le moteur de transcription ne gère pas le
@@ -200,6 +204,38 @@ struct MenuBarContent: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
+    }
+
+    /// « Avec qui » pour un one-to-one : les candidats du calendrier remplissent
+    /// aussi l'e-mail d'un coup, nécessaire pour restreindre la page publiée à
+    /// cette seule personne. Une saisie libre reste possible si l'interlocuteur
+    /// n'a pas d'événement de calendrier (café improvisé, Slack huddle…).
+    private var oneToOneParticipantField: some View {
+        HStack(spacing: 6) {
+            Text("👤").font(.caption)
+            if !session.oneToOneCandidates.isEmpty {
+                Picker("Avec qui", selection: $session.oneToOneParticipantName) {
+                    Text("Choisir…").tag("")
+                    ForEach(session.oneToOneCandidates, id: \.name) { candidate in
+                        Text(candidate.name).tag(candidate.name)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: 130)
+                .onChange(of: session.oneToOneParticipantName) {
+                    session.oneToOneParticipantEmail = session.oneToOneCandidates
+                        .first { $0.name == session.oneToOneParticipantName }?.email ?? ""
+                }
+            }
+            TextField("Avec qui ?", text: $session.oneToOneParticipantName)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 130)
+            TextField("E-mail (restreint la page)", text: $session.oneToOneParticipantEmail)
+                .textFieldStyle(.roundedBorder)
+                .help("La page publiée ne sera visible que de toi et de cette personne, si son compte Confluence est trouvé.")
+            Spacer()
+        }
     }
 
     private var statusText: String {

@@ -69,6 +69,12 @@ public final class RecordingSession {
     /// pas le changement de langue en cours de réunion : elle doit être fixée avant
     /// de démarrer.
     public var selectedTranscriptionLocale: String
+    /// Interlocuteur du prochain enregistrement, pour les types « one-to-one »
+    /// (`MeetingTemplate.requiresParticipant`). Ignoré pour tout autre type.
+    public var oneToOneParticipantName: String = ""
+    /// E-mail de cet interlocuteur — optionnel, sert uniquement à restreindre la
+    /// page Confluence publiée à l'utilisateur et cette seule personne.
+    public var oneToOneParticipantEmail: String = ""
 
     public let settings: AppSettings
     private let store: MeetingStore
@@ -84,6 +90,28 @@ public final class RecordingSession {
     private var suggestionObserver: Task<Void, Never>?
     /// Titre issu d'une suggestion acceptée, quand le calendrier ne le fournit pas.
     private var pendingSuggestionTitle: String?
+    /// Application de visio dont on surveille le micro pendant l'enregistrement, pour
+    /// proposer la fin de réunion. `nil` si aucune application connue n'a été
+    /// identifiée (enregistrement démarré manuellement sans visio détectée).
+    private var monitoredConferencingApp: String?
+    private var endOfMeetingObserver: Task<Void, Never>?
+    /// Depuis quand l'application suivie ne capte plus le micro. Remis à `nil` dès
+    /// qu'elle recapte le micro : une coupure passagère ne doit pas compter.
+    private var conferencingAppAbsentSince: Date?
+    /// Empêche de renotifier en boucle tant que l'absence se poursuit sans que
+    /// l'utilisateur n'ait répondu.
+    private var meetingEndNotified = false
+    /// Posé quand l'utilisateur répond « je continue » : n'y revient pas avant ce
+    /// délai, même si l'application suivie reste absente entre-temps.
+    private var meetingEndSnoozedUntil: Date?
+
+    /// Intervalle entre deux vérifications de fin de réunion.
+    private static let endOfMeetingCheckInterval: Double = 10
+    /// Durée d'absence continue du micro avant de proposer la fin de réunion — une
+    /// coupure réseau ou un micro coupé un instant ne doit pas suffire.
+    private static let endOfMeetingGracePeriod: Double = 90
+    /// Délai avant de reproposer, une fois l'utilisateur ayant choisi de continuer.
+    private static let endOfMeetingSnooze: Double = 300
 
     public init(settings: AppSettings = AppSettings()) {
         self.settings = settings
@@ -102,6 +130,12 @@ public final class RecordingSession {
         }
         notifier.onRetrySummary = { [weak self] id in
             Task { await self?.retrySummary(id) }
+        }
+        notifier.onMeetingEndedGenerateSummary = { [weak self] in
+            Task { await self?.stopAndGenerateSummaryFromNotification() }
+        }
+        notifier.onMeetingEndedKeepRecording = { [weak self] in
+            self?.snoozeMeetingEndDetection()
         }
     }
 
@@ -146,6 +180,66 @@ public final class RecordingSession {
         }
     }
 
+    /// Surveille, pendant l'enregistrement, si l'application de visio suivie capte
+    /// toujours le micro. Une absence continue au-delà d'un délai de grâce propose
+    /// (jamais n'impose) de générer le compte rendu — voir `endOfMeetingGracePeriod`
+    /// pour le raisonnement sur les coupures passagères.
+    private func observeMeetingEnd() {
+        endOfMeetingObserver?.cancel()
+        guard settings.detectMeetingEnd, let appName = monitoredConferencingApp else { return }
+
+        endOfMeetingObserver = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(Self.endOfMeetingCheckInterval))
+                guard let self, self.isRecording else { return }
+
+                let stillActive = ConferencingDetector.activeApps()
+                    .contains { $0.name == appName }
+                if stillActive {
+                    self.conferencingAppAbsentSince = nil
+                    self.meetingEndNotified = false
+                    continue
+                }
+
+                if let snoozedUntil = self.meetingEndSnoozedUntil, Date.now < snoozedUntil {
+                    continue
+                }
+                let absentSince = self.conferencingAppAbsentSince ?? Date.now
+                self.conferencingAppAbsentSince = absentSince
+
+                guard !self.meetingEndNotified,
+                      Date.now.timeIntervalSince(absentSince) >= Self.endOfMeetingGracePeriod,
+                      let meetingID = self.meetingID
+                else { continue }
+
+                self.meetingEndNotified = true
+                self.notifier.announceMeetingEnded(meetingID: meetingID)
+            }
+        }
+    }
+
+    /// Réponse à l'action « Générer le compte rendu » de la notification de fin de
+    /// réunion : arrête l'enregistrement, puis génère le compte rendu même si
+    /// `autoSummarize` est désactivé — l'utilisateur vient de le demander
+    /// explicitement en tapant l'action, ce n'est plus une décision prise pour lui.
+    private func stopAndGenerateSummaryFromNotification() async {
+        guard isRecording else { return }
+        let shouldForceSummary = !settings.autoSummarize
+        await stop()
+        if shouldForceSummary, let meeting = reviewedMeeting {
+            await generateSummary(for: meeting)
+        }
+    }
+
+    /// Réponse à l'action « Continuer l'enregistrement » : ne touche à rien d'autre
+    /// que de repousser la prochaine proposition, pour ne pas relancer une
+    /// notification à chaque cycle tant que la visio reste éteinte.
+    private func snoozeMeetingEndDetection() {
+        meetingEndSnoozedUntil = Date.now.addingTimeInterval(Self.endOfMeetingSnooze)
+        meetingEndNotified = false
+        conferencingAppAbsentSince = nil
+    }
+
     /// Guesses the meeting type from a title (calendar or conferencing app) and
     /// applies it — but only if the user hasn't already picked a type by hand from
     /// the menu. The default template acts as a "still untouched" marker: as soon
@@ -166,6 +260,7 @@ public final class RecordingSession {
         notifier.withdraw(suggestion.id)
         detectedCalendarMeeting = suggestion.calendarMeeting
         pendingSuggestionTitle = suggestion.title
+        monitoredConferencingApp = suggestion.appName
         detector.acceptCurrent()
         await start()
     }
@@ -183,6 +278,24 @@ public final class RecordingSession {
 
     public var selectedTemplate: MeetingTemplate {
         settings.template(id: selectedTemplateID)
+    }
+
+    /// Candidats proposés pour « avec qui » sur un one-to-one : participants du
+    /// calendrier en premier (ils portent un e-mail exploitable pour restreindre la
+    /// page ensuite), puis les personnes connues des réglages, en repli — sans
+    /// e-mail, la page ne pourra être restreinte qu'à l'utilisateur seul.
+    public var oneToOneCandidates: [(name: String, email: String?)] {
+        var seen = Set<String>()
+        var candidates: [(name: String, email: String?)] = []
+        for attendee in detectedCalendarMeeting?.attendeeDetails ?? [] {
+            guard seen.insert(attendee.name).inserted else { continue }
+            candidates.append((attendee.name, attendee.email))
+        }
+        for name in settings.knownPeople {
+            guard seen.insert(name).inserted else { continue }
+            candidates.append((name, nil))
+        }
+        return candidates
     }
 
     /// Destination lisible, calculée localement sans appel réseau, pour l'afficher
@@ -297,6 +410,16 @@ public final class RecordingSession {
         meetingID = id
         startedAt = .now
 
+        // Si le démarrage n'est pas passé par une suggestion (bouton manuel), on
+        // tente quand même de repérer une application de visio déjà active, pour
+        // pouvoir proposer la fin de réunion plus tard.
+        if monitoredConferencingApp == nil {
+            monitoredConferencingApp = ConferencingDetector.activeApps().first?.name
+        }
+        conferencingAppAbsentSince = nil
+        meetingEndNotified = false
+        meetingEndSnoozedUntil = nil
+
         do {
             let directory = try store.prepareDirectory(for: id)
 
@@ -325,6 +448,7 @@ public final class RecordingSession {
             ]
 
             state = .recording(since: startedAt ?? .now)
+            observeMeetingEnd()
         } catch {
             await teardown()
             state = .failed(error.localizedDescription)
@@ -363,7 +487,11 @@ public final class RecordingSession {
             locale: selectedTranscriptionLocale,
             knownAttendees: detectedCalendarMeeting?.attendees ?? [],
             templateID: selectedTemplateID,
-            outputLanguage: selectedOutputLanguage
+            outputLanguage: selectedOutputLanguage,
+            oneToOneParticipant: selectedTemplate.requiresParticipant && !oneToOneParticipantName.isEmpty
+                ? oneToOneParticipantName : nil,
+            oneToOneParticipantEmail: selectedTemplate.requiresParticipant && !oneToOneParticipantEmail.isEmpty
+                ? oneToOneParticipantEmail : nil
         )
         meeting.trackStartOffsets = Dictionary(
             uniqueKeysWithValues: (result?.trackStartOffsets ?? [:])
@@ -383,6 +511,8 @@ public final class RecordingSession {
         await teardown()
         state = .idle
         pendingSuggestionTitle = nil
+        oneToOneParticipantName = ""
+        oneToOneParticipantEmail = ""
         // Une nouvelle réunion peut suivre immédiatement : on réarme les propositions.
         detector.resetDismissals()
         notifier.reset()
@@ -511,6 +641,17 @@ public final class RecordingSession {
         meetings = store.loadAll()
     }
 
+    /// Corrige l'interlocuteur d'un one-to-one après l'enregistrement — utile si le
+    /// calendrier ne le proposait pas ou si le mauvais nom a été sélectionné.
+    public func setOneToOneParticipant(name: String, email: String, for meeting: Meeting) {
+        var updated = meeting
+        updated.oneToOneParticipant = name.isEmpty ? nil : name
+        updated.oneToOneParticipantEmail = email.isEmpty ? nil : email
+        try? store.update(updated, customTemplates: settings.customTemplates)
+        if reviewedMeeting?.id == meeting.id { reviewedMeeting = updated }
+        meetings = store.loadAll()
+    }
+
     // MARK: - Publication
 
     public func publish(
@@ -560,7 +701,9 @@ public final class RecordingSession {
                 language: meeting.outputLanguage,
                 jiraProjectKey: jiraProjectKey,
                 jiraParentKey: jiraParentKey,
-                translateForJira: translateForJira
+                translateForJira: translateForJira,
+                participantName: meeting.oneToOneParticipant ?? "",
+                restrictToParticipantEmail: meeting.oneToOneParticipantEmail
             ) { step in
                 Task { @MainActor [weak self] in
                     self?.publishState = .running(Self.describe(step))
@@ -772,6 +915,12 @@ public final class RecordingSession {
         transcriber = nil
         meetingID = nil
         startedAt = nil
+        endOfMeetingObserver?.cancel()
+        endOfMeetingObserver = nil
+        monitoredConferencingApp = nil
+        conferencingAppAbsentSince = nil
+        meetingEndNotified = false
+        meetingEndSnoozedUntil = nil
     }
 
     private static func defaultTitle(for date: Date) -> String {

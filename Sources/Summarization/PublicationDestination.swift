@@ -31,6 +31,7 @@ public struct TitleFormat: Sendable {
     public static let placeholders: [(token: String, description: String)] = [
         ("{summary}", "titre proposé par le modèle"),
         ("{type}", "nom du type de réunion"),
+        ("{participant}", "interlocuteur (types one-to-one uniquement)"),
         ("{Weekday}", "Lundi"),
         ("{weekday}", "lundi"),
         ("{date}", "7 septembre 2026"),
@@ -44,13 +45,15 @@ public struct TitleFormat: Sendable {
         summaryTitle: String,
         templateName: String,
         date: Date,
-        language: SummaryLanguage = .french
+        language: SummaryLanguage = .french,
+        participant: String = ""
     ) -> String {
         let locale = language.locale
         let weekday = date.formatted(.dateTime.weekday(.wide).locale(locale))
         let substitutions: [String: String] = [
             "{summary}": summaryTitle,
             "{type}": templateName,
+            "{participant}": participant,
             "{Weekday}": weekday.capitalizedFirst,
             "{weekday}": weekday.lowercased(),
             "{date}": date.formatted(.dateTime.day().month(.wide).year().locale(locale)),

@@ -276,3 +276,24 @@
 "Réponse Atlassian inattendue." = "Risposta imprevista di Atlassian.";
 "Réponse Notion inattendue." = "Risposta imprevista di Notion.";
 "Serveur injoignable : %@" = "Server non raggiungibile: %@";
+
+/* ============================================================
+   One to One (MenuBarContent.swift, ReviewWindow.swift, restrizione Confluence)
+   ============================================================ */
+"Choisir…" = "Scegli…";
+"Avec qui" = "Con chi";
+"Avec qui ?" = "Con chi?";
+"E-mail (restreint la page)" = "E-mail (limita la pagina)";
+"La page publiée ne sera visible que de toi et de cette personne, si son compte Confluence est trouvé." = "La pagina pubblicata sarà visibile solo a te e a questa persona, se il suo account Confluence viene trovato.";
+"Le compte Confluence de l'interlocuteur n'a pas été trouvé — la page reste restreinte à toi seul." = "L'account Confluence dell'altra persona non è stato trovato — la pagina resta limitata solo a te.";
+"Aucun e-mail renseigné pour l'interlocuteur — la page reste restreinte à toi seul." = "Nessuna e-mail indicata per l'altra persona — la pagina resta limitata solo a te.";
+"La page n'a pas pu être restreinte : %@" = "Non è stato possibile limitare la pagina: %@";
+
+/* ============================================================
+   Rilevamento di fine riunione (MeetingNotifier.swift, SettingsWindow.swift)
+   ============================================================ */
+"Proposer de générer le compte rendu quand la réunion semble terminée" = "Proponi di generare il resoconto quando la riunione sembra conclusa";
+"Basé sur l'application de visioconférence qui n'utilise plus le micro depuis un moment — une simple proposition, jamais un arrêt automatique : une coupure passagère (réseau, micro coupé volontairement…) ne doit pas arrêter l'enregistrement à ta place." = "Basato sul fatto che l'app di videoconferenza non usa più il microfono da un po' — una semplice proposta, mai un arresto automatico: un'interruzione passeggera (rete, microfono disattivato volontariamente…) non deve fermare la registrazione al posto tuo.";
+"Continuer l'enregistrement" = "Continua a registrare";
+"La réunion semble terminée" = "La riunione sembra conclusa";
+"Générer le compte rendu, ou continuer l'enregistrement ?" = "Generare il resoconto, o continuare a registrare?";

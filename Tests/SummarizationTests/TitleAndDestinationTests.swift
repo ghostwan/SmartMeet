@@ -75,6 +75,27 @@ struct TitleFormatTests {
                 == "Comité produit — 7 septembre 2026"
         )
     }
+
+    @Test("Le jeton participant se substitue, et disparaît proprement si absent")
+    func participantToken() {
+        #expect(
+            TitleFormat.render(
+                "1:1 {participant} — {date}", summaryTitle: "x", templateName: "One to One",
+                date: date, participant: "Sandra"
+            ) == "1:1 Sandra — 7 septembre 2026"
+        )
+        // Sans interlocuteur renseigné, le séparateur ne laisse pas de double espace.
+        #expect(
+            TitleFormat.render(
+                "1:1 {participant} — {date}", summaryTitle: "x", templateName: "One to One",
+                date: date
+            ) == "1:1 — 7 septembre 2026"
+        )
+        #expect(
+            MeetingTemplate.oneToOne.pageTitle(summaryTitle: "x", date: date, participant: "Sandra")
+                == "1:1 Sandra — 7 septembre 2026"
+        )
+    }
 }
 
 @Suite("Page de sprint")

@@ -3,11 +3,26 @@ import Foundation
 
 /// Un événement de calendrier susceptible de correspondre à la réunion en cours.
 public struct CalendarMeeting: Sendable, Equatable, Identifiable {
+    /// Un participant nommé, avec son e-mail quand EventKit le renseigne — utile
+    /// pour proposer un interlocuteur de one-to-one sans ressaisie manuelle.
+    public struct Attendee: Sendable, Equatable, Identifiable {
+        public let name: String
+        public let email: String?
+        public var id: String { email ?? name }
+
+        public init(name: String, email: String? = nil) {
+            self.name = name
+            self.email = email
+        }
+    }
+
     public let id: String
     public let title: String
     public let startDate: Date
     public let endDate: Date
     public let attendees: [String]
+    /// Mêmes participants que `attendees`, mais avec leur e-mail quand disponible.
+    public let attendeeDetails: [Attendee]
     public let hasVideoLink: Bool
 
     public init(
@@ -16,6 +31,7 @@ public struct CalendarMeeting: Sendable, Equatable, Identifiable {
         startDate: Date,
         endDate: Date,
         attendees: [String],
+        attendeeDetails: [Attendee] = [],
         hasVideoLink: Bool
     ) {
         self.id = id
@@ -23,6 +39,7 @@ public struct CalendarMeeting: Sendable, Equatable, Identifiable {
         self.startDate = startDate
         self.endDate = endDate
         self.attendees = attendees
+        self.attendeeDetails = attendeeDetails
         self.hasVideoLink = hasVideoLink
     }
 }
@@ -80,10 +97,18 @@ public final class CalendarService {
     }
 
     private func meeting(from event: EKEvent) -> CalendarMeeting {
-        let attendees = (event.attendees ?? [])
-            .compactMap { $0.name }
+        let participants = (event.attendees ?? [])
             // L'organisateur apparaît aussi dans la liste des participants.
-            .filter { $0 != event.organizer?.name }
+            .filter { $0.name != nil && $0.name != event.organizer?.name }
+        let attendees = participants.compactMap(\.name)
+        let attendeeDetails = participants.compactMap { participant -> CalendarMeeting.Attendee? in
+            guard let name = participant.name else { return nil }
+            // EventKit expose l'e-mail via une URL `mailto:`, pas un champ dédié.
+            let email = participant.url.scheme == "mailto"
+                ? String(participant.url.absoluteString.dropFirst("mailto:".count))
+                : nil
+            return CalendarMeeting.Attendee(name: name, email: email)
+        }
 
         let haystack = [event.location, event.notes, event.url?.absoluteString]
             .compactMap { $0 }
@@ -97,6 +122,7 @@ public final class CalendarService {
             startDate: event.startDate,
             endDate: event.endDate,
             attendees: attendees,
+            attendeeDetails: attendeeDetails,
             hasVideoLink: videoHosts.contains { haystack.contains($0) }
         )
     }

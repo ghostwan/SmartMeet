@@ -33,6 +33,13 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
     public var tokenUsage: TokenUsage?
     /// Lien Jira listant tous les tickets créés lors de la dernière publication.
     public var jiraSearchURL: String?
+    /// Interlocuteur d'un one-to-one (type dont `requiresParticipant` est vrai).
+    /// `nil` pour tout autre type de réunion.
+    public var oneToOneParticipant: String?
+    /// E-mail de cet interlocuteur, utilisé pour restreindre la page Confluence
+    /// publiée à ces deux seuls comptes. Optionnel : sans lui, la page reste
+    /// restreinte à l'utilisateur seul plutôt que rester ouverte à tout l'espace.
+    public var oneToOneParticipantEmail: String?
 
     public init(
         id: UUID = UUID(),
@@ -49,7 +56,9 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         jiraIssueKeys: [String] = [],
         notionPageURL: String? = nil,
         tokenUsage: TokenUsage? = nil,
-        jiraSearchURL: String? = nil
+        jiraSearchURL: String? = nil,
+        oneToOneParticipant: String? = nil,
+        oneToOneParticipantEmail: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -66,13 +75,15 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         self.notionPageURL = notionPageURL
         self.tokenUsage = tokenUsage
         self.jiraSearchURL = jiraSearchURL
+        self.oneToOneParticipant = oneToOneParticipant
+        self.oneToOneParticipantEmail = oneToOneParticipantEmail
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, title, startedAt, duration, locale, trackStartOffsets
         case knownAttendees, templateID, outputLanguage
         case summary, confluencePageURL, jiraIssueKeys, notionPageURL, tokenUsage
-        case jiraSearchURL
+        case jiraSearchURL, oneToOneParticipant, oneToOneParticipantEmail
     }
 
     // Décodage tolérant : les réunions enregistrées avant l'ajout du compte rendu
@@ -99,6 +110,10 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         notionPageURL = try container.decodeIfPresent(String.self, forKey: .notionPageURL)
         tokenUsage = try container.decodeIfPresent(TokenUsage.self, forKey: .tokenUsage)
         jiraSearchURL = try container.decodeIfPresent(String.self, forKey: .jiraSearchURL)
+        oneToOneParticipant = try container.decodeIfPresent(String.self, forKey: .oneToOneParticipant)
+        oneToOneParticipantEmail = try container.decodeIfPresent(
+            String.self, forKey: .oneToOneParticipantEmail
+        )
     }
 
     public var formattedDuration: String {
@@ -125,7 +140,7 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
             options: [.diacriticInsensitive, .caseInsensitive], locale: nil
         )
         let haystack = (
-            [title, summary?.tldr ?? "", transcript ?? ""]
+            [title, summary?.tldr ?? "", transcript ?? "", oneToOneParticipant ?? ""]
                 + knownAttendees + (summary?.decisions ?? [])
         )
         .joined(separator: " ")

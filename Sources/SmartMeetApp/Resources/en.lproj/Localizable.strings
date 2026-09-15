@@ -276,3 +276,24 @@
 "Réponse Atlassian inattendue." = "Unexpected Atlassian response.";
 "Réponse Notion inattendue." = "Unexpected Notion response.";
 "Serveur injoignable : %@" = "Server unreachable: %@";
+
+/* ============================================================
+   One to One (MenuBarContent.swift, ReviewWindow.swift, Confluence restriction)
+   ============================================================ */
+"Choisir…" = "Choose…";
+"Avec qui" = "With whom";
+"Avec qui ?" = "With whom?";
+"E-mail (restreint la page)" = "Email (restricts the page)";
+"La page publiée ne sera visible que de toi et de cette personne, si son compte Confluence est trouvé." = "The published page will only be visible to you and this person, if their Confluence account is found.";
+"Le compte Confluence de l'interlocuteur n'a pas été trouvé — la page reste restreinte à toi seul." = "The other person's Confluence account wasn't found — the page stays restricted to you alone.";
+"Aucun e-mail renseigné pour l'interlocuteur — la page reste restreinte à toi seul." = "No email was provided for the other person — the page stays restricted to you alone.";
+"La page n'a pas pu être restreinte : %@" = "The page couldn't be restricted: %@";
+
+/* ============================================================
+   End-of-meeting detection (MeetingNotifier.swift, SettingsWindow.swift)
+   ============================================================ */
+"Proposer de générer le compte rendu quand la réunion semble terminée" = "Suggest generating the minutes when the meeting seems to be over";
+"Basé sur l'application de visioconférence qui n'utilise plus le micro depuis un moment — une simple proposition, jamais un arrêt automatique : une coupure passagère (réseau, micro coupé volontairement…) ne doit pas arrêter l'enregistrement à ta place." = "Based on the video conferencing app no longer using the microphone for a while — just a suggestion, never an automatic stop: a brief interruption (network, microphone muted on purpose…) shouldn't stop the recording on your behalf.";
+"Continuer l'enregistrement" = "Keep recording";
+"La réunion semble terminée" = "The meeting seems to be over";
+"Générer le compte rendu, ou continuer l'enregistrement ?" = "Generate the minutes, or keep recording?";

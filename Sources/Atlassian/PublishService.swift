@@ -128,6 +128,13 @@ public struct PublishService: Sendable {
         /// Jira sont toujours en anglais, indépendamment de la langue du compte
         /// rendu. `nil` laisse le texte tel quel.
         translateForJira: (@Sendable (String) async throws -> String)? = nil,
+        /// Nom de l'interlocuteur d'un one-to-one, substitué au jeton `{participant}`
+        /// du titre. Ignoré pour tout autre type.
+        participantName: String = "",
+        /// E-mail de l'interlocuteur d'un one-to-one (`template.requiresParticipant`
+        /// vrai). Ignoré pour tout autre type. Sert à restreindre la page publiée à
+        /// l'utilisateur et cette seule personne.
+        restrictToParticipantEmail: String? = nil,
         onStep: @Sendable (PublishStep) -> Void = { _ in }
     ) async throws -> PublicationResult {
         guard configuration.isConfluenceReady || !template.spaceKeyOverride.isEmpty else {
@@ -139,7 +146,8 @@ public struct PublishService: Sendable {
 
         onStep(.creatingPage)
         let baseTitle = template.pageTitle(
-            summaryTitle: summary.title, date: meetingDate, language: language
+            summaryTitle: summary.title, date: meetingDate, language: language,
+            participant: participantName
         )
         var enriched = summary
         let body = ConfluenceStorageRenderer.render(
@@ -157,6 +165,44 @@ public struct PublishService: Sendable {
 
         var createdKeys: [String: String] = [:]
         var failures: [String] = []
+
+        if template.requiresParticipant {
+            do {
+                var accountIDs = [try await confluence.currentUserAccountID()]
+                if let restrictToParticipantEmail, !restrictToParticipantEmail.isEmpty {
+                    if let participantAccountID = try await confluence.accountID(
+                        forEmail: restrictToParticipantEmail
+                    ) {
+                        accountIDs.append(participantAccountID)
+                    } else {
+                        failures.append(NSLocalizedString(
+                            "Le compte Confluence de l'interlocuteur n'a pas été trouvé — la page reste restreinte à toi seul.",
+                            bundle: .main,
+                            value: "Le compte Confluence de l'interlocuteur n'a pas été trouvé — la page reste restreinte à toi seul.",
+                            comment: ""
+                        ))
+                    }
+                } else {
+                    failures.append(NSLocalizedString(
+                        "Aucun e-mail renseigné pour l'interlocuteur — la page reste restreinte à toi seul.",
+                        bundle: .main,
+                        value: "Aucun e-mail renseigné pour l'interlocuteur — la page reste restreinte à toi seul.",
+                        comment: ""
+                    ))
+                }
+                try await confluence.restrictReadAccess(pageID: page.id, accountIDs: accountIDs)
+            } catch {
+                failures.append(String(
+                    format: NSLocalizedString(
+                        "La page n'a pas pu être restreinte : %@",
+                        bundle: .main,
+                        value: "La page n'a pas pu être restreinte : %@",
+                        comment: ""
+                    ),
+                    error.localizedDescription
+                ))
+            }
+        }
 
         if createJiraIssues, configuration.isJiraReady {
             let englishTitle: String

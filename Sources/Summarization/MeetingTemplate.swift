@@ -222,6 +222,12 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
     public var spaceKeyOverride: String
     /// Page sous laquelle publier.
     public var parent: ParentPageReference
+    /// Vrai pour un type qui concerne exactement deux personnes (l'utilisateur et
+    /// un·e interlocuteur·rice unique) — un one-to-one, typiquement. Pilote deux
+    /// choses : l'UI propose de renseigner cet·te interlocuteur·rice avant
+    /// l'enregistrement, et la page publiée est restreinte à ces deux comptes plutôt
+    /// que visible par tout l'espace.
+    public var requiresParticipant: Bool
     /// Les modèles fournis ne sont pas supprimables, seulement dupliquables.
     public var isBuiltIn: Bool
 
@@ -234,6 +240,7 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
         titleFormat: String = "{summary} — {date}",
         spaceKeyOverride: String = "",
         parent: ParentPageReference = .spaceHome,
+        requiresParticipant: Bool = false,
         isBuiltIn: Bool = false
     ) {
         self.id = id
@@ -244,12 +251,13 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
         self.titleFormat = titleFormat
         self.spaceKeyOverride = spaceKeyOverride
         self.parent = parent
+        self.requiresParticipant = requiresParticipant
         self.isBuiltIn = isBuiltIn
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, name, symbol, sections, instructions
-        case titleFormat, spaceKeyOverride, parent, isBuiltIn
+        case titleFormat, spaceKeyOverride, parent, requiresParticipant, isBuiltIn
     }
 
     /// Décodage tolérant : les types enregistrés avant l'ajout de la destination
@@ -266,6 +274,7 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
         spaceKeyOverride = try container.decodeIfPresent(String.self, forKey: .spaceKeyOverride) ?? ""
         parent = try container.decodeIfPresent(ParentPageReference.self, forKey: .parent)
             ?? .spaceHome
+        requiresParticipant = try container.decodeIfPresent(Bool.self, forKey: .requiresParticipant) ?? false
         isBuiltIn = try container.decodeIfPresent(Bool.self, forKey: .isBuiltIn) ?? false
     }
 
@@ -273,14 +282,16 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
     public func pageTitle(
         summaryTitle: String,
         date: Date,
-        language: SummaryLanguage = .french
+        language: SummaryLanguage = .french,
+        participant: String = ""
     ) -> String {
         TitleFormat.render(
             titleFormat,
             summaryTitle: summaryTitle,
             templateName: name,
             date: date,
-            language: language
+            language: language,
+            participant: participant
         )
     }
 }
@@ -395,7 +406,30 @@ public extension MeetingTemplate {
         isBuiltIn: true
     )
 
-    static let builtIns: [MeetingTemplate] = [generic, daily, synchro, retrospective, personal]
+    /// Tête-à-tête entre l'utilisateur et une seule autre personne (manager, pair,
+    /// entretien récurrent…). Contrairement aux autres types, il concerne
+    /// nommément une personne précise : l'UI demande qui avant l'enregistrement, et
+    /// la page publiée lui est restreinte, ainsi qu'à l'utilisateur — pas le reste
+    /// de l'espace.
+    static let oneToOne = MeetingTemplate(
+        id: "builtin.oneToOne",
+        name: "One to One",
+        symbol: "person.2",
+        sections: [.tldr, .decisions, .actionItems, .topics, .openQuestions, .nextSteps],
+        instructions: """
+        C'est un tête-à-tête entre l'utilisateur et une seule autre personne, pas une \
+        réunion d'équipe. Reste factuel sur ce qui a été dit par les deux \
+        interlocuteurs, sans reformuler en langage de management.
+
+        Les décisions et action items sont nominatifs : chacun sait déjà qui est qui, \
+        inutile de le préciser lourdement.
+        """,
+        titleFormat: "1:1 {participant} — {date}",
+        requiresParticipant: true,
+        isBuiltIn: true
+    )
+
+    static let builtIns: [MeetingTemplate] = [generic, daily, synchro, retrospective, personal, oneToOne]
 
     /// Retrouve un modèle par identifiant, avec repli sur le modèle générique.
     /// Un modèle personnalisé prime sur un modèle fourni de même identifiant : c'est
@@ -429,6 +463,7 @@ public extension MeetingTemplate {
             daily.id: ["daily", "standup", "stand-up", "stand up", "point quotidien"],
             synchro.id: ["synchro", "sync"],
             retrospective.id: ["retro", "rétro", "retrospective", "rétrospective"],
+            oneToOne.id: ["one to one", "one-to-one", "1:1", "1-1", "tete a tete", "tête-à-tête"],
         ]
 
         for candidate in candidates {

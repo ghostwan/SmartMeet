@@ -111,6 +111,58 @@ public struct ConfluenceClient: Sendable {
         _ = try await client.request("DELETE", "/wiki/api/v2/pages/\(id)")
     }
 
+    /// Compte associé au jeton API utilisé pour publier — la façon la plus fiable de
+    /// résoudre « moi » en `accountId`, sans dépendre d'une recherche par e-mail
+    /// potentiellement bridée (voir `accountID(forEmail:)`).
+    public func currentUserAccountID() async throws -> String {
+        let payload = try await client.request("GET", "/wiki/rest/api/user/current")
+        let id = payload["accountId"] as? String ?? ""
+        guard !id.isEmpty else { throw AtlassianError.unexpectedResponse }
+        return id
+    }
+
+    /// Résout un e-mail en `accountId` Confluence Cloud, pour restreindre une page à
+    /// une personne précise.
+    ///
+    /// Non garanti : certains sites Cloud bornent la recherche d'utilisateurs par
+    /// e-mail pour des raisons de confidentialité (RGPD), en particulier si le jeton
+    /// utilisé n'a pas de droits d'administration. On renvoie alors `nil` plutôt que
+    /// de faire échouer toute la publication — restreindre la page à l'utilisateur
+    /// seul reste préférable à ne pas la restreindre du tout.
+    public func accountID(forEmail email: String) async throws -> String? {
+        guard let encodedCQL = "user.emailAddress=\"\(email)\""
+            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+        else { return nil }
+        guard let payload = try? await client.request(
+            "GET", "/wiki/rest/api/search/user?cql=\(encodedCQL)"
+        ) else { return nil }
+        let results = payload["results"] as? [[String: Any]] ?? []
+        guard let first = results.first else { return nil }
+        let user = (first["user"] as? [String: Any]) ?? first
+        return user["accountId"] as? String
+    }
+
+    /// Restreint la lecture d'une page aux seuls comptes indiqués — le reste de
+    /// l'espace ne la voit plus. Utilisé pour les types « one-to-one », dont la
+    /// page n'a de sens que pour l'utilisateur et un·e seul·e interlocuteur·rice.
+    public func restrictReadAccess(pageID: String, accountIDs: [String]) async throws {
+        let users = accountIDs.map { ["type": "known", "accountId": $0] }
+        let body: [String: Any] = [
+            "results": [
+                [
+                    "operation": "read",
+                    "restrictions": [
+                        "user": users,
+                        "group": ["results": []],
+                    ],
+                ]
+            ]
+        ]
+        _ = try await client.request(
+            "PUT", "/wiki/rest/api/content/\(pageID)/restriction", body: body
+        )
+    }
+
     /// Réécrit le corps d'une page. Confluence exige le numéro de version suivant,
     /// d'où la relecture préalable.
     public func updatePage(id: String, title: String, storageBody: String) async throws {

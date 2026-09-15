@@ -15,6 +15,7 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
         static let summaryReady = "summary-ready"
         static let published = "meeting-published"
         static let failure = "meeting-failure"
+        static let meetingEnded = "meeting-ended"
     }
 
     private enum Action {
@@ -24,6 +25,8 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
         static let publish = "publish"
         static let open = "open"
         static let retry = "retry"
+        static let generateSummary = "generate-summary"
+        static let keepRecording = "keep-recording"
     }
 
     private enum Payload {
@@ -37,6 +40,8 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
     var onReview: ((UUID) -> Void)?
     var onPublish: ((UUID) -> Void)?
     var onRetrySummary: ((UUID) -> Void)?
+    var onMeetingEndedGenerateSummary: (() -> Void)?
+    var onMeetingEndedKeepRecording: (() -> Void)?
 
     private var isAuthorized = false
     /// Dernière erreur d'autorisation, remontée par le diagnostic.
@@ -84,6 +89,14 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
             UNNotificationCategory(
                 identifier: Category.failure,
                 actions: [action(Action.retry, L("Réessayer"), foreground: true)],
+                intentIdentifiers: []
+            ),
+            UNNotificationCategory(
+                identifier: Category.meetingEnded,
+                actions: [
+                    action(Action.generateSummary, L("Générer le compte rendu"), foreground: true),
+                    action(Action.keepRecording, L("Continuer l'enregistrement")),
+                ],
                 intentIdentifiers: []
             ),
         ])
@@ -166,6 +179,20 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
         )
     }
 
+    /// L'application de visioconférence suivie ne capte plus le micro depuis un
+    /// moment : la réunion semble terminée. Une simple proposition — jamais un arrêt
+    /// automatique, une coupure passagère (réseau, micro coupé volontairement…) ne
+    /// doit pas couper l'enregistrement à la place de l'utilisateur.
+    func announceMeetingEnded(meetingID: UUID) {
+        send(
+            id: "ended-\(meetingID.uuidString)",
+            category: Category.meetingEnded,
+            title: L("La réunion semble terminée"),
+            body: L("Générer le compte rendu, ou continuer l'enregistrement ?"),
+            payload: [Payload.meetingID: meetingID.uuidString]
+        )
+    }
+
     private func send(
         id: String,
         category: String,
@@ -238,6 +265,14 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
                 if let meetingID { onRetrySummary?(meetingID) }
             case (Category.failure, _):
                 if let meetingID { onReview?(meetingID) }
+
+            case (Category.meetingEnded, Action.generateSummary):
+                onMeetingEndedGenerateSummary?()
+            case (Category.meetingEnded, _):
+                // Tapoter la bannière elle-même reste le choix le moins engageant :
+                // on continue l'enregistrement plutôt que de risquer de l'arrêter
+                // par un clic hâtif sur la notification.
+                onMeetingEndedKeepRecording?()
 
             default:
                 break

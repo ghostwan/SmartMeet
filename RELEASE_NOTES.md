@@ -23,6 +23,19 @@ notes, then resets it to this template once the release is published.
 - Added `SpikeAX`, a diagnostic spike (`Scripts/bundle-spike.sh SpikeAX`) that
   dumps Microsoft Teams' accessibility tree, to assess whether per-speaker
   names could be derived from Teams during transcription.
+- New "One to One" meeting type: picking it prompts for who the 1:1 is with
+  (suggested from calendar attendees or known people), and the published
+  Confluence page is restricted to only the current user and that person
+  (best effort — restricting the other person specifically requires their
+  email to resolve to a Confluence account, which isn't guaranteed on every
+  site; the page always stays at least private to the current user).
+- SmartMeet now notices when the tracked conferencing app (Teams, Zoom…) has
+  stopped using the microphone for a while during a recording, and proposes
+  — via a notification, never automatically — to stop and generate the
+  minutes. A 90 s grace period absorbs brief interruptions (network hiccup,
+  muting the app on purpose) so a short cut doesn't end the recording on
+  your behalf; dismissing the suggestion snoozes it for 5 minutes. New
+  setting to disable it (on by default): *Settings › Meeting detection*.
 
 ### Changed
 
