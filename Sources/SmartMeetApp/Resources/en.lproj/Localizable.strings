@@ -215,6 +215,13 @@
 "Titre de la page publiée" = "Published page title";
 "Format" = "Format";
 "Les parties littérales ne sont pas traduites : seuls les jetons de date suivent la langue du compte rendu." = "Literal parts aren't translated: only date tokens follow the minutes' language.";
+"Point sur la migration" = "Migration update";
+"titre proposé par le modèle" = "title proposed by the model";
+"nom du type de réunion" = "meeting type name";
+"interlocuteur (types one-to-one uniquement)" = "counterpart (one-to-one types only)";
+"Lundi" = "Monday";
+"lundi" = "monday";
+"7 septembre 2026" = "September 7, 2026";
 "Destination" = "Destination";
 "Service de publication" = "Publication service";
 "Service" = "Service";

@@ -24,15 +24,31 @@ the model, the rendering order, the page title, and its destination.
 **Sprint page.** Set it once at the start of a sprint; every sprint meeting's
 minutes then attach to it automatically, with nothing left to reconfigure.
 
-**Output language.** The minutes are produced in French or English,
-independently of the language spoken. The choice is made before recording: it
-drives the prompt, not just the formatting.
+**Output language.** The minutes can be produced in 14 commonly spoken
+languages, independently of the language spoken. Each profile chooses which
+languages appear in the picker; English is the only default. The choice is
+made before recording and drives the prompt, not just the formatting.
 
 **Meeting detection.** When a meeting starts, SmartMeet offers to record it
 through an actionable notification. Detection cross-references two signals:
 the calendar, which says what *should* be happening, and the video
 conferencing app capturing the microphone, which says what has *actually*
 started.
+
+## Screenshots
+
+All screenshots below use isolated mock data and the English localization; no
+real meeting, credential, or user profile is included.
+
+<p align="center">
+  <img src="Documentation/Screenshots/menu-overview.png" alt="SmartMeet menu showing meeting type and language selectors plus recent mock meetings" width="360">
+</p>
+
+<p align="center"><em>Start a recording with profile-specific meeting and language settings.</em></p>
+
+![Review and edit generated meeting minutes before publication](Documentation/Screenshots/meeting-review.png)
+
+![Configure the meeting types available in the active profile](Documentation/Screenshots/meeting-types.png)
 
 ## Requirements
 

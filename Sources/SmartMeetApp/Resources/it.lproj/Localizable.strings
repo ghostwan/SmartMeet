@@ -215,6 +215,13 @@
 "Titre de la page publiée" = "Titolo della pagina pubblicata";
 "Format" = "Formato";
 "Les parties littérales ne sont pas traduites : seuls les jetons de date suivent la langue du compte rendu." = "Le parti letterali non vengono tradotte: solo i token di data seguono la lingua del resoconto.";
+"Point sur la migration" = "Aggiornamento sulla migrazione";
+"titre proposé par le modèle" = "titolo proposto dal modello";
+"nom du type de réunion" = "nome del tipo di riunione";
+"interlocuteur (types one-to-one uniquement)" = "interlocutore (solo tipi uno a uno)";
+"Lundi" = "Lunedì";
+"lundi" = "lunedì";
+"7 septembre 2026" = "7 settembre 2026";
 "Destination" = "Destinazione";
 "Service de publication" = "Servizio di pubblicazione";
 "Service" = "Servizio";

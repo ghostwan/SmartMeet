@@ -316,7 +316,9 @@ struct ReviewWindow: View {
                     field("Titre", text: $draft.title)
                     Label(
                         L("Publié sous : %@", template.pageTitle(
-                            summaryTitle: draft.title, date: meeting.startedAt
+                            summaryTitle: draft.title,
+                            date: meeting.startedAt,
+                            language: meeting.outputLanguage
                         )),
                         systemImage: "text.badge.checkmark"
                     )
@@ -346,29 +348,29 @@ struct ReviewWindow: View {
         case .fourL:
             fourLSection(language: language)
         case .tldr:
-            multiline(section.displayName, text: $draft.tldr, height: 70)
+            multiline(section.displayName(in: language), text: $draft.tldr, height: 70)
         case .blockers:
-            blockersSection
+            blockersSection(language: language)
         case .participantReports:
-            participantReportsSection
+            participantReportsSection(language: language)
         case .moods:
-            moodsSection
+            moodsSection(language: language)
         case .topics:
             topicsSection
         case .decisions:
-            EditableList(title: section.displayName, items: $draft.decisions)
+            EditableList(title: section.displayName(in: language), items: $draft.decisions)
         case .actionItems:
             actionItemsSection
         case .openQuestions:
-            EditableList(title: section.displayName, items: $draft.openQuestions)
+            EditableList(title: section.displayName(in: language), items: $draft.openQuestions)
         case .nextSteps:
-            EditableList(title: section.displayName, items: $draft.nextSteps)
+            EditableList(title: section.displayName(in: language), items: $draft.nextSteps)
         }
     }
 
-    private var blockersSection: some View {
+    private func blockersSection(language: SummaryLanguage) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionTitle(SummarySection.blockers.displayName)
+            sectionTitle(SummarySection.blockers.displayName(in: language))
             if draft.blockers.isEmpty {
                 Text("Rien ne bloque.").font(.callout).foregroundStyle(.tertiary)
             }
@@ -410,9 +412,9 @@ struct ReviewWindow: View {
         }
     }
 
-    private var participantReportsSection: some View {
+    private func participantReportsSection(language: SummaryLanguage) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle(SummarySection.participantReports.displayName)
+            sectionTitle(SummarySection.participantReports.displayName(in: language))
             ForEach($draft.participantReports) { $report in
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
@@ -533,9 +535,9 @@ struct ReviewWindow: View {
         .background(.quaternary.opacity(0.25), in: .rect(cornerRadius: 6))
     }
 
-    private var moodsSection: some View {
+    private func moodsSection(language: SummaryLanguage) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionTitle(SummarySection.moods.displayName)
+            sectionTitle(SummarySection.moods.displayName(in: language))
             ForEach($draft.moods) { $mood in
                 HStack(spacing: 8) {
                     Picker("", selection: $mood.mood) {
@@ -617,7 +619,7 @@ struct ReviewWindow: View {
                         HStack {
                             Picker("", selection: $item.issueType) {
                                 ForEach(MeetingSummary.IssueType.allCases) { type in
-                                    Label(type.displayName(in: .french), systemImage: type.symbol)
+                                    Label(type.displayName(in: .english), systemImage: type.symbol)
                                         .tag(type)
                                 }
                             }

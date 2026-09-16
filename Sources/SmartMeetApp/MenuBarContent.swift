@@ -151,7 +151,9 @@ struct MenuBarContent: View {
                 .frame(maxWidth: 150)
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(session.selectedTemplate.sections.map(\.displayName).joined(separator: " · "))
+                    Text(session.selectedTemplate.sections.map {
+                        $0.displayName(in: session.selectedOutputLanguage)
+                    }.joined(separator: " · "))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)

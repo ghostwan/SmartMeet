@@ -161,7 +161,7 @@ struct TemplatesSettingsView: View {
             TextField("Format", text: binding(\.titleFormat)).textFieldStyle(.roundedBorder)
 
             Text(L("Aperçu : %@", selected.pageTitle(
-                summaryTitle: "Point sur la migration",
+                summaryTitle: L("Point sur la migration"),
                 date: .now,
                 language: settings.defaultOutputLanguage
             )))
@@ -173,7 +173,7 @@ struct TemplatesSettingsView: View {
                 .foregroundStyle(.tertiary)
 
             FlowText(
-                items: TitleFormat.placeholders.map { "\($0.token) → \($0.description)" }
+                items: TitleFormat.placeholders.map { "\($0.token) → \(L($0.description))" }
             )
         }
     }
@@ -295,7 +295,7 @@ struct TemplatesSettingsView: View {
             ForEach(Array(selected.sections.enumerated()), id: \.element) { index, section in
                 HStack(spacing: 6) {
                     Text("\(index + 1).").font(.caption.monospaced()).foregroundStyle(.tertiary)
-                    Text(section.displayName).font(.callout)
+                    Text(section.displayName(in: settings.defaultOutputLanguage)).font(.callout)
                     Spacer()
                     Button { move(section, by: -1) } label: { Image(systemName: "arrow.up") }
                         .disabled(index == 0)
@@ -310,7 +310,7 @@ struct TemplatesSettingsView: View {
             if !available.isEmpty {
                 Menu("Ajouter une section") {
                     ForEach(available) { section in
-                        Button(section.displayName) { toggle(section) }
+                        Button(section.displayName(in: settings.defaultOutputLanguage)) { toggle(section) }
                     }
                 }
                 .menuStyle(.borderlessButton)

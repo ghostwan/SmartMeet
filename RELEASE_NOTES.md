@@ -16,6 +16,9 @@ notes, then resets it to this template once the release is published.
 
 ### Changed
 
+- The README now includes English screenshots rendered from isolated mock
+  profiles and meetings, with no real user data or credentials.
+
 - Confluence destinations are simplified to a default parent page or a
   specific page; the previous current-sprint and per-template space concepts
   are no longer used. Without a configured parent, SmartMeet targets the
