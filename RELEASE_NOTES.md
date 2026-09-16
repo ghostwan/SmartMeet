@@ -73,3 +73,10 @@ notes, then resets it to this template once the release is published.
   are no longer used. Without a configured parent, SmartMeet targets the
   user's personal Confluence space.
 ### Fixed
+
+- Settings window: the tab bar no longer collapses tabs behind a "More"
+  overflow button (macOS 26's default tab style adapts to a sidebar past a
+  handful of tabs, and the traffic lights ate into the leftmost tab when the
+  window's toolbar and title bar shared the same row). Fixed with
+  `.tabViewStyle(.grouped)` and `.windowToolbarStyle(.expanded)`.
+

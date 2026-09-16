@@ -25,6 +25,13 @@ struct SmartMeetApp: App {
             SettingsWindow(settings: session.settings, session: session)
         }
         .windowResizability(.contentSize)
+        // The default unified toolbar style shares its row with the title
+        // bar's traffic lights: with `.grouped`'s tab bar rendered as that
+        // toolbar, the leftmost tabs end up partly hidden behind the
+        // traffic lights instead of starting at the window's left edge.
+        // `.expanded` gives the title bar its own row, so the tab bar below
+        // it gets the window's full width to itself.
+        .windowToolbarStyle(.expanded)
     }
 }
 
