@@ -37,9 +37,6 @@ started.
 
 ## Screenshots
 
-All screenshots below use isolated mock data and the English localization; no
-real meeting, credential, or user profile is included.
-
 <p align="center">
   <img src="Documentation/Screenshots/menu-overview.png" alt="SmartMeet menu showing meeting type and language selectors plus recent mock meetings" width="360">
 </p>
