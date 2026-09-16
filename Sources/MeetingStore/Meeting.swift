@@ -41,6 +41,11 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
     /// to those two accounts only. Optional: without it, the page stays
     /// restricted to the user alone rather than being open to the whole space.
     public var oneToOneParticipantEmail: String?
+    /// Confluence `accountId` of that counterpart, resolved ahead of time via
+    /// the "search Confluence users" picker (by display name) rather than the
+    /// e-mail search, which some Cloud sites restrict for GDPR reasons. Takes
+    /// priority over `oneToOneParticipantEmail` at publish time when present.
+    public var oneToOneParticipantAccountID: String?
 
     public init(
         id: UUID = UUID(),
@@ -59,7 +64,8 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         tokenUsage: TokenUsage? = nil,
         jiraSearchURL: String? = nil,
         oneToOneParticipant: String? = nil,
-        oneToOneParticipantEmail: String? = nil
+        oneToOneParticipantEmail: String? = nil,
+        oneToOneParticipantAccountID: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -78,6 +84,7 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         self.jiraSearchURL = jiraSearchURL
         self.oneToOneParticipant = oneToOneParticipant
         self.oneToOneParticipantEmail = oneToOneParticipantEmail
+        self.oneToOneParticipantAccountID = oneToOneParticipantAccountID
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -85,6 +92,7 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         case knownAttendees, templateID, outputLanguage
         case summary, confluencePageURL, jiraIssueKeys, notionPageURL, tokenUsage
         case jiraSearchURL, oneToOneParticipant, oneToOneParticipantEmail
+        case oneToOneParticipantAccountID
     }
 
     // Tolerant decoding: meetings recorded before the summary feature was added
@@ -114,6 +122,9 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         oneToOneParticipant = try container.decodeIfPresent(String.self, forKey: .oneToOneParticipant)
         oneToOneParticipantEmail = try container.decodeIfPresent(
             String.self, forKey: .oneToOneParticipantEmail
+        )
+        oneToOneParticipantAccountID = try container.decodeIfPresent(
+            String.self, forKey: .oneToOneParticipantAccountID
         )
     }
 

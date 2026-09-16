@@ -20,6 +20,7 @@ struct ReviewWindow: View {
     @State private var templateSelection: String = ""
     @State private var oneToOneNameInput: String = ""
     @State private var oneToOneEmailInput: String = ""
+    @State private var oneToOneAccountIDInput: String = ""
     @State private var showJiraDestinationSheet = false
     @State private var jiraProjectKeyInput = ""
     @State private var jiraParentKeyInput = ""
@@ -68,6 +69,7 @@ struct ReviewWindow: View {
             publicationService = session.settings.publicationServiceKind(for: template)
             publicationDestination = template.destination
             publicationPageInput = template.destination.pageID ?? ""
+            oneToOneAccountIDInput = meeting.oneToOneParticipantAccountID ?? ""
         }
         .onChange(of: session.summaryState) { load(session.reviewedMeeting ?? meeting) }
         .sheet(isPresented: $showJiraDestinationSheet) {
@@ -257,24 +259,47 @@ struct ReviewWindow: View {
     private func oneToOneParticipantEditor(_ meeting: Meeting) -> some View {
         HStack(spacing: 8) {
             Text("👤").font(.caption)
-            TextField("Avec qui ?", text: $oneToOneNameInput)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 150)
+            TextField(
+                "Avec qui ?",
+                text: Binding(
+                    get: { oneToOneNameInput },
+                    set: {
+                        oneToOneNameInput = $0
+                        // A manual edit invalidates any accountId resolved
+                        // from a previous search result.
+                        oneToOneAccountIDInput = ""
+                    }
+                )
+            )
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 150)
+            ConfluenceUserSearchButton(
+                search: { await session.searchConfluenceUsers(matching: $0) },
+                onSelect: { match in
+                    oneToOneNameInput = match.displayName
+                    oneToOneEmailInput = match.email ?? ""
+                    oneToOneAccountIDInput = match.accountID
+                }
+            )
             TextField("E-mail (restreint la page)", text: $oneToOneEmailInput)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 220)
             Button("Définir") {
                 session.setOneToOneParticipant(
-                    name: oneToOneNameInput, email: oneToOneEmailInput, for: meeting
+                    name: oneToOneNameInput,
+                    email: oneToOneEmailInput,
+                    accountID: oneToOneAccountIDInput,
+                    for: meeting
                 )
             }
             .disabled(
                 oneToOneNameInput == (meeting.oneToOneParticipant ?? "")
                     && oneToOneEmailInput == (meeting.oneToOneParticipantEmail ?? "")
+                    && oneToOneAccountIDInput == (meeting.oneToOneParticipantAccountID ?? "")
             )
             Spacer()
         }
-        .help("La page publiée ne sera visible que de toi et de cette personne, si son compte Confluence est trouvé.")
+        .help("La page publiée ne sera visible que de toi et de cette personne, si son compte Confluence est trouvé. Utilise la loupe pour chercher directement le compte Confluence par nom.")
     }
 
     private func progress(_ message: String) -> some View {

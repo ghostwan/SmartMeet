@@ -114,5 +114,10 @@ let package = Package(
             dependencies: ["Notion"],
             path: "Tests/NotionTests"
         ),
+        .testTarget(
+            name: "MeetingStoreTests",
+            dependencies: ["MeetingStore"],
+            path: "Tests/MeetingStoreTests"
+        ),
     ]
 )

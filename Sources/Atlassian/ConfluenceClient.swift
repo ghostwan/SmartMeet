@@ -15,6 +15,19 @@ public struct ConfluenceSpaceSummary: Sendable, Identifiable, Equatable {
     public let homepageID: String
 }
 
+/// A Confluence account found while searching users by name — used to let
+/// the user pick the one-to-one counterpart from a quick list instead of
+/// typing their e-mail (which the search-by-email endpoint can silently fail
+/// to resolve, see `accountID(forEmail:)`).
+public struct ConfluenceUserMatch: Sendable, Identifiable, Equatable {
+    public var id: String { accountID }
+    public let accountID: String
+    public let displayName: String
+    /// Not always returned (profile visibility settings): the caller falls
+    /// back to restricting by `accountID` directly rather than requiring it.
+    public let email: String?
+}
+
 /// Confluence Cloud, API v2.
 ///
 /// `acli` only exposes `confluence page view`: creation necessarily goes
@@ -177,6 +190,34 @@ public struct ConfluenceClient: Sendable {
         guard let first = results.first else { return nil }
         let user = (first["user"] as? [String: Any]) ?? first
         return user["accountId"] as? String
+    }
+
+    /// Quick "who is this" search by (partial) display name, for a one-to-one
+    /// counterpart picker — faster and more forgiving than requiring the exact
+    /// e-mail up front. Same endpoint as `accountID(forEmail:)`, but the CQL
+    /// field switches from `user.emailAddress` (exact match) to
+    /// `user.fullname` with the `~` fuzzy operator, the only one it supports
+    /// (see Confluence's CQL field reference).
+    ///
+    /// Best effort like its sibling: an empty array is returned rather than
+    /// throwing if the query is too short or the search is unavailable, so a
+    /// keystroke-by-keystroke search field never surfaces a hard error.
+    public func searchUsers(matching query: String, limit: Int = 8) async throws -> [ConfluenceUserMatch] {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard trimmed.count >= 2 else { return [] }
+        guard let encodedCQL = "user.fullname~\"\(trimmed)\""
+            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+        else { return [] }
+        guard let payload = try? await client.request(
+            "GET", "/wiki/rest/api/search/user?cql=\(encodedCQL)&limit=\(limit)"
+        ) else { return [] }
+        let results = payload["results"] as? [[String: Any]] ?? []
+        return results.compactMap { result in
+            let user = (result["user"] as? [String: Any]) ?? result
+            guard let accountID = user["accountId"] as? String, !accountID.isEmpty else { return nil }
+            let displayName = user["displayName"] as? String ?? user["publicName"] as? String ?? accountID
+            return ConfluenceUserMatch(accountID: accountID, displayName: displayName, email: user["email"] as? String)
+        }
     }
 
     /// Restricts read access of a page to the given accounts only — the rest

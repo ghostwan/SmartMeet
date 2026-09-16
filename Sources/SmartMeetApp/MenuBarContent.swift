@@ -239,16 +239,35 @@ struct MenuBarContent: View {
                 .pickerStyle(.menu)
                 .frame(width: 130)
                 .onChange(of: session.oneToOneParticipantName) {
+                    // A calendar candidate has no accountId of its own — only
+                    // the e-mail already known from the calendar invite.
                     session.oneToOneParticipantEmail = session.oneToOneCandidates
                         .first { $0.name == session.oneToOneParticipantName }?.email ?? ""
+                    session.oneToOneParticipantAccountID = ""
                 }
             }
-            TextField("Avec qui ?", text: $session.oneToOneParticipantName)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 130)
+            TextField(
+                "Avec qui ?",
+                text: Binding(
+                    get: { session.oneToOneParticipantName },
+                    set: {
+                        session.oneToOneParticipantName = $0
+                        // A manual edit invalidates any accountId resolved
+                        // from a previous search result: it no longer
+                        // matches the typed name.
+                        session.oneToOneParticipantAccountID = ""
+                    }
+                )
+            )
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 130)
+            ConfluenceUserSearchButton(
+                search: { await session.searchConfluenceUsers(matching: $0) },
+                onSelect: { session.selectOneToOneParticipant($0) }
+            )
             TextField("E-mail (restreint la page)", text: $session.oneToOneParticipantEmail)
                 .textFieldStyle(.roundedBorder)
-                .help("La page publiée ne sera visible que de toi et de cette personne, si son compte Confluence est trouvé.")
+                .help("La page publiée ne sera visible que de toi et de cette personne, si son compte Confluence est trouvé. Utilise la loupe pour chercher directement le compte Confluence par nom.")
             Spacer()
         }
     }

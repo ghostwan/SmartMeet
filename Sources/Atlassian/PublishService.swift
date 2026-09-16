@@ -108,6 +108,11 @@ public struct PublishService: Sendable {
         /// true). Ignored for any other type. Used to restrict the published
         /// page to the user and that one person only.
         restrictToParticipantEmail: String? = nil,
+        /// `accountId` resolved ahead of time (typically via the "search
+        /// Confluence users" picker). Takes priority over
+        /// `restrictToParticipantEmail`: it's already an exact match, so
+        /// there's no need to fall back to the less reliable e-mail search.
+        restrictToParticipantAccountID: String? = nil,
         onStep: @Sendable (PublishStep) -> Void = { _ in }
     ) async throws -> PublicationResult {
         guard configuration.isConfluenceReady else {
@@ -143,7 +148,9 @@ public struct PublishService: Sendable {
         if template.requiresParticipant {
             do {
                 var accountIDs = [try await confluence.currentUserAccountID()]
-                if let restrictToParticipantEmail, !restrictToParticipantEmail.isEmpty {
+                if let restrictToParticipantAccountID, !restrictToParticipantAccountID.isEmpty {
+                    accountIDs.append(restrictToParticipantAccountID)
+                } else if let restrictToParticipantEmail, !restrictToParticipantEmail.isEmpty {
                     if let participantAccountID = try await confluence.accountID(
                         forEmail: restrictToParticipantEmail
                     ) {

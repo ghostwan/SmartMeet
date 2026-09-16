@@ -75,6 +75,10 @@ public final class RecordingSession {
     /// E-mail of this other party — optional, only used to restrict the
     /// published Confluence page to the user and this one person.
     public var oneToOneParticipantEmail: String = ""
+    /// Confluence `accountId` of this other party, set when picked from the
+    /// "search Confluence users" results rather than typed by hand — a more
+    /// reliable path to restrict the page than the e-mail search.
+    public var oneToOneParticipantAccountID: String = ""
 
     public let settings: AppSettings
     private let store: MeetingStore
@@ -319,6 +323,27 @@ public final class RecordingSession {
         return candidates
     }
 
+    /// Quick "who is this" lookup against Confluence itself, for the
+    /// one-to-one counterpart picker — faster and more reliable than typing
+    /// (and hoping the e-mail search finds) an e-mail address by hand.
+    /// Best effort: an empty array on any failure (offline, misconfigured
+    /// Atlassian settings…) rather than surfacing an error from what's meant
+    /// to be a lightweight, as-you-type search.
+    public func searchConfluenceUsers(matching query: String) async -> [ConfluenceUserMatch] {
+        guard settings.canPublish else { return [] }
+        let client = ConfluenceClient(configuration: settings.atlassian, token: settings.atlassianToken)
+        return (try? await client.searchUsers(matching: query)) ?? []
+    }
+
+    /// Fills in the one-to-one fields from a Confluence search result: the
+    /// `accountId` is kept alongside, so publication can restrict the page
+    /// without going through the less reliable e-mail search.
+    public func selectOneToOneParticipant(_ match: ConfluenceUserMatch) {
+        oneToOneParticipantName = match.displayName
+        oneToOneParticipantEmail = match.email ?? ""
+        oneToOneParticipantAccountID = match.accountID
+    }
+
     /// Readable destination, computed locally with no network call, to
     /// display before publishing.
     public func destinationSummary(for template: MeetingTemplate) -> String {
@@ -493,7 +518,9 @@ public final class RecordingSession {
             oneToOneParticipant: selectedTemplate.requiresParticipant && !oneToOneParticipantName.isEmpty
                 ? oneToOneParticipantName : nil,
             oneToOneParticipantEmail: selectedTemplate.requiresParticipant && !oneToOneParticipantEmail.isEmpty
-                ? oneToOneParticipantEmail : nil
+                ? oneToOneParticipantEmail : nil,
+            oneToOneParticipantAccountID: selectedTemplate.requiresParticipant && !oneToOneParticipantAccountID.isEmpty
+                ? oneToOneParticipantAccountID : nil
         )
         meeting.trackStartOffsets = Dictionary(
             uniqueKeysWithValues: (result?.trackStartOffsets ?? [:])
@@ -515,6 +542,7 @@ public final class RecordingSession {
         pendingSuggestionTitle = nil
         oneToOneParticipantName = ""
         oneToOneParticipantEmail = ""
+        oneToOneParticipantAccountID = ""
         // A new meeting can follow right away: reset the dismissed suggestions.
         detector.resetDismissals()
         notifier.reset()
@@ -667,10 +695,13 @@ public final class RecordingSession {
 
     /// Corrects the other party of a one-to-one after recording — useful if
     /// the calendar didn't suggest them or if the wrong name was selected.
-    public func setOneToOneParticipant(name: String, email: String, for meeting: Meeting) {
+    public func setOneToOneParticipant(
+        name: String, email: String, accountID: String = "", for meeting: Meeting
+    ) {
         var updated = meeting
         updated.oneToOneParticipant = name.isEmpty ? nil : name
         updated.oneToOneParticipantEmail = email.isEmpty ? nil : email
+        updated.oneToOneParticipantAccountID = accountID.isEmpty ? nil : accountID
         try? store.update(updated, customTemplates: settings.customTemplates)
         if reviewedMeeting?.id == meeting.id { reviewedMeeting = updated }
         meetings = store.loadAll()
@@ -730,7 +761,8 @@ public final class RecordingSession {
                 jiraParentKey: jiraParentKey,
                 translateForJira: translateForJira,
                 participantName: meeting.oneToOneParticipant ?? "",
-                restrictToParticipantEmail: meeting.oneToOneParticipantEmail
+                restrictToParticipantEmail: meeting.oneToOneParticipantEmail,
+                restrictToParticipantAccountID: meeting.oneToOneParticipantAccountID
             ) { step in
                 Task { @MainActor [weak self] in
                     self?.publishState = .running(Self.describe(step))
