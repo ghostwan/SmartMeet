@@ -128,54 +128,19 @@ struct SprintPageTests {
 
 @Suite("Résolution de la destination")
 struct DestinationTests {
-    private func configuration(sprint: SprintPage?) -> AtlassianConfiguration {
-        AtlassianConfiguration(
-            site: "acme",
-            email: "a@b.c",
-            spaceKey: "DEFAUT",
-            parentPageID: "",
-            jiraProjectKey: "SEC",
-            sprintPage: sprint
-        )
-    }
-
-    @Test("Les types fournis liés au sprint le sont bien")
-    func builtInsUseSprintPage() {
-        #expect(MeetingTemplate.daily.parent.isSprintPage)
-        #expect(MeetingTemplate.retrospective.parent.isSprintPage)
-        #expect(MeetingTemplate.synchro.parent.isSprintPage)
-        // A generic meeting doesn't belong to a sprint.
-        #expect(!MeetingTemplate.generic.parent.isSprintPage)
-    }
-
-    @Test("La page de sprint impose son propre espace")
-    func sprintPageDictatesSpace() {
-        let sprint = SprintPage(id: "999", title: "Sprint 42", spaceKey: "EQUIPE")
-        var template = MeetingTemplate.daily
-        template.spaceKeyOverride = "IGNORE"
-
-        // Publishing to a different space than the parent page's would create
-        // an orphan page: the sprint page wins.
-        let configuration = configuration(sprint: sprint)
-        #expect(configuration.sprintPage?.spaceKey == "EQUIPE")
-        #expect(template.parent.isSprintPage)
-    }
-
-    @Test("Une page fixe conserve son identifiant")
-    func fixedPageKeepsID() {
+    @Test("Une page spécifique conserve son identifiant quel que soit le service")
+    func specificPageKeepsID() {
         var template = MeetingTemplate(name: "Comité", sections: [.tldr])
-        template.parent = .page(id: "424242")
-        #expect(template.parent.fixedPageID == "424242")
-        #expect(!template.parent.isSprintPage)
+        template.destination = .page(id: "424242")
+        #expect(template.destination.pageID == "424242")
     }
 
     @Test("La destination survit à un aller-retour d'encodage")
     func codableRoundTrip() throws {
         var template = MeetingTemplate(name: "Sprint review", sections: [.tldr])
-        template.parent = .sprintPage
         template.titleFormat = "Review {Weekday} {date}"
-        template.spaceKeyOverride = "EQUIPE"
         template.serviceKind = .notion
+        template.destination = .page(id: "notion-page")
 
         let data = try JSONEncoder().encode(template)
         let decoded = try JSONDecoder().decode(MeetingTemplate.self, from: data)
@@ -193,6 +158,7 @@ struct DestinationTests {
         #expect(template.parent == .spaceHome)
         #expect(template.titleFormat == "{summary} — {date}")
         #expect(template.serviceKind == nil)
+        #expect(template.destination == .profileDefault)
     }
 
     @Test("Un service inconnu retombe sur l'héritage du profil")
@@ -203,5 +169,16 @@ struct DestinationTests {
         """
         let template = try JSONDecoder().decode(MeetingTemplate.self, from: Data(json.utf8))
         #expect(template.serviceKind == nil)
+    }
+
+    @Test("Une page spécifique commune aux services survit à l'encodage")
+    func commonSpecificPageRoundTrip() throws {
+        var template = MeetingTemplate.personal
+        template.serviceKind = .atlassian
+        template.destination = .page(id: "424242")
+        let data = try JSONEncoder().encode(template)
+        let decoded = try JSONDecoder().decode(MeetingTemplate.self, from: data)
+        #expect(decoded.destination == .page(id: "424242"))
+        #expect(decoded.serviceKind == .atlassian)
     }
 }

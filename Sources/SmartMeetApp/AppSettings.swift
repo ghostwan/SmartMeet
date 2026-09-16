@@ -666,17 +666,6 @@ public final class AppSettings {
         activeProfile = profile
     }
 
-    /// Current sprint page, common parent of the sprint's meetings.
-    public var sprintPage: SprintPage? {
-        get { atlassian.sprintPage }
-        set { atlassian.sprintPage = newValue }
-    }
-
-    /// True if at least one meeting type relies on the sprint page.
-    public var usesSprintPage: Bool {
-        allTemplates.contains { $0.parent.isSprintPage }
-    }
-
     /// Built-in templates then custom templates, in display order, scoped to
     /// the active profile. An edited built-in type is represented by its
     /// current version (the possible override in `customTemplates`), not the

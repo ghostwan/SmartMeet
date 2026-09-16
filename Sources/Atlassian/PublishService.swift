@@ -53,63 +53,33 @@ public struct PublishService: Sendable {
     /// For the parent, an unset sprint page falls back to the space's home
     /// page rather than failing outright — a poorly filed report beats a lost
     /// one.
-    public func resolveDestination(for template: MeetingTemplate) async throws -> ResolvedDestination {
-        let sprintPage = configuration.sprintPage
-
-        let spaceKey: String = if template.parent.isSprintPage, let sprintPage {
-            // The sprint page dictates its own space: publishing elsewhere would
-            // create an orphan page, outside the sprint's tree.
-            sprintPage.spaceKey
-        } else if !template.spaceKeyOverride.isEmpty {
-            template.spaceKeyOverride
-        } else {
-            configuration.spaceKey
+    public func resolveDestination(
+        _ destination: PublicationDestination
+    ) async throws -> ResolvedDestination {
+        let pageID: String? = switch destination {
+        case .page(let id) where !id.isEmpty: id
+        case .page, .profileDefault: configuration.parentPageID.isEmpty
+            ? nil
+            : configuration.parentPageID
         }
 
-        guard !spaceKey.isEmpty else {
-            throw AtlassianError.notConfigured(NSLocalizedString("espace Confluence", bundle: .main, value: "espace Confluence", comment: ""))
-        }
-        let space = try await confluence.space(key: spaceKey)
-
-        switch template.parent {
-        case .sprintPage:
-            if let sprintPage {
-                // The page may have been deleted on Confluence's side since it was
-                // recorded; better to fail clearly here than at page creation,
-                // with a message that points to the settings.
-                _ = try await confluence.page(id: sprintPage.id)
-                return ResolvedDestination(
-                    spaceKey: spaceKey,
-                    spaceID: space.id,
-                    parentPageID: sprintPage.id,
-                    description: "\(spaceKey) › \(sprintPage.title)"
-                )
-            }
+        if let pageID {
+            let page = try await confluence.page(id: pageID)
             return ResolvedDestination(
-                spaceKey: spaceKey,
-                spaceID: space.id,
-                parentPageID: space.homepageID,
-                description: "\(spaceKey) › accueil (aucune page de sprint définie)"
-            )
-
-        case .page(let id) where !id.isEmpty:
-            let parent = try await confluence.page(id: id)
-            return ResolvedDestination(
-                spaceKey: spaceKey,
-                spaceID: space.id,
-                parentPageID: id,
-                description: "\(spaceKey) › \(parent.title)"
-            )
-
-        case .page, .spaceHome:
-            let fallback = configuration.parentPageID
-            return ResolvedDestination(
-                spaceKey: spaceKey,
-                spaceID: space.id,
-                parentPageID: fallback.isEmpty ? space.homepageID : fallback,
-                description: "\(spaceKey) › \(space.name)"
+                spaceKey: page.spaceKey,
+                spaceID: page.spaceID,
+                parentPageID: page.id,
+                description: "\(page.spaceKey) › \(page.title)"
             )
         }
+
+        let space = try await confluence.personalSpace()
+        return ResolvedDestination(
+            spaceKey: space.key,
+            spaceID: space.id,
+            parentPageID: space.homepageID,
+            description: "\(space.key) › \(space.name)"
+        )
     }
 
     public func publish(
@@ -121,6 +91,7 @@ public struct PublishService: Sendable {
         meetingDate: Date = .now,
         language: SummaryLanguage = .french,
         includeTranscript: Bool = true,
+        destination: PublicationDestination? = nil,
         /// Destination chosen for this specific publication (typically asked of
         /// the user right before creating the tickets). `nil` falls back to the
         /// global settings.
@@ -139,12 +110,12 @@ public struct PublishService: Sendable {
         restrictToParticipantEmail: String? = nil,
         onStep: @Sendable (PublishStep) -> Void = { _ in }
     ) async throws -> PublicationResult {
-        guard configuration.isConfluenceReady || !template.spaceKeyOverride.isEmpty else {
-            throw AtlassianError.notConfigured(NSLocalizedString("site, e-mail ou espace Confluence", bundle: .main, value: "site, e-mail ou espace Confluence", comment: ""))
+        guard configuration.isConfluenceReady else {
+            throw AtlassianError.notConfigured(NSLocalizedString("site ou e-mail Confluence", bundle: .main, value: "site ou e-mail Confluence", comment: ""))
         }
 
         onStep(.resolvingDestination)
-        let destination = try await resolveDestination(for: template)
+        let destination = try await resolveDestination(destination ?? template.destination)
 
         onStep(.creatingPage)
         let baseTitle = template.pageTitle(

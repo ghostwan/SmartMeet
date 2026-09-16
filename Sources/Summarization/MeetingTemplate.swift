@@ -226,6 +226,7 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
     /// effective service; a concrete value never silently falls back to a
     /// different service if it later becomes unavailable.
     public var serviceKind: ServiceKind?
+    public var destination: PublicationDestination
     /// True for a type that involves exactly two people (the user and a single
     /// counterpart) — a one-to-one, typically. This drives two things: the UI
     /// asks for that counterpart before recording, and the published page is
@@ -244,6 +245,7 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
         spaceKeyOverride: String = "",
         parent: ParentPageReference = .spaceHome,
         serviceKind: ServiceKind? = nil,
+        destination: PublicationDestination = .profileDefault,
         requiresParticipant: Bool = false,
         isBuiltIn: Bool = false
     ) {
@@ -256,13 +258,15 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
         self.spaceKeyOverride = spaceKeyOverride
         self.parent = parent
         self.serviceKind = serviceKind
+        self.destination = destination
         self.requiresParticipant = requiresParticipant
         self.isBuiltIn = isBuiltIn
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, name, symbol, sections, instructions
-        case titleFormat, spaceKeyOverride, parent, serviceKind, requiresParticipant, isBuiltIn
+        case titleFormat, spaceKeyOverride, parent, serviceKind, destination
+        case requiresParticipant, isBuiltIn
     }
 
     /// Tolerant decoding: templates saved before the destination field was added
@@ -281,6 +285,15 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
             ?? .spaceHome
         let rawServiceKind = try container.decodeIfPresent(String.self, forKey: .serviceKind)
         serviceKind = rawServiceKind.flatMap(ServiceKind.init(rawValue:))
+        if let decoded = try? container.decode(
+            PublicationDestination.self, forKey: .destination
+        ) {
+            destination = decoded
+        } else if case .page(let id) = parent, !id.isEmpty {
+            destination = .page(id: id)
+        } else {
+            destination = .profileDefault
+        }
         requiresParticipant = try container.decodeIfPresent(Bool.self, forKey: .requiresParticipant) ?? false
         isBuiltIn = try container.decodeIfPresent(Bool.self, forKey: .isBuiltIn) ?? false
     }
@@ -370,7 +383,6 @@ public extension MeetingTemplate {
         // A daily is identified by its date, not by a title the model
         // rephrases differently every day.
         titleFormat: "Daily {Weekday} {date}",
-        parent: .sprintPage,
         isBuiltIn: true
     )
 
@@ -388,7 +400,6 @@ public extension MeetingTemplate {
         ouvertes.
         """,
         titleFormat: "{summary} — {Weekday} {date}",
-        parent: .sprintPage,
         isBuiltIn: true
     )
 
@@ -419,7 +430,6 @@ public extension MeetingTemplate {
         Les action items restent nominatifs, puisqu'il faut bien un responsable.
         """,
         titleFormat: "{type} — {date}",
-        parent: .sprintPage,
         isBuiltIn: true
     )
 

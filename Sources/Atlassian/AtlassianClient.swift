@@ -82,7 +82,7 @@ public struct AtlassianConfiguration: Codable, Sendable, Equatable {
     }
 
     public var isConfluenceReady: Bool {
-        !site.isEmpty && !email.isEmpty && !spaceKey.isEmpty
+        !site.isEmpty && !email.isEmpty
     }
 
     public var isJiraReady: Bool {

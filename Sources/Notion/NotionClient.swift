@@ -100,6 +100,7 @@ public struct NotionClient: Sendable {
     public func createPage(
         title: String,
         markdown: String,
+        parentPageID: String? = nil,
         transcript: String? = nil,
         transcriptTitle: String = "Full transcript"
     ) async throws -> NotionPage {
@@ -109,8 +110,9 @@ public struct NotionClient: Sendable {
         let firstBatch = Array(allBlocks.prefix(MarkdownToNotionBlocks.maxBlocksPerRequest))
         let remaining = Array(allBlocks.dropFirst(MarkdownToNotionBlocks.maxBlocksPerRequest))
 
-        let parent: [String: Any] = configuration.isConfigured
-            ? ["page_id": configuration.parentPageID]
+        let effectiveParentID = parentPageID ?? configuration.parentPageID
+        let parent: [String: Any] = !effectiveParentID.isEmpty
+            ? ["page_id": effectiveParentID]
             : ["workspace": true]
 
         let body: [String: Any] = [

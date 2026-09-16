@@ -3,6 +3,8 @@ import Foundation
 public struct ConfluencePage: Sendable, Equatable {
     public let id: String
     public let title: String
+    public let spaceID: String
+    public let spaceKey: String
     public let url: URL?
 }
 
@@ -78,7 +80,9 @@ public struct ConfluenceClient: Sendable {
         let key = spaceKey ?? configuration.spaceKey
         let url = configuration.baseURL
             .map { $0.appending(path: "wiki/spaces/\(key)/pages/\(id)") }
-        return ConfluencePage(id: id, title: title, url: url)
+        return ConfluencePage(
+            id: id, title: title, spaceID: spaceID, spaceKey: key, url: url
+        )
     }
 
     /// Re-reads a page to confirm it exists and retrieve its title. Used to
@@ -93,8 +97,41 @@ public struct ConfluenceClient: Sendable {
         let title = payload["title"] as? String ?? ""
         guard !title.isEmpty else { throw AtlassianError.unexpectedResponse }
         let spaceID = string(payload["spaceId"])
-        let url = configuration.baseURL.map { $0.appending(path: "wiki/spaces/\(spaceID)/pages/\(id)") }
-        return ConfluencePage(id: id, title: title, url: url)
+        let spacePayload = try await client.request("GET", "/wiki/api/v2/spaces/\(spaceID)")
+        let spaceKey = spacePayload["key"] as? String ?? ""
+        let url = configuration.baseURL.map {
+            $0.appending(path: "wiki/spaces/\(spaceKey)/pages/\(id)")
+        }
+        return ConfluencePage(
+            id: id, title: title, spaceID: spaceID, spaceKey: spaceKey, url: url
+        )
+    }
+
+    public func personalSpace() async throws -> ConfluenceSpaceSummary {
+        let payload = try await client.request(
+            "GET", "/wiki/rest/api/user/current?expand=personalSpace,personalSpace.homepage"
+        )
+        guard let personal = payload["personalSpace"] as? [String: Any] else {
+            throw AtlassianError.notConfigured(NSLocalizedString(
+                "page Confluence par défaut ou espace personnel",
+                bundle: .main,
+                value: "page Confluence par défaut ou espace personnel",
+                comment: ""
+            ))
+        }
+        let homepage = personal["homepage"] as? [String: Any]
+        let id = string(personal["id"])
+        let key = personal["key"] as? String ?? ""
+        let homepageID = string(homepage?["id"])
+        guard !id.isEmpty, !key.isEmpty, !homepageID.isEmpty else {
+            throw AtlassianError.unexpectedResponse
+        }
+        return ConfluenceSpaceSummary(
+            id: id,
+            key: key,
+            name: personal["name"] as? String ?? key,
+            homepageID: homepageID
+        )
     }
 
     /// Space a page belongs to, used to attach the sprint page to the right

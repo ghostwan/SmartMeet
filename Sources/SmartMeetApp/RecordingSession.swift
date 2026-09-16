@@ -328,60 +328,27 @@ public final class RecordingSession {
             }
             return L("Aucun service de publication sélectionné")
         }
+        return destinationSummary(service: service, destination: template.destination)
+    }
+
+    public func destinationSummary(
+        service: ServiceKind,
+        destination: PublicationDestination
+    ) -> String {
+        if case .page(let id) = destination, !id.isEmpty {
+            return L("%@ › page %@", service.displayName, id)
+        }
         if service == .notion {
             guard settings.canPublishToNotion else { return L("Notion › configuration incomplète") }
             let parent = settings.notion.parentPageTitle.isEmpty
                 ? settings.notion.parentPageID
                 : settings.notion.parentPageTitle
-            return parent.isEmpty ? "Notion › workspace" : "Notion › \(parent)"
+            return parent.isEmpty ? L("Notion › pages privées") : "Notion › \(parent)"
         }
-
-        let space = template.parent.isSprintPage
-            ? (settings.sprintPage?.spaceKey ?? settings.atlassian.spaceKey)
-            : (template.spaceKeyOverride.isEmpty ? settings.atlassian.spaceKey : template.spaceKeyOverride)
-
-        guard !space.isEmpty else { return L("Destination non configurée") }
-
-        switch template.parent {
-        case .sprintPage:
-            if let sprint = settings.sprintPage {
-                return L("%@ › %@", space, sprint.title)
-            }
-            return L("%@ › accueil — aucune page de sprint définie", space)
-        case .page(let id) where !id.isEmpty:
-            return L("%@ › page %@", space, id)
-        case .page, .spaceHome:
-            return settings.atlassian.parentPageID.isEmpty
-                ? L("%@ › accueil de l'espace", space)
-                : L("%@ › page %@", space, settings.atlassian.parentPageID)
-        }
-    }
-
-    /// Sets the sprint page from a Confluence identifier or URL. The space
-    /// is deduced from the page, not typed by hand.
-    public func setSprintPage(from input: String) async -> String {
-        guard let pageID = SprintPage.extractPageID(from: input) else {
-            return L("❌ Identifiant ou URL de page non reconnu.")
-        }
-        guard settings.canPublish else {
-            return L("❌ Configure d'abord le site, l'e-mail et le jeton Atlassian.")
-        }
-
-        let client = ConfluenceClient(
-            configuration: settings.atlassian, token: settings.atlassianToken
-        )
-        do {
-            let page = try await client.page(id: pageID)
-            let spaceKey = try await client.spaceKey(forPage: pageID)
-            settings.sprintPage = SprintPage(id: pageID, title: page.title, spaceKey: spaceKey)
-            return L("✅ %@ › %@", spaceKey, page.title)
-        } catch {
-            return L("❌ %@", error.localizedDescription)
-        }
-    }
-
-    public func clearSprintPage() {
-        settings.sprintPage = nil
+        guard settings.canPublish else { return L("Confluence › configuration incomplète") }
+        return settings.atlassian.parentPageID.isEmpty
+            ? L("Confluence › espace personnel")
+            : L("Confluence › page %@", settings.atlassian.parentPageID)
     }
 
     // MARK: - Derived state
@@ -714,6 +681,7 @@ public final class RecordingSession {
     public func publish(
         _ meeting: Meeting,
         createJiraIssues: Bool,
+        destination: PublicationDestination? = nil,
         jiraProjectKey: String? = nil,
         jiraParentKey: String? = nil
     ) async {
@@ -757,6 +725,7 @@ public final class RecordingSession {
                 meetingDate: meeting.startedAt,
                 language: meeting.outputLanguage,
                 includeTranscript: settings.includesTranscript(for: .atlassian),
+                destination: destination,
                 jiraProjectKey: jiraProjectKey,
                 jiraParentKey: jiraParentKey,
                 translateForJira: translateForJira,
@@ -827,7 +796,11 @@ public final class RecordingSession {
 
     /// Publishes the minutes as a Notion page, optionally followed by the
     /// transcript in a collapsed toggle according to the active profile.
-    public func publishToNotion(_ meeting: Meeting, createTasks: Bool = false) async {
+    public func publishToNotion(
+        _ meeting: Meeting,
+        createTasks: Bool = false,
+        destination: PublicationDestination? = nil
+    ) async {
         guard let summary = meeting.summary else {
             notionPublishState = .failed(L("Aucun compte rendu à publier."))
             return
@@ -852,9 +825,11 @@ public final class RecordingSession {
             : nil
 
         do {
+            let effectiveDestination = destination ?? template.destination
             let page = try await client.createPage(
                 title: title,
                 markdown: markdown,
+                parentPageID: effectiveDestination.pageID,
                 transcript: transcript,
                 transcriptTitle: meeting.outputLanguage.pick(
                     fr: "Transcript intégral", en: "Full transcript"

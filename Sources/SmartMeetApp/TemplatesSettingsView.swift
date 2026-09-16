@@ -1,4 +1,5 @@
 import Atlassian
+import Notion
 import Summarization
 import SwiftUI
 
@@ -183,66 +184,55 @@ struct TemplatesSettingsView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
 
-            Picker("Service de publication", selection: binding(\.serviceKind)) {
+            Picker("Service de publication", selection: Binding(
+                get: { selected.serviceKind },
+                set: { service in
+                    var template = selected
+                    if template.serviceKind != service {
+                        template.serviceKind = service
+                        template.destination = .profileDefault
+                    }
+                    settings.upsert(template)
+                }
+            )) {
                 Text(inheritedServiceLabel).tag(ServiceKind?.none)
                 ForEach(settings.enabledServices.sorted { $0.displayName < $1.displayName }) { kind in
                     Text(kind.displayName).tag(ServiceKind?.some(kind))
                 }
             }
 
-            switch settings.publicationServiceKind(for: selected) {
-            case .atlassian:
-                Picker("Page parente Confluence", selection: parentModeBinding) {
-                    Text("Page de sprint courante").tag(ParentMode.sprint)
-                    Text("Page fixe").tag(ParentMode.fixed)
-                    Text("Accueil de l'espace").tag(ParentMode.home)
-                }
-                .pickerStyle(.radioGroup)
+            Picker("Page de publication", selection: destinationModeBinding) {
+                Text("Destination par défaut du profil").tag(DestinationMode.profileDefault)
+                Text("Page spécifique").tag(DestinationMode.specificPage)
+            }
+            .pickerStyle(.radioGroup)
 
-                if case .page(let id) = selected.parent {
-                    TextField(
-                        "URL ou identifiant de la page",
-                        text: Binding(
-                            get: { id },
-                            set: { newValue in
-                                var template = selected
-                                template.parent = .page(
-                                    id: SprintPage.extractPageID(from: newValue) ?? newValue
-                                )
-                                settings.upsert(template)
-                            }
-                        )
+            if case .page(let id) = selected.destination {
+                TextField(
+                    "URL ou identifiant de la page",
+                    text: Binding(
+                        get: { id },
+                        set: { value in
+                            var template = selected
+                            template.destination = .page(id: normalizedPageID(value))
+                            settings.upsert(template)
+                        }
                     )
-                    .textFieldStyle(.roundedBorder)
-                }
+                )
+                .textFieldStyle(.roundedBorder)
+            }
 
-                if !selected.parent.isSprintPage {
-                    TextField(
-                        "Espace Confluence (vide = espace par défaut)",
-                        text: binding(\.spaceKeyOverride)
-                    )
-                    .textFieldStyle(.roundedBorder)
-                }
-
-                if selected.parent.isSprintPage, settings.sprintPage == nil {
-                    Label(
-                        "Aucune page de sprint définie — onglet Services. En attendant, les comptes rendus iront à l'accueil de l'espace.",
-                        systemImage: "exclamationmark.triangle"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                }
-            case .notion:
-                Text("La page parente Notion est configurée pour le profil dans l'onglet Services.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            case nil:
+            if settings.publicationServiceKind(for: selected) == nil {
                 Label(
                     "Ajoute un service au profil ou choisis un service par défaut pour permettre la publication automatique.",
                     systemImage: "exclamationmark.triangle"
                 )
                 .font(.caption)
                 .foregroundStyle(.orange)
+            } else if selected.destination == .profileDefault {
+                Text("La destination par défaut se configure dans l'onglet Services.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Label(
@@ -261,27 +251,36 @@ struct TemplatesSettingsView: View {
         return L("Hériter du profil (%@)", inherited)
     }
 
-    private enum ParentMode: Hashable { case sprint, fixed, home }
+    private enum DestinationMode: Hashable { case profileDefault, specificPage }
 
-    private var parentModeBinding: Binding<ParentMode> {
+    private var destinationModeBinding: Binding<DestinationMode> {
         Binding(
             get: {
-                switch selected.parent {
-                case .sprintPage: .sprint
-                case .page: .fixed
-                case .spaceHome: .home
+                switch selected.destination {
+                case .profileDefault: .profileDefault
+                case .page: .specificPage
                 }
             },
             set: { mode in
                 var template = selected
-                template.parent = switch mode {
-                case .sprint: .sprintPage
-                case .fixed: .page(id: selected.parent.fixedPageID ?? "")
-                case .home: .spaceHome
+                template.destination = switch mode {
+                case .profileDefault: .profileDefault
+                case .specificPage: .page(id: selected.destination.pageID ?? "")
                 }
                 settings.upsert(template)
             }
         )
+    }
+
+    private func normalizedPageID(_ input: String) -> String {
+        switch settings.publicationServiceKind(for: selected) {
+        case .notion:
+            return NotionConfiguration.extractPageID(from: input) ?? input
+        case .atlassian:
+            return SprintPage.extractPageID(from: input) ?? input
+        case nil:
+            return input
+        }
     }
 
     private var sectionsEditor: some View {

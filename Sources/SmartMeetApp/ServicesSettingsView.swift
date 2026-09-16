@@ -19,9 +19,7 @@ struct ServicesSettingsView: View {
     @State private var spaces: [ConfluenceSpaceSummary] = []
     @State private var issueTypes: [String] = []
     @State private var statusMessage: String?
-    @State private var sprintPageInput: String = ""
-    @State private var sprintStatus: String?
-    @State private var isResolvingSprint = false
+    @State private var confluencePageInput = ""
     @State private var notionPageInput: String = ""
     @State private var notionPageStatus: String?
     @State private var notionVerifyStatus: String?
@@ -44,6 +42,7 @@ struct ServicesSettingsView: View {
             if selectedKind == nil || !settings.enabledServices.contains(selectedKind!) {
                 selectedKind = enabledSorted.first
             }
+            confluencePageInput = settings.atlassian.parentPageID
         }
     }
 
@@ -129,25 +128,18 @@ struct ServicesSettingsView: View {
             }
 
             Section("Confluence par défaut") {
-                if spaces.isEmpty {
-                    TextField("Clé de l'espace", text: $settings.atlassian.spaceKey)
-                } else {
-                    Picker("Espace", selection: $settings.atlassian.spaceKey) {
-                        ForEach(spaces) { space in
-                            Text("\(space.name) (\(space.key))").tag(space.key)
-                        }
-                    }
+                HStack {
+                    TextField(
+                        "Page parente par défaut (URL ou identifiant, vide = espace personnel)",
+                        text: $confluencePageInput
+                    )
+                    .onSubmit(applyConfluenceParentPage)
+                    Button("Définir") { applyConfluenceParentPage() }
                 }
-                TextField(
-                    "Page parente (id, vide = accueil)",
-                    text: $settings.atlassian.parentPageID
-                )
-                Text("Valeurs utilisées par les types de réunion qui ne définissent pas leur propre destination.")
+                Text("Sans page configurée, SmartMeet publie dans votre espace personnel Confluence. Une page spécifique peut être choisie dans chaque type de réunion ou juste avant de publier.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-
-            sprintSection
 
             Section("Jira") {
                 TextField("Projet", text: $settings.atlassian.jiraProjectKey)
@@ -184,6 +176,18 @@ struct ServicesSettingsView: View {
         .formStyle(.grouped)
         .padding()
         .frame(minWidth: 330)
+    }
+
+    private func applyConfluenceParentPage() {
+        let trimmed = confluencePageInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            settings.atlassian.parentPageID = ""
+            return
+        }
+        if let id = SprintPage.extractPageID(from: trimmed) {
+            settings.atlassian.parentPageID = id
+            confluencePageInput = id
+        }
     }
 
     private var notionForm: some View {
@@ -401,66 +405,6 @@ struct ServicesSettingsView: View {
             notionTaskStatus = L("❌ %@", error.localizedDescription)
         }
         isLoadingNotionDataSources = false
-    }
-
-    /// The sprint page is set once at the start of a sprint; every meeting
-    /// type that references it then follows automatically.
-    private var sprintSection: some View {
-        Section("Page de sprint courante") {
-            if let sprint = settings.sprintPage {
-                HStack {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(sprint.title).font(.callout).lineLimit(1)
-                        Text(L(
-                            "%@ · définie le %@",
-                            sprint.spaceKey,
-                            sprint.setAt.formatted(date: .abbreviated, time: .shortened)
-                        ))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button("Retirer") {
-                        session.clearSprintPage()
-                        sprintStatus = nil
-                    }
-                }
-            }
-
-            HStack {
-                TextField(
-                    settings.sprintPage == nil ? "URL ou identifiant de la page" : "Changer de page",
-                    text: $sprintPageInput
-                )
-                .onSubmit { Task { await applySprintPage() } }
-
-                Button(isResolvingSprint ? "…" : "Définir") {
-                    Task { await applySprintPage() }
-                }
-                .disabled(sprintPageInput.isEmpty || isResolvingSprint)
-            }
-
-            if let sprintStatus {
-                Text(sprintStatus).font(.caption).foregroundStyle(.secondary)
-            }
-
-            Text("Colle l'URL de la page qui agrège le sprint. Les types de réunion réglés sur « page de sprint » y publieront leurs comptes rendus, dans l'espace de cette page.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            if settings.sprintPage != nil {
-                Text("Changer de page ne migre pas les comptes rendus déjà publiés : ils restent sur l'ancienne page de sprint.")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            }
-        }
-    }
-
-    private func applySprintPage() async {
-        isResolvingSprint = true
-        sprintStatus = await session.setSprintPage(from: sprintPageInput)
-        isResolvingSprint = false
-        if settings.sprintPage != nil { sprintPageInput = "" }
     }
 
     private func loadRemoteOptions() async {

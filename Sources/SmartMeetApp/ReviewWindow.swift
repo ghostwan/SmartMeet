@@ -1,4 +1,6 @@
+import Atlassian
 import MeetingStore
+import Notion
 import Summarization
 import SwiftUI
 
@@ -22,6 +24,9 @@ struct ReviewWindow: View {
     @State private var jiraProjectKeyInput = ""
     @State private var jiraParentKeyInput = ""
     @State private var pendingPublishMeeting: Meeting?
+    @State private var publicationService: ServiceKind?
+    @State private var publicationDestination: PublicationDestination = .profileDefault
+    @State private var publicationPageInput = ""
 
     var body: some View {
         Group {
@@ -59,6 +64,10 @@ struct ReviewWindow: View {
             templateSelection = meeting.templateID
             oneToOneNameInput = meeting.oneToOneParticipant ?? ""
             oneToOneEmailInput = meeting.oneToOneParticipantEmail ?? ""
+            let template = session.template(for: meeting)
+            publicationService = session.settings.publicationServiceKind(for: template)
+            publicationDestination = template.destination
+            publicationPageInput = template.destination.pageID ?? ""
         }
         .onChange(of: session.summaryState) { load(session.reviewedMeeting ?? meeting) }
         .sheet(isPresented: $showJiraDestinationSheet) {
@@ -103,6 +112,7 @@ struct ReviewWindow: View {
                             await session.publish(
                                 meeting,
                                 createJiraIssues: true,
+                                destination: publicationDestination,
                                 jiraProjectKey: jiraProjectKeyInput,
                                 jiraParentKey: jiraParentKeyInput
                             )
@@ -699,9 +709,47 @@ struct ReviewWindow: View {
             }
 
             HStack(spacing: 8) {
-                // The effective destination depends on the meeting type and
-                // the sprint page: it's shown before publishing, not after.
-                Label(session.destinationSummary(for: template), systemImage: "tray.and.arrow.down")
+                Picker("Service", selection: Binding(
+                    get: { publicationService },
+                    set: { service in
+                        if publicationService != service {
+                            publicationService = service
+                            publicationDestination = .profileDefault
+                            publicationPageInput = ""
+                        }
+                    }
+                )) {
+                    ForEach(session.settings.enabledServices.sorted {
+                        $0.displayName < $1.displayName
+                    }) { service in
+                        Text(service.displayName).tag(ServiceKind?.some(service))
+                    }
+                }
+                .frame(width: 130)
+                Picker("Destination", selection: Binding(
+                    get: {
+                        publicationDestination == .profileDefault ? 0 : 1
+                    },
+                    set: { value in
+                        publicationDestination = value == 0
+                            ? .profileDefault
+                            : .page(id: publicationPageInput)
+                    }
+                )) {
+                    Text("Défaut du profil").tag(0)
+                    Text("Page spécifique").tag(1)
+                }
+                .frame(width: 170)
+                if publicationDestination != .profileDefault {
+                    TextField("URL ou identifiant", text: $publicationPageInput)
+                        .textFieldStyle(.roundedBorder)
+                        .onChange(of: publicationPageInput) {
+                            publicationDestination = .page(
+                                id: normalizedPublicationPageID(publicationPageInput)
+                            )
+                        }
+                }
+                Label(publicationDestinationSummary, systemImage: "tray.and.arrow.down")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -715,10 +763,13 @@ struct ReviewWindow: View {
             }
 
             HStack {
-                Toggle("Créer les tickets Jira cochés", isOn: $createJiraIssues)
-                    .disabled(!session.settings.atlassian.isJiraReady)
-                Toggle("Créer les tâches Notion cochées", isOn: $createNotionTasks)
-                    .disabled(!session.settings.notion.isTaskDataSourceConfigured)
+                if publicationService == .atlassian {
+                    Toggle("Créer les tickets Jira cochés", isOn: $createJiraIssues)
+                        .disabled(!session.settings.atlassian.isJiraReady)
+                } else if publicationService == .notion {
+                    Toggle("Créer les tâches Notion cochées", isOn: $createNotionTasks)
+                        .disabled(!session.settings.notion.isTaskDataSourceConfigured)
+                }
                 Spacer()
                 Button("Copier en markdown") {
                     NSPasteboard.general.clearContents()
@@ -728,55 +779,11 @@ struct ReviewWindow: View {
                     )
                 }
                 Button(L("Enregistrer les modifications")) { session.saveReviewedSummary(draft) }
-                if session.settings.canPublishToNotion {
-                    Group {
-                        if case .running = session.notionPublishState {
-                            Button {
-                            } label: {
-                                ProgressView().controlSize(.small)
-                            }
-                            .disabled(true)
-                        } else if session.settings.publicationServiceKind(for: template) == .notion {
-                            Button("Publier sur Notion") {
-                                session.saveReviewedSummary(draft)
-                                if let updated = session.reviewedMeeting {
-                                    Task {
-                                        await session.publishToNotion(
-                                            updated,
-                                            createTasks: createNotionTasks
-                                        )
-                                    }
-                                }
-                            }
-                            .buttonStyle(.borderedProminent)
-                        } else {
-                            Button("Publier sur Notion") {
-                                session.saveReviewedSummary(draft)
-                                if let updated = session.reviewedMeeting {
-                                    Task {
-                                        await session.publishToNotion(
-                                            updated,
-                                            createTasks: createNotionTasks
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
+                Button(publicationService == .notion ? "Publier sur Notion" : "Publier sur Confluence") {
+                    publishUsingReviewDestination()
                 }
-                Group {
-                    if session.settings.publicationServiceKind(for: template) == .atlassian {
-                        Button("Publier sur Confluence") {
-                            confluencePublishAction()
-                        }
-                        .buttonStyle(.borderedProminent)
-                    } else {
-                        Button("Publier sur Confluence") {
-                            confluencePublishAction()
-                        }
-                    }
-                }
-                .disabled(!session.settings.canPublish)
+                .buttonStyle(.borderedProminent)
+                .disabled(!canPublishUsingReviewDestination)
             }
         }
         .padding()
@@ -795,7 +802,59 @@ struct ReviewWindow: View {
             pendingPublishMeeting = updated
             showJiraDestinationSheet = true
         } else {
-            Task { await session.publish(updated, createJiraIssues: false) }
+            Task {
+                await session.publish(
+                    updated,
+                    createJiraIssues: false,
+                    destination: publicationDestination
+                )
+            }
+        }
+    }
+
+    private var publicationDestinationSummary: String {
+        guard let publicationService else { return L("Aucun service de publication sélectionné") }
+        return session.destinationSummary(
+            service: publicationService,
+            destination: publicationDestination
+        )
+    }
+
+    private var canPublishUsingReviewDestination: Bool {
+        guard let publicationService,
+              session.settings.canPublish(to: publicationService)
+        else { return false }
+        if case .page(let id) = publicationDestination { return !id.isEmpty }
+        return true
+    }
+
+    private func normalizedPublicationPageID(_ input: String) -> String {
+        switch publicationService {
+        case .notion:
+            return NotionConfiguration.extractPageID(from: input) ?? input
+        case .atlassian:
+            return SprintPage.extractPageID(from: input) ?? input
+        case nil:
+            return input
+        }
+    }
+
+    private func publishUsingReviewDestination() {
+        session.saveReviewedSummary(draft)
+        guard let updated = session.reviewedMeeting else { return }
+        switch publicationService {
+        case .notion:
+            Task {
+                await session.publishToNotion(
+                    updated,
+                    createTasks: createNotionTasks,
+                    destination: publicationDestination
+                )
+            }
+        case .atlassian:
+            confluencePublishAction()
+        case nil:
+            break
         }
     }
 

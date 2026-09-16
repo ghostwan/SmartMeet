@@ -159,12 +159,7 @@ struct MenuBarContent: View {
                     // now than at publish time.
                     Text(session.destinationSummary(for: session.selectedTemplate))
                         .font(.caption2)
-                        .foregroundStyle(
-                            session.selectedTemplate.parent.isSprintPage
-                                && session.settings.sprintPage == nil
-                                ? Color.orange
-                                : Color.secondary.opacity(0.6)
-                        )
+                        .foregroundStyle(Color.secondary.opacity(0.6))
                         .lineLimit(1)
                 }
                 Spacer()

@@ -174,15 +174,14 @@ minutes.
 ### Destination
 
 Each type can inherit the profile's publication service or explicitly target
-Notion or Atlassian. A manual choice in the review window always takes
-precedence. Notion types publish under the profile's configured parent page;
-Atlassian types can additionally target one of these Confluence parents:
+Notion or Atlassian. For either service, it then chooses the profile's default
+destination or a specific parent page. Confluence derives the space from that
+page; without a configured default it uses the current user's personal space.
+Notion uses the configured parent page, or its private-page root when the
+integration supports root publication.
 
-- **current sprint page** — set in *Settings › Services*, by pasting the
-  page's URL. The space is inferred from the page. As long as no page is
-  set, the minutes go to the space's home page instead of failing;
-- **fixed page** — Confluence identifier or URL;
-- **space home page**.
+The review window exposes the same service and destination controls, so one
+meeting can be published elsewhere without changing its meeting type.
 
 The effective destination is shown in the menu and before publishing.
 

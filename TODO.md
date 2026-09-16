@@ -179,7 +179,7 @@ for generating the minutes.
 Checking everything is in place:
 
 ```sh
-swift test                                   # 173 tests
+swift test                                   # 172 tests
 ./Scripts/bundle-app.sh && open build/SmartMeet.app
 open build/SmartMeet.app --args --check-notifications /tmp/report.txt
 ```

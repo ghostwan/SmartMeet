@@ -230,15 +230,15 @@ struct ConfluenceRendererTests {
 
 @Suite("Configuration Atlassian")
 struct AtlassianConfigurationTests {
-    @Test("La publication exige site, e-mail et espace")
+    @Test("La publication Confluence exige seulement le compte, la destination est résolue ensuite")
     func readiness() {
         var configuration = AtlassianConfiguration(
             site: "acme", email: "a@b.c", spaceKey: "", jiraProjectKey: "SEC"
         )
-        #expect(!configuration.isConfluenceReady)
-        configuration.spaceKey = "SMARTMEET"
         #expect(configuration.isConfluenceReady)
         #expect(configuration.isJiraReady)
+        configuration.email = ""
+        #expect(!configuration.isConfluenceReady)
     }
 
     @Test("L'URL de base est dérivée du site")

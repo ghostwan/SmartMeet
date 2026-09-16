@@ -21,6 +21,19 @@ public enum ParentPageReference: Codable, Sendable, Equatable, Hashable {
     }
 }
 
+/// Service-neutral publication location. Each service interprets a specific
+/// page ID in its own API; `.profileDefault` uses that profile's configured
+/// parent (or the service's safe personal/private fallback).
+public enum PublicationDestination: Codable, Sendable, Equatable, Hashable {
+    case profileDefault
+    case page(id: String)
+
+    public var pageID: String? {
+        if case .page(let id) = self { return id }
+        return nil
+    }
+}
+
 /// Composition of the published page's title.
 ///
 /// The title produced by the model is too variable to serve as a naming
