@@ -56,6 +56,12 @@ notes, then resets it to this template once the release is published.
   Picking a result resolves the `accountId` right away, which is also more
   reliable at publish time than the e-mail search (some Cloud sites restrict
   it for GDPR reasons).
+- New *Settings › One-to-one* tab: recurring 1:1 counterparts are configured
+  once, each with its own publication destination (a specific Confluence or
+  Notion page, overriding the meeting type's own destination) and an e-mail
+  to add as a watcher on every Jira ticket created from their action items.
+  Recording a one-to-one is now a matter of picking a configured name from a
+  list — no more retyping an e-mail or destination page every time.
 
 ### Changed
 

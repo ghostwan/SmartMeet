@@ -19,8 +19,12 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
     /// into speech recognition and the minutes prompt.
     public var vocabulary: [String]
     /// People regularly involved in meetings under this profile, used for
-    /// transcription hints, prompt context and one-to-one suggestions.
+    /// transcription hints and prompt context.
     public var knownPeople: [String]
+    /// People configured for recurring one-to-ones under this profile: each
+    /// carries its own publication destination and the Jira e-mail tickets
+    /// should be shared with, so recording only requires picking a name.
+    public var oneToOnePeople: [OneToOnePerson]
     /// Meeting types created by the user for this profile, in addition to the
     /// built-in templates.
     public var customTemplates: [MeetingTemplate]
@@ -107,6 +111,7 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
         symbol: String = "person.crop.circle",
         vocabulary: [String] = [],
         knownPeople: [String] = [],
+        oneToOnePeople: [OneToOnePerson] = [],
         customTemplates: [MeetingTemplate] = [],
         enabledTemplateIDs: Set<String>? = nil,
         defaultTemplateID: String? = nil,
@@ -131,6 +136,7 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
         self.symbol = symbol
         self.vocabulary = vocabulary
         self.knownPeople = knownPeople
+        self.oneToOnePeople = oneToOnePeople
         self.customTemplates = customTemplates
         self.enabledTemplateIDs = enabledTemplateIDs ?? [MeetingTemplate.personal.id]
         self.defaultTemplateID = defaultTemplateID ?? MeetingTemplate.personal.id
@@ -154,14 +160,13 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, symbol, vocabulary, knownPeople, customTemplates
+        case id, name, symbol, vocabulary, knownPeople, oneToOnePeople, customTemplates
         case enabledTemplateIDs, defaultTemplateID, defaultServiceKind
         case enabledServices, servicesIncludingTranscript, localeIdentifier, recentTranscriptionLocales
         case defaultOutputLanguage, enabledOutputLanguages, detectMeetings, autoStartOnDetection
         case detectMeetingEnd, autoSummarize, autoPublish, autoCreateJiraIssues, autoCreateNotionTasks
         case diarizeMicrophoneTrack
     }
-
     // Tolerant decoding: a profile saved before a field existed should still
     // load, with a sensible default rather than failing the whole array.
     public init(from decoder: any Decoder) throws {
@@ -171,6 +176,9 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
         symbol = try container.decodeIfPresent(String.self, forKey: .symbol) ?? "person.crop.circle"
         vocabulary = try container.decodeIfPresent([String].self, forKey: .vocabulary) ?? []
         knownPeople = try container.decodeIfPresent([String].self, forKey: .knownPeople) ?? []
+        oneToOnePeople = try container.decodeIfPresent(
+            [OneToOnePerson].self, forKey: .oneToOnePeople
+        ) ?? []
         customTemplates = try container.decodeIfPresent(
             [MeetingTemplate].self, forKey: .customTemplates
         ) ?? []

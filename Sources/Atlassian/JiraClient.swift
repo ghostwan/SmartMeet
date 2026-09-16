@@ -88,6 +88,31 @@ public struct JiraClient: Sendable {
         _ = try await client.request("DELETE", "/rest/api/3/issue/\(key)")
     }
 
+    /// Resolves an e-mail into a Jira Cloud `accountId`, to add someone as a
+    /// watcher on a ticket. Distinct endpoint from Confluence's own user
+    /// search (`ConfluenceClient.accountID(forEmail:)`): the two products
+    /// share a site but not a user-search API.
+    ///
+    /// Best effort: some Cloud sites restrict user search by e-mail (GDPR).
+    /// `nil` is returned rather than failing the whole publication.
+    public func accountID(forEmail email: String) async throws -> String? {
+        guard let encoded = email.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+        else { return nil }
+        guard let results = try? await client.requestArray(
+            "GET", "/rest/api/3/user/search?query=\(encoded)"
+        ) else { return nil }
+        return results.first?["accountId"] as? String
+    }
+
+    /// Adds a watcher to an already-created ticket — used to share it with
+    /// someone regardless of who ends up assigned, e.g. a one-to-one's
+    /// counterpart configured to always see the tickets raised against them.
+    public func addWatcher(issueKey: String, accountID: String) async throws {
+        _ = try await client.request(
+            "POST", "/rest/api/3/issue/\(issueKey)/watchers", stringBody: accountID
+        )
+    }
+
     private func textParagraph(_ text: String) -> [String: Any] {
         ["type": "paragraph", "content": [["type": "text", "text": text]]]
     }

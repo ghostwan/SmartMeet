@@ -155,6 +155,17 @@ public final class AppSettings {
             activeProfile = profile
         }
     }
+    /// People configured for recurring one-to-ones under the active profile:
+    /// each carries its own publication destination and Jira share e-mail,
+    /// so recording only requires picking a name from this list.
+    public var oneToOnePeople: [OneToOnePerson] {
+        get { activeProfile.oneToOnePeople }
+        set {
+            var profile = activeProfile
+            profile.oneToOnePeople = newValue
+            activeProfile = profile
+        }
+    }
     /// User's name: the transcript only knows them by the label "Moi" ("Me").
     public var userName: String {
         didSet { defaults.set(userName, forKey: Key.userName) }
@@ -759,6 +770,29 @@ public final class AppSettings {
         } else {
             customTemplates.append(template)
         }
+    }
+
+    /// Adds a blank one-to-one counterpart to configure under the active
+    /// profile, returned so the caller can select it right away.
+    @discardableResult
+    public func createOneToOnePerson() -> OneToOnePerson {
+        let person = OneToOnePerson(name: L("Nouvelle personne"))
+        oneToOnePeople.append(person)
+        return person
+    }
+
+    /// Saves a one-to-one counterpart's configuration (name, destination,
+    /// Jira share e-mail…), whether it's new or already exists.
+    public func upsert(_ person: OneToOnePerson) {
+        if let index = oneToOnePeople.firstIndex(where: { $0.id == person.id }) {
+            oneToOnePeople[index] = person
+        } else {
+            oneToOnePeople.append(person)
+        }
+    }
+
+    public func removeOneToOnePerson(_ person: OneToOnePerson) {
+        oneToOnePeople.removeAll { $0.id == person.id }
     }
 
 }

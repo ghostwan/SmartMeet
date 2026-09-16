@@ -46,6 +46,15 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
     /// e-mail search, which some Cloud sites restrict for GDPR reasons. Takes
     /// priority over `oneToOneParticipantEmail` at publish time when present.
     public var oneToOneParticipantAccountID: String?
+    /// Publication destination carried over from the counterpart configured
+    /// in Settings (`OneToOnePerson.destination`), overriding the meeting
+    /// type's own destination. `nil` defers to the meeting type, same as
+    /// `.profileDefault`.
+    public var oneToOneDestination: PublicationDestination?
+    /// E-mail of the account to add as a watcher on every Jira ticket created
+    /// from this meeting's action items, carried over from the counterpart
+    /// configured in Settings. `nil` shares with no one beyond the assignee.
+    public var oneToOneJiraShareEmail: String?
 
     public init(
         id: UUID = UUID(),
@@ -65,7 +74,9 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         jiraSearchURL: String? = nil,
         oneToOneParticipant: String? = nil,
         oneToOneParticipantEmail: String? = nil,
-        oneToOneParticipantAccountID: String? = nil
+        oneToOneParticipantAccountID: String? = nil,
+        oneToOneDestination: PublicationDestination? = nil,
+        oneToOneJiraShareEmail: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -85,6 +96,8 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         self.oneToOneParticipant = oneToOneParticipant
         self.oneToOneParticipantEmail = oneToOneParticipantEmail
         self.oneToOneParticipantAccountID = oneToOneParticipantAccountID
+        self.oneToOneDestination = oneToOneDestination
+        self.oneToOneJiraShareEmail = oneToOneJiraShareEmail
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -92,7 +105,7 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         case knownAttendees, templateID, outputLanguage
         case summary, confluencePageURL, jiraIssueKeys, notionPageURL, tokenUsage
         case jiraSearchURL, oneToOneParticipant, oneToOneParticipantEmail
-        case oneToOneParticipantAccountID
+        case oneToOneParticipantAccountID, oneToOneDestination, oneToOneJiraShareEmail
     }
 
     // Tolerant decoding: meetings recorded before the summary feature was added
@@ -125,6 +138,12 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         )
         oneToOneParticipantAccountID = try container.decodeIfPresent(
             String.self, forKey: .oneToOneParticipantAccountID
+        )
+        oneToOneDestination = try container.decodeIfPresent(
+            PublicationDestination.self, forKey: .oneToOneDestination
+        )
+        oneToOneJiraShareEmail = try container.decodeIfPresent(
+            String.self, forKey: .oneToOneJiraShareEmail
         )
     }
 

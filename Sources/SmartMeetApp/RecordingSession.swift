@@ -79,6 +79,13 @@ public final class RecordingSession {
     /// "search Confluence users" results rather than typed by hand — a more
     /// reliable path to restrict the page than the e-mail search.
     public var oneToOneParticipantAccountID: String = ""
+    /// Publication destination for the next recording, carried over from a
+    /// configured `OneToOnePerson`. `nil` defers to the meeting type's own
+    /// destination.
+    public var oneToOneDestination: PublicationDestination?
+    /// E-mail to add as a watcher on every Jira ticket created for the next
+    /// recording, carried over from a configured `OneToOnePerson`.
+    public var oneToOneJiraShareEmail: String = ""
 
     public let settings: AppSettings
     private let store: MeetingStore
@@ -344,6 +351,18 @@ public final class RecordingSession {
         oneToOneParticipantAccountID = match.accountID
     }
 
+    /// Fills in every one-to-one field from a person configured in Settings:
+    /// name, restriction e-mail/accountId, publication destination and Jira
+    /// share e-mail — the whole point of configuring them once being to pick
+    /// a name instead of retyping all of this at every recording.
+    public func selectOneToOnePerson(_ person: OneToOnePerson) {
+        oneToOneParticipantName = person.name
+        oneToOneParticipantEmail = person.email
+        oneToOneParticipantAccountID = person.confluenceAccountID
+        oneToOneDestination = person.destination == .profileDefault ? nil : person.destination
+        oneToOneJiraShareEmail = person.jiraShareEmail
+    }
+
     /// Readable destination, computed locally with no network call, to
     /// display before publishing.
     public func destinationSummary(for template: MeetingTemplate) -> String {
@@ -520,7 +539,10 @@ public final class RecordingSession {
             oneToOneParticipantEmail: selectedTemplate.requiresParticipant && !oneToOneParticipantEmail.isEmpty
                 ? oneToOneParticipantEmail : nil,
             oneToOneParticipantAccountID: selectedTemplate.requiresParticipant && !oneToOneParticipantAccountID.isEmpty
-                ? oneToOneParticipantAccountID : nil
+                ? oneToOneParticipantAccountID : nil,
+            oneToOneDestination: selectedTemplate.requiresParticipant ? oneToOneDestination : nil,
+            oneToOneJiraShareEmail: selectedTemplate.requiresParticipant && !oneToOneJiraShareEmail.isEmpty
+                ? oneToOneJiraShareEmail : nil
         )
         meeting.trackStartOffsets = Dictionary(
             uniqueKeysWithValues: (result?.trackStartOffsets ?? [:])
@@ -543,6 +565,8 @@ public final class RecordingSession {
         oneToOneParticipantName = ""
         oneToOneParticipantEmail = ""
         oneToOneParticipantAccountID = ""
+        oneToOneDestination = nil
+        oneToOneJiraShareEmail = ""
         // A new meeting can follow right away: reset the dismissed suggestions.
         detector.resetDismissals()
         notifier.reset()
@@ -707,6 +731,23 @@ public final class RecordingSession {
         meetings = store.loadAll()
     }
 
+    /// Applies a person configured in Settings to an already-recorded
+    /// one-to-one — e.g. picking the right counterpart after the fact also
+    /// restores their configured destination and Jira share e-mail, not just
+    /// their name.
+    public func setOneToOnePerson(_ person: OneToOnePerson, for meeting: Meeting) {
+        var updated = meeting
+        updated.oneToOneParticipant = person.name.isEmpty ? nil : person.name
+        updated.oneToOneParticipantEmail = person.email.isEmpty ? nil : person.email
+        updated.oneToOneParticipantAccountID = person.confluenceAccountID.isEmpty
+            ? nil : person.confluenceAccountID
+        updated.oneToOneDestination = person.destination == .profileDefault ? nil : person.destination
+        updated.oneToOneJiraShareEmail = person.jiraShareEmail.isEmpty ? nil : person.jiraShareEmail
+        try? store.update(updated, customTemplates: settings.customTemplates)
+        if reviewedMeeting?.id == meeting.id { reviewedMeeting = updated }
+        meetings = store.loadAll()
+    }
+
     // MARK: - Publication
 
     public func publish(
@@ -756,13 +797,14 @@ public final class RecordingSession {
                 meetingDate: meeting.startedAt,
                 language: meeting.outputLanguage,
                 includeTranscript: settings.includesTranscript(for: .atlassian),
-                destination: destination,
+                destination: destination ?? meeting.oneToOneDestination,
                 jiraProjectKey: jiraProjectKey,
                 jiraParentKey: jiraParentKey,
                 translateForJira: translateForJira,
                 participantName: meeting.oneToOneParticipant ?? "",
                 restrictToParticipantEmail: meeting.oneToOneParticipantEmail,
-                restrictToParticipantAccountID: meeting.oneToOneParticipantAccountID
+                restrictToParticipantAccountID: meeting.oneToOneParticipantAccountID,
+                jiraShareEmail: meeting.oneToOneJiraShareEmail
             ) { step in
                 Task { @MainActor [weak self] in
                     self?.publishState = .running(Self.describe(step))
@@ -857,7 +899,7 @@ public final class RecordingSession {
             : nil
 
         do {
-            let effectiveDestination = destination ?? template.destination
+            let effectiveDestination = destination ?? meeting.oneToOneDestination ?? template.destination
             let page = try await client.createPage(
                 title: title,
                 markdown: markdown,

@@ -198,6 +198,18 @@ meeting can be published elsewhere without changing its meeting type.
 
 The effective destination is shown in the menu and before publishing.
 
+### One-to-one counterparts
+
+*Settings › One-to-one* configures the people you regularly hold 1:1s with —
+name, an optional e-mail to restrict the published Confluence page to just
+the two of you, a publication destination that overrides the "One to One"
+type's own destination (e.g. everyone's minutes under their own Confluence
+page), and an e-mail to add as a Jira watcher on every ticket created from
+their action items. Recording a one-to-one then only requires picking a name
+from the list — the manual "who with" field (calendar candidates, free text,
+Confluence search) is still available, folded under "Autre / corriger", for
+a counterpart not configured yet.
+
 ### Headless mode
 
 Useful for diagnostics and end-to-end testing.

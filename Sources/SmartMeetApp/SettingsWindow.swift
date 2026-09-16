@@ -1,3 +1,4 @@
+import AppKit
 import Diarization
 import Summarization
 import SwiftUI
@@ -11,6 +12,33 @@ struct SettingsWindow: View {
     @State private var knownPeopleText: String = ""
     @State private var availableLocales: [(id: String, label: String)] = []
 
+    /// Tab titles, kept in sync with the `Label`s below — used only to size
+    /// the window so every tab fits without the ">>" overflow chevron,
+    /// whatever the number of tabs (a new one was recently added) or the
+    /// active language (some translations run noticeably longer than the
+    /// French originals).
+    private static let tabTitles = [
+        "Profils", "Transcription", "Compte rendu", "Types de réunion", "One-to-one", "Services",
+    ]
+
+    /// Sums each tab's localized label width (text + its own icon/padding)
+    /// rather than using a single fixed constant: a window sized for five
+    /// tabs starts truncating the sixth, and a translation can run longer
+    /// than the French original it was sized for.
+    private var windowWidth: CGFloat {
+        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        // Empirical allowance for a tab's icon plus its internal padding —
+        // just the label's text width would sit right at the truncation
+        // threshold.
+        let perTabAllowance: CGFloat = 56
+        let labelsWidth = Self.tabTitles.reduce(CGFloat.zero) { total, title in
+            let localized = NSLocalizedString(title, bundle: .main, value: title, comment: "")
+            let width = (localized as NSString).size(withAttributes: [.font: font]).width
+            return total + width + perTabAllowance
+        }
+        return max(760, labelsWidth)
+    }
+
     var body: some View {
         TabView {
             ProfilesSettingsView(settings: settings, session: session)
@@ -19,10 +47,20 @@ struct SettingsWindow: View {
             summaryTab.tabItem { Label("Compte rendu", systemImage: "sparkles") }
             TemplatesSettingsView(settings: settings, session: session)
                 .tabItem { Label("Types de réunion", systemImage: "square.stack") }
+            OneToOnePeopleSettingsView(settings: settings, session: session)
+                .tabItem { Label("One-to-one", systemImage: "person.2") }
             ServicesSettingsView(settings: settings, session: session)
                 .tabItem { Label("Services", systemImage: "tray.and.arrow.up") }
         }
-        .frame(width: 760, height: 480)
+        // macOS 26's default tab style adapts to a sidebar and collapses
+        // extra tabs behind a "More" overflow button once there are more
+        // than a handful — regardless of the window's width, which
+        // `windowWidth` above has no effect on. `.tabBarOnly` doesn't
+        // actually apply on macOS (its availability list omits it); `.grouped`
+        // is the one macOS 15+ style that keeps a classic, fully expanded
+        // preferences-style tab bar with every tab directly clickable.
+        .tabViewStyle(.grouped)
+        .frame(width: windowWidth, height: 480)
         .onAppear {
             vocabularyText = settings.vocabulary.joined(separator: ", ")
             knownPeopleText = settings.knownPeople.joined(separator: ", ")

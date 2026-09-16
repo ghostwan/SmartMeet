@@ -155,6 +155,43 @@ public struct AtlassianClient: Sendable {
         _ path: String,
         body: [String: Any]? = nil
     ) async throws -> [String: Any] {
+        let (data, _) = try await rawRequest(method, path, body: body)
+        guard !data.isEmpty else { return [:] }
+        return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    }
+
+    /// Same as `request`, for endpoints whose JSON body is a bare string
+    /// rather than an object (e.g. Jira's "add watcher", whose body is just
+    /// an `accountId` string).
+    func request(
+        _ method: String,
+        _ path: String,
+        stringBody: String
+    ) async throws -> [String: Any] {
+        let (data, _) = try await rawRequest(method, path, rawBody: try JSONSerialization.data(
+            withJSONObject: stringBody, options: .fragmentsAllowed
+        ))
+        guard !data.isEmpty else { return [:] }
+        return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    }
+
+    /// Same as `request`, for endpoints whose successful response is a bare
+    /// JSON array rather than an object (e.g. Jira's user search).
+    func requestArray(
+        _ method: String,
+        _ path: String
+    ) async throws -> [[String: Any]] {
+        let (data, _) = try await rawRequest(method, path)
+        guard !data.isEmpty else { return [] }
+        return (try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]) ?? []
+    }
+
+    private func rawRequest(
+        _ method: String,
+        _ path: String,
+        body: [String: Any]? = nil,
+        rawBody: Data? = nil
+    ) async throws -> (Data, HTTPURLResponse) {
         guard let baseURL = configuration.baseURL else {
             throw AtlassianError.notConfigured(NSLocalizedString("site Atlassian", bundle: .main, value: "site Atlassian", comment: ""))
         }
@@ -172,7 +209,10 @@ public struct AtlassianClient: Sendable {
         let credentials = Data("\(configuration.email):\(token)".utf8).base64EncodedString()
         request.setValue("Basic \(credentials)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if let body {
+        if let rawBody {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = rawBody
+        } else if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
@@ -187,7 +227,6 @@ public struct AtlassianClient: Sendable {
                 body: String(decoding: data, as: UTF8.self)
             )
         }
-        guard !data.isEmpty else { return [:] }
-        return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+        return (data, http)
     }
 }

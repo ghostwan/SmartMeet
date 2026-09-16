@@ -113,6 +113,12 @@ public struct PublishService: Sendable {
         /// `restrictToParticipantEmail`: it's already an exact match, so
         /// there's no need to fall back to the less reliable e-mail search.
         restrictToParticipantAccountID: String? = nil,
+        /// E-mail to add as a watcher on every Jira ticket created during
+        /// this publication, e.g. a one-to-one counterpart configured to
+        /// always see their tickets regardless of who's assigned. Resolved
+        /// to an `accountId` once and reused for every ticket rather than
+        /// per-ticket, since it never changes within a single publication.
+        jiraShareEmail: String? = nil,
         onStep: @Sendable (PublishStep) -> Void = { _ in }
     ) async throws -> PublicationResult {
         guard configuration.isConfluenceReady else {
@@ -193,6 +199,23 @@ public struct PublishService: Sendable {
                 englishTitle = title
             }
 
+            // Resolved once and reused for every ticket: an e-mail search
+            // failure (GDPR-restricted site, unknown address…) shouldn't be
+            // retried per ticket, and shouldn't cost the tickets themselves —
+            // only the sharing is skipped.
+            var jiraShareAccountID: String?
+            if let jiraShareEmail, !jiraShareEmail.isEmpty {
+                jiraShareAccountID = try? await jira.accountID(forEmail: jiraShareEmail)
+                if jiraShareAccountID == nil {
+                    failures.append(NSLocalizedString(
+                        "Le compte Jira à qui partager les tickets n'a pas été trouvé — les tickets restent visibles de la seule personne assignée.",
+                        bundle: .main,
+                        value: "Le compte Jira à qui partager les tickets n'a pas été trouvé — les tickets restent visibles de la seule personne assignée.",
+                        comment: ""
+                    ))
+                }
+            }
+
             let selected = summary.actionItems.enumerated().filter { $0.element.isSelected }
             for (position, (index, item)) in selected.enumerated() {
                 onStep(.creatingIssue(index: position + 1, total: selected.count))
@@ -213,6 +236,9 @@ public struct PublishService: Sendable {
                     )
                     enriched.actionItems[index].jiraKey = issue.key
                     createdKeys[item.id.uuidString] = issue.key
+                    if let jiraShareAccountID {
+                        try? await jira.addWatcher(issueKey: issue.key, accountID: jiraShareAccountID)
+                    }
                 } catch {
                     // A rejected ticket must not cost the already-published page.
                     failures.append(String(

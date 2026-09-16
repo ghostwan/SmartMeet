@@ -113,9 +113,12 @@ macOS keychain (`Sources/Atlassian/KeychainStore.swift`) or in the environment
   value, out-of-vocabulary value) in addition to the nominal case.
 - Before considering a task done: `swift build` with no warnings and
   `swift test` fully green.
-- Once a task is done, rebuild the app (`./Scripts/bundle-app.sh`) and relaunch
-  it (`open build/SmartMeet.app`) to verify the change for real, not just in
-  the test suite.
+- **After every task, unconditionally — not just when asked — rebuild the app
+  (`./Scripts/bundle-app.sh`) and relaunch it on this machine (`pkill -x
+  SmartMeet; open build/SmartMeet.app`)** to verify the change for real, not
+  just in the test suite. This is the last step of a task, done automatically
+  right before reporting the result back, never skipped and never left for
+  the user to trigger themselves.
 
 ## Structural things to know
 

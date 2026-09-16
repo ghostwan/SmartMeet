@@ -67,8 +67,8 @@ struct ReviewWindow: View {
             oneToOneEmailInput = meeting.oneToOneParticipantEmail ?? ""
             let template = session.template(for: meeting)
             publicationService = session.settings.publicationServiceKind(for: template)
-            publicationDestination = template.destination
-            publicationPageInput = template.destination.pageID ?? ""
+            publicationDestination = meeting.oneToOneDestination ?? template.destination
+            publicationPageInput = publicationDestination.pageID ?? ""
             oneToOneAccountIDInput = meeting.oneToOneParticipantAccountID ?? ""
         }
         .onChange(of: session.summaryState) { load(session.reviewedMeeting ?? meeting) }
@@ -257,6 +257,41 @@ struct ReviewWindow: View {
     /// Corrects the other party of a one-to-one after recording — useful if
     /// the calendar didn't suggest them or if the wrong name was picked up.
     private func oneToOneParticipantEditor(_ meeting: Meeting) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if !session.settings.oneToOnePeople.isEmpty {
+                HStack(spacing: 6) {
+                    Text("👤").font(.caption)
+                    Picker("Avec qui", selection: Binding(
+                        get: {
+                            session.settings.oneToOnePeople
+                                .first { $0.name == oneToOneNameInput }?.id ?? ""
+                        },
+                        set: { newID in
+                            guard let person = session.settings.oneToOnePeople.first(
+                                where: { $0.id == newID }
+                            ) else { return }
+                            session.setOneToOnePerson(person, for: meeting)
+                            oneToOneNameInput = person.name
+                            oneToOneEmailInput = person.email
+                            oneToOneAccountIDInput = person.confluenceAccountID
+                        }
+                    )) {
+                        Text("Choisir…").tag("")
+                        ForEach(session.settings.oneToOnePeople) { person in
+                            Text(person.name).tag(person.id)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 160)
+                    Spacer()
+                }
+            }
+            oneToOneManualParticipantEditor(meeting)
+        }
+    }
+
+    private func oneToOneManualParticipantEditor(_ meeting: Meeting) -> some View {
         HStack(spacing: 8) {
             Text("👤").font(.caption)
             TextField(

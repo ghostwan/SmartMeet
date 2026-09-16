@@ -221,13 +221,45 @@ struct MenuBarContent: View {
         .padding(.vertical, 6)
     }
 
-    /// "Who with" for a one-to-one: calendar candidates also fill in the
-    /// e-mail at once, needed to restrict the published page to that one
-    /// person. Free-text entry is still possible if the other party has no
-    /// calendar event (impromptu coffee chat, Slack huddle…).
+    /// "Who with" for a one-to-one: people configured in Settings › One-to-one
+    /// (name, destination, Jira share e-mail) are the primary path — pick a
+    /// name and everything else follows. The calendar-based picker and
+    /// free-text fields stay available, folded away, for a counterpart not
+    /// configured yet (impromptu coffee chat, Slack huddle…).
     private var oneToOneParticipantField: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text("👤").font(.caption)
+                if session.settings.oneToOnePeople.isEmpty {
+                    Text("Aucune personne configurée (Réglages › One-to-one)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Picker("Avec qui", selection: configuredPersonBinding) {
+                        Text("Choisir…").tag("")
+                        ForEach(session.settings.oneToOnePeople) { person in
+                            Text(person.name).tag(person.id)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 160)
+                }
+                Spacer()
+            }
+
+            DisclosureGroup("Autre / corriger") {
+                oneToOneManualEntry
+            }
+            .font(.caption)
+        }
+    }
+
+    /// Fallback identical to the picker's `tag`: manual free-text entry
+    /// (candidate picker, name field, Confluence search, restriction e-mail)
+    /// for a one-to-one whose counterpart isn't configured in Settings yet.
+    private var oneToOneManualEntry: some View {
         HStack(spacing: 6) {
-            Text("👤").font(.caption)
             if !session.oneToOneCandidates.isEmpty {
                 Picker("Avec qui", selection: $session.oneToOneParticipantName) {
                     Text("Choisir…").tag("")
@@ -270,6 +302,30 @@ struct MenuBarContent: View {
                 .help("La page publiée ne sera visible que de toi et de cette personne, si son compte Confluence est trouvé. Utilise la loupe pour chercher directement le compte Confluence par nom.")
             Spacer()
         }
+    }
+
+    /// Maps the picker's selection (a person's id) onto the session's
+    /// one-to-one fields: selecting "Choisir…" clears them, so a wrong
+    /// earlier pick or free-text entry doesn't linger.
+    private var configuredPersonBinding: Binding<String> {
+        Binding(
+            get: {
+                session.settings.oneToOnePeople
+                    .first { $0.name == session.oneToOneParticipantName }?.id ?? ""
+            },
+            set: { newID in
+                guard let person = session.settings.oneToOnePeople.first(where: { $0.id == newID })
+                else {
+                    session.oneToOneParticipantName = ""
+                    session.oneToOneParticipantEmail = ""
+                    session.oneToOneParticipantAccountID = ""
+                    session.oneToOneDestination = nil
+                    session.oneToOneJiraShareEmail = ""
+                    return
+                }
+                session.selectOneToOnePerson(person)
+            }
+        )
     }
 
     private var statusText: String {
