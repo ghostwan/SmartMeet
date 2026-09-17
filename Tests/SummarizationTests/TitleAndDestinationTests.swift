@@ -159,6 +159,20 @@ struct DestinationTests {
         #expect(template.titleFormat == "{summary} — {date}")
         #expect(template.serviceKind == nil)
         #expect(template.destination == .profileDefault)
+        #expect(template.defaultRestrictedViewers.isEmpty)
+    }
+
+    @Test("Les personnes autorisées à voir la page par défaut survivent à l'encodage")
+    func defaultRestrictedViewersRoundTrip() throws {
+        var template = MeetingTemplate(name: "Synchro sensible", sections: [.tldr])
+        template.defaultRestrictedViewers = [
+            RestrictedViewer(displayName: "Alex", email: "alex@example.com", accountID: "557058:alex")
+        ]
+
+        let data = try JSONEncoder().encode(template)
+        let decoded = try JSONDecoder().decode(MeetingTemplate.self, from: data)
+
+        #expect(decoded.defaultRestrictedViewers == template.defaultRestrictedViewers)
     }
 
     @Test("Un service inconnu retombe sur l'héritage du profil")

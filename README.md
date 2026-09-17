@@ -210,6 +210,18 @@ from the list — the manual "who with" field (calendar candidates, free text,
 Confluence search) is still available, folded under "Autre / corriger", for
 a counterpart not configured yet.
 
+### Restricting who can view a published page
+
+Beyond the one-to-one mechanism above (which always restricts a 1:1 to its
+two participants), any meeting type can define a default list of extra
+people allowed to view its published Confluence page — configured in
+*Settings › Types de réunion*, under each type's own "Visibilité par défaut".
+That list is carried over to every new meeting of that type as a starting
+point and stays editable per meeting from the review window before
+publishing, using the same debounced Confluence search picker (by name or
+e-mail) as the one-to-one counterpart. Without any restriction configured,
+a published page remains visible to the whole Confluence space, as before.
+
 ### Headless mode
 
 Useful for diagnostics and end-to-end testing.

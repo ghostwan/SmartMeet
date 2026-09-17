@@ -532,6 +532,10 @@ public final class RecordingSession {
             duration: result?.duration ?? 0,
             locale: selectedTranscriptionLocale,
             knownAttendees: detectedCalendarMeeting?.attendees ?? [],
+            // Pre-filled from the same calendar source as a starting point,
+            // but this one is meant to be corrected by the user before
+            // generation — see `setConfirmedParticipants`.
+            confirmedParticipants: detectedCalendarMeeting?.attendees ?? [],
             templateID: selectedTemplateID,
             outputLanguage: selectedOutputLanguage,
             oneToOneParticipant: selectedTemplate.requiresParticipant && !oneToOneParticipantName.isEmpty
@@ -542,7 +546,8 @@ public final class RecordingSession {
                 ? oneToOneParticipantAccountID : nil,
             oneToOneDestination: selectedTemplate.requiresParticipant ? oneToOneDestination : nil,
             oneToOneJiraShareEmail: selectedTemplate.requiresParticipant && !oneToOneJiraShareEmail.isEmpty
-                ? oneToOneJiraShareEmail : nil
+                ? oneToOneJiraShareEmail : nil,
+            restrictedViewers: selectedTemplate.defaultRestrictedViewers
         )
         meeting.trackStartOffsets = Dictionary(
             uniqueKeysWithValues: (result?.trackStartOffsets ?? [:])
@@ -597,6 +602,7 @@ public final class RecordingSession {
         let context = SummaryContext(
             date: meeting.startedAt,
             knownAttendees: meeting.knownAttendees,
+            confirmedParticipants: meeting.confirmedParticipants,
             vocabulary: settings.contextualVocabulary,
             userName: settings.userName
         )
@@ -717,6 +723,20 @@ public final class RecordingSession {
         meetings = store.loadAll()
     }
 
+    /// Confirms who was actually present before generating the minutes — the
+    /// transcript itself only carries generic track/diarization labels
+    /// ("Participants", "Locuteur 2"), never real names, which is the root
+    /// cause of "who said what" misattribution. Meant to be called from the
+    /// review window before the first `generateSummary`, though nothing
+    /// prevents correcting it and regenerating afterward.
+    public func setConfirmedParticipants(_ participants: [String], for meeting: Meeting) {
+        var updated = meeting
+        updated.confirmedParticipants = participants
+        try? store.update(updated, customTemplates: settings.customTemplates)
+        if reviewedMeeting?.id == meeting.id { reviewedMeeting = updated }
+        meetings = store.loadAll()
+    }
+
     /// Corrects the other party of a one-to-one after recording — useful if
     /// the calendar didn't suggest them or if the wrong name was selected.
     public func setOneToOneParticipant(
@@ -743,6 +763,30 @@ public final class RecordingSession {
             ? nil : person.confluenceAccountID
         updated.oneToOneDestination = person.destination == .profileDefault ? nil : person.destination
         updated.oneToOneJiraShareEmail = person.jiraShareEmail.isEmpty ? nil : person.jiraShareEmail
+        try? store.update(updated, customTemplates: settings.customTemplates)
+        if reviewedMeeting?.id == meeting.id { reviewedMeeting = updated }
+        meetings = store.loadAll()
+    }
+
+    /// Adds a person found via the Confluence search picker to the list of
+    /// people allowed to view this meeting's published page — on top of
+    /// whatever restriction the meeting type itself already applies (e.g. a
+    /// one-to-one's counterpart). A no-op if already added.
+    public func addRestrictedViewer(_ match: ConfluenceUserMatch, for meeting: Meeting) {
+        guard !meeting.restrictedViewers.contains(where: { $0.accountID == match.accountID }) else { return }
+        var updated = meeting
+        updated.restrictedViewers.append(
+            RestrictedViewer(displayName: match.displayName, email: match.email, accountID: match.accountID)
+        )
+        try? store.update(updated, customTemplates: settings.customTemplates)
+        if reviewedMeeting?.id == meeting.id { reviewedMeeting = updated }
+        meetings = store.loadAll()
+    }
+
+    /// Removes someone from that same list.
+    public func removeRestrictedViewer(_ viewer: RestrictedViewer, for meeting: Meeting) {
+        var updated = meeting
+        updated.restrictedViewers.removeAll { $0.accountID == viewer.accountID }
         try? store.update(updated, customTemplates: settings.customTemplates)
         if reviewedMeeting?.id == meeting.id { reviewedMeeting = updated }
         meetings = store.loadAll()
@@ -804,6 +848,7 @@ public final class RecordingSession {
                 participantName: meeting.oneToOneParticipant ?? "",
                 restrictToParticipantEmail: meeting.oneToOneParticipantEmail,
                 restrictToParticipantAccountID: meeting.oneToOneParticipantAccountID,
+                restrictedViewerAccountIDs: meeting.restrictedViewers.map(\.accountID),
                 jiraShareEmail: meeting.oneToOneJiraShareEmail
             ) { step in
                 Task { @MainActor [weak self] in

@@ -160,6 +160,7 @@ enum HeadlessRecorder {
                 context: SummaryContext(
                     date: meeting.startedAt,
                     knownAttendees: meeting.knownAttendees,
+                    confirmedParticipants: meeting.confirmedParticipants,
                     vocabulary: settings.contextualVocabulary,
                     userName: settings.userName
                 ),

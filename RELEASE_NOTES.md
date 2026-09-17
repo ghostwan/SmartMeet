@@ -62,6 +62,25 @@ notes, then resets it to this template once the release is published.
   to add as a watcher on every Jira ticket created from their action items.
   Recording a one-to-one is now a matter of picking a configured name from a
   list — no more retyping an e-mail or destination page every time.
+- The review window now offers "Supprimer le local" once a meeting has been
+  published (Confluence and/or Notion): unlike the existing audio/transcript
+  cleanup, this also removes the generated minutes and metadata from this
+  machine entirely — the already-published page is unaffected and stays the
+  sole remaining copy.
+- The review window now lets you confirm who was actually present before
+  generating the minutes (and correct it before regenerating): the
+  transcript itself only ever carries audio-track labels ("Moi"/
+  "Participants") or generic diarization clusters ("Locuteur 2"), never real
+  names, which was the root cause of decisions and action items sometimes
+  getting attributed to the wrong person. The confirmed roster is now
+  passed to the model as a closed, explicit list to attribute statements
+  against.
+- Any meeting type (not just the "One to One" one) can now restrict who is
+  allowed to view its published Confluence page beyond its author, on top of
+  whatever the type itself already enforces. A default list of people is
+  configured per meeting type in *Settings › Types de réunion*, and stays
+  editable per meeting from the review window before publication, using the
+  same Confluence search picker as the one-to-one counterpart.
 
 ### Changed
 
@@ -79,4 +98,11 @@ notes, then resets it to this template once the release is published.
   handful of tabs, and the traffic lights ate into the leftmost tab when the
   window's toolbar and title bar shared the same row). Fixed with
   `.tabViewStyle(.grouped)` and `.windowToolbarStyle(.expanded)`.
+- The Confluence account search picker (magnifying-glass button next to the
+  one-to-one counterpart or e-mail fields) only ever searched by display
+  name, so typing a full e-mail address into it — the very thing the field
+  sits next to and looks like it should accept — silently returned no
+  result. It now also matches on `user.emailAddress` and merges both result
+  sets.
+
 

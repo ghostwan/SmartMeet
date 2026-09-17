@@ -192,21 +192,49 @@ public struct ConfluenceClient: Sendable {
         return user["accountId"] as? String
     }
 
-    /// Quick "who is this" search by (partial) display name, for a one-to-one
-    /// counterpart picker — faster and more forgiving than requiring the exact
-    /// e-mail up front. Same endpoint as `accountID(forEmail:)`, but the CQL
-    /// field switches from `user.emailAddress` (exact match) to
-    /// `user.fullname` with the `~` fuzzy operator, the only one it supports
-    /// (see Confluence's CQL field reference).
+    /// Quick "who is this" search, for a one-to-one counterpart picker or any
+    /// other "restrict this page to…" picker — faster and more forgiving than
+    /// requiring the exact e-mail up front.
     ///
-    /// Best effort like its sibling: an empty array is returned rather than
-    /// throwing if the query is too short or the search is unavailable, so a
-    /// keystroke-by-keystroke search field never surfaces a hard error.
+    /// Two searches are combined rather than picking one field: the `~` fuzzy
+    /// operator is only supported on `user.fullname` (see Confluence's CQL
+    /// field reference), so typing a full e-mail address into the same field
+    /// as a name — which every UI using this method invites the user to do,
+    /// since the field sits right next to a plain e-mail `TextField` — would
+    /// otherwise silently never match anything. `user.emailAddress` only
+    /// supports exact equality, so it only ever contributes a result once the
+    /// address is fully typed; until then the fullname search alone carries
+    /// the as-you-type results.
+    ///
+    /// Best effort like `accountID(forEmail:)`: an empty array is returned
+    /// rather than throwing if the query is too short or a search is
+    /// unavailable, so a keystroke-by-keystroke search field never surfaces a
+    /// hard error.
     public func searchUsers(matching query: String, limit: Int = 8) async throws -> [ConfluenceUserMatch] {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         guard trimmed.count >= 2 else { return [] }
-        guard let encodedCQL = "user.fullname~\"\(trimmed)\""
-            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+
+        async let byName = matches(cql: "user.fullname~\"\(trimmed)\"", limit: limit)
+        async let byEmail = matches(cql: "user.emailAddress=\"\(trimmed)\"", limit: limit)
+
+        // E-mail results first: an exact match is a stronger signal than a
+        // fuzzy name match, and deduplication below keeps only the first
+        // occurrence of each account.
+        var seen = Set<String>()
+        var merged: [ConfluenceUserMatch] = []
+        for match in await byEmail + (await byName) {
+            guard seen.insert(match.accountID).inserted else { continue }
+            merged.append(match)
+        }
+        return Array(merged.prefix(limit))
+    }
+
+    /// Runs one CQL user search and maps the raw payload into
+    /// `ConfluenceUserMatch`. Shared by both branches of `searchUsers(matching:)`.
+    /// Best effort: an invalid CQL (e.g. `emailAddress="not an e-mail"`) or an
+    /// unavailable search returns an empty array rather than throwing.
+    private func matches(cql: String, limit: Int) async -> [ConfluenceUserMatch] {
+        guard let encodedCQL = cql.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
         else { return [] }
         guard let payload = try? await client.request(
             "GET", "/wiki/rest/api/search/user?cql=\(encodedCQL)&limit=\(limit)"

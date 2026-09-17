@@ -16,6 +16,14 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
     public var trackStartOffsets: [String: TimeInterval]
     /// Attendees sourced from the calendar, injected into the generation prompt.
     public var knownAttendees: [String]
+    /// People confirmed by the user as actually present, edited right before
+    /// generation (unlike `knownAttendees`, set once from the calendar at
+    /// recording time and never reviewed). Closes the gap the transcript
+    /// itself can't: audio tracks and speaker diarization only carry generic
+    /// labels ("Participants", "Locuteur 2"), never real names — this is what
+    /// lets the model attribute decisions and action items correctly instead
+    /// of guessing. Pre-filled from `knownAttendees` as a starting point.
+    public var confirmedParticipants: [String]
     /// Chosen meeting type: drives the schema requested from the model and the
     /// rendering order.
     public var templateID: String
@@ -55,6 +63,12 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
     /// from this meeting's action items, carried over from the counterpart
     /// configured in Settings. `nil` shares with no one beyond the assignee.
     public var oneToOneJiraShareEmail: String?
+    /// Extra people allowed to view the published page, in addition to the
+    /// author — independent of the one-to-one restriction above, applicable
+    /// to any meeting type. Pre-filled from `MeetingTemplate.
+    /// defaultRestrictedViewers` when the meeting is recorded, still editable
+    /// from the review window before publication.
+    public var restrictedViewers: [RestrictedViewer]
 
     public init(
         id: UUID = UUID(),
@@ -64,6 +78,7 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         locale: String,
         trackStartOffsets: [String: TimeInterval] = [:],
         knownAttendees: [String] = [],
+        confirmedParticipants: [String] = [],
         templateID: String = MeetingTemplate.personal.id,
         outputLanguage: SummaryLanguage = .french,
         summary: MeetingSummary? = nil,
@@ -76,7 +91,8 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         oneToOneParticipantEmail: String? = nil,
         oneToOneParticipantAccountID: String? = nil,
         oneToOneDestination: PublicationDestination? = nil,
-        oneToOneJiraShareEmail: String? = nil
+        oneToOneJiraShareEmail: String? = nil,
+        restrictedViewers: [RestrictedViewer] = []
     ) {
         self.id = id
         self.title = title
@@ -85,6 +101,7 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         self.locale = locale
         self.trackStartOffsets = trackStartOffsets
         self.knownAttendees = knownAttendees
+        self.confirmedParticipants = confirmedParticipants
         self.templateID = templateID
         self.outputLanguage = outputLanguage
         self.summary = summary
@@ -98,14 +115,16 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         self.oneToOneParticipantAccountID = oneToOneParticipantAccountID
         self.oneToOneDestination = oneToOneDestination
         self.oneToOneJiraShareEmail = oneToOneJiraShareEmail
+        self.restrictedViewers = restrictedViewers
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, title, startedAt, duration, locale, trackStartOffsets
-        case knownAttendees, templateID, outputLanguage
+        case knownAttendees, confirmedParticipants, templateID, outputLanguage
         case summary, confluencePageURL, jiraIssueKeys, notionPageURL, tokenUsage
         case jiraSearchURL, oneToOneParticipant, oneToOneParticipantEmail
         case oneToOneParticipantAccountID, oneToOneDestination, oneToOneJiraShareEmail
+        case restrictedViewers
     }
 
     // Tolerant decoding: meetings recorded before the summary feature was added
@@ -121,6 +140,9 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
             [String: TimeInterval].self, forKey: .trackStartOffsets
         ) ?? [:]
         knownAttendees = try container.decodeIfPresent([String].self, forKey: .knownAttendees) ?? []
+        confirmedParticipants = try container.decodeIfPresent(
+            [String].self, forKey: .confirmedParticipants
+        ) ?? []
         templateID = try container.decodeIfPresent(String.self, forKey: .templateID)
             ?? MeetingTemplate.personal.id
         outputLanguage = try container.decodeIfPresent(
@@ -145,6 +167,9 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         oneToOneJiraShareEmail = try container.decodeIfPresent(
             String.self, forKey: .oneToOneJiraShareEmail
         )
+        restrictedViewers = try container.decodeIfPresent(
+            [RestrictedViewer].self, forKey: .restrictedViewers
+        ) ?? []
     }
 
     public var formattedDuration: String {
@@ -172,7 +197,7 @@ public struct Meeting: Sendable, Codable, Identifiable, Equatable {
         )
         let haystack = (
             [title, summary?.tldr ?? "", transcript ?? "", oneToOneParticipant ?? ""]
-                + knownAttendees + (summary?.decisions ?? [])
+                + knownAttendees + confirmedParticipants + (summary?.decisions ?? [])
         )
         .joined(separator: " ")
         .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)

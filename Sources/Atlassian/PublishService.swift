@@ -113,6 +113,12 @@ public struct PublishService: Sendable {
         /// `restrictToParticipantEmail`: it's already an exact match, so
         /// there's no need to fall back to the less reliable e-mail search.
         restrictToParticipantAccountID: String? = nil,
+        /// Confluence `accountId`s of extra people allowed to view the page,
+        /// in addition to its author — independent of `template.
+        /// requiresParticipant`, applicable to any meeting type. Resolved
+        /// ahead of time (via the "search Confluence users" picker), same as
+        /// `restrictToParticipantAccountID`.
+        restrictedViewerAccountIDs: [String] = [],
         /// E-mail to add as a watcher on every Jira ticket created during
         /// this publication, e.g. a one-to-one counterpart configured to
         /// always see their tickets regardless of who's assigned. Resolved
@@ -151,33 +157,36 @@ public struct PublishService: Sendable {
         var createdKeys: [String: String] = [:]
         var failures: [String] = []
 
-        if template.requiresParticipant {
+        if template.requiresParticipant || !restrictedViewerAccountIDs.isEmpty {
             do {
                 var accountIDs = [try await confluence.currentUserAccountID()]
-                if let restrictToParticipantAccountID, !restrictToParticipantAccountID.isEmpty {
-                    accountIDs.append(restrictToParticipantAccountID)
-                } else if let restrictToParticipantEmail, !restrictToParticipantEmail.isEmpty {
-                    if let participantAccountID = try await confluence.accountID(
-                        forEmail: restrictToParticipantEmail
-                    ) {
-                        accountIDs.append(participantAccountID)
+                accountIDs.append(contentsOf: restrictedViewerAccountIDs)
+                if template.requiresParticipant {
+                    if let restrictToParticipantAccountID, !restrictToParticipantAccountID.isEmpty {
+                        accountIDs.append(restrictToParticipantAccountID)
+                    } else if let restrictToParticipantEmail, !restrictToParticipantEmail.isEmpty {
+                        if let participantAccountID = try await confluence.accountID(
+                            forEmail: restrictToParticipantEmail
+                        ) {
+                            accountIDs.append(participantAccountID)
+                        } else {
+                            failures.append(NSLocalizedString(
+                                "Le compte Confluence de l'interlocuteur n'a pas été trouvé — la page reste restreinte à toi seul.",
+                                bundle: .main,
+                                value: "Le compte Confluence de l'interlocuteur n'a pas été trouvé — la page reste restreinte à toi seul.",
+                                comment: ""
+                            ))
+                        }
                     } else {
                         failures.append(NSLocalizedString(
-                            "Le compte Confluence de l'interlocuteur n'a pas été trouvé — la page reste restreinte à toi seul.",
+                            "Aucun e-mail renseigné pour l'interlocuteur — la page reste restreinte à toi seul.",
                             bundle: .main,
-                            value: "Le compte Confluence de l'interlocuteur n'a pas été trouvé — la page reste restreinte à toi seul.",
+                            value: "Aucun e-mail renseigné pour l'interlocuteur — la page reste restreinte à toi seul.",
                             comment: ""
                         ))
                     }
-                } else {
-                    failures.append(NSLocalizedString(
-                        "Aucun e-mail renseigné pour l'interlocuteur — la page reste restreinte à toi seul.",
-                        bundle: .main,
-                        value: "Aucun e-mail renseigné pour l'interlocuteur — la page reste restreinte à toi seul.",
-                        comment: ""
-                    ))
                 }
-                try await confluence.restrictReadAccess(pageID: page.id, accountIDs: accountIDs)
+                try await confluence.restrictReadAccess(pageID: page.id, accountIDs: Array(Set(accountIDs)))
             } catch {
                 failures.append(String(
                     format: NSLocalizedString(

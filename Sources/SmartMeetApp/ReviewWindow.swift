@@ -16,6 +16,8 @@ struct ReviewWindow: View {
     @State private var isDiarizing = false
     @State private var rawDeletionStatus: String?
     @State private var showDeleteRawConfirmation = false
+    @State private var showDeleteAllConfirmation = false
+    @State private var showParticipantsPopover = false
     @State private var showTranscript = false
     @State private var templateSelection: String = ""
     @State private var oneToOneNameInput: String = ""
@@ -191,6 +193,26 @@ struct ReviewWindow: View {
                     .help("Diarisation expérimentale de la piste micro (hauteur, timbre) — voir Réglages.")
                 }
                 if meeting.hasSummary {
+                    Button {
+                        showParticipantsPopover = true
+                    } label: {
+                        Label("Participants", systemImage: "person.2")
+                    }
+                    .help("Corrige qui était présent avant de régénérer — le transcript ne connaît que la piste audio, jamais les vrais noms, d'où les attributions parfois erronées.")
+                    .popover(isPresented: $showParticipantsPopover) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Qui était présent ?")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            EditableList(
+                                title: "Participants",
+                                items: confirmedParticipantsBinding(for: meeting)
+                            )
+                        }
+                        .padding()
+                        .frame(width: 260)
+                    }
+
                     Picker("Type", selection: $templateSelection) {
                         ForEach(session.settings.allTemplates) { template in
                             Label(template.localizedName, systemImage: template.symbol).tag(template.id)
@@ -233,10 +255,34 @@ struct ReviewWindow: View {
                         ))
                     }
                 }
+                if meeting.isPublished || meeting.isPublishedToNotion {
+                    Button(role: .destructive) {
+                        showDeleteAllConfirmation = true
+                    } label: {
+                        Label("Supprimer le local", systemImage: "trash.fill")
+                    }
+                    .help("La réunion est déjà publiée : supprime l'audio, le transcript et le compte rendu de cette machine. La page publiée n'est pas affectée. Irréversible.")
+                    .confirmationDialog(
+                        "Supprimer toutes les données locales ?",
+                        isPresented: $showDeleteAllConfirmation,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Supprimer", role: .destructive) {
+                            session.delete(meeting)
+                        }
+                        Button("Annuler", role: .cancel) {}
+                    } message: {
+                        Text(L(
+                            "L'audio, le transcript et le compte rendu seront définitivement supprimés de cette machine. La page déjà publiée sur %@ reste en ligne et n'est pas affectée.",
+                            publishedServicesSummary(meeting)
+                        ))
+                    }
+                }
             }
             if session.settings.template(id: templateSelection).requiresParticipant {
                 oneToOneParticipantEditor(meeting)
             }
+            restrictedViewersEditor(meeting)
             if let diarizationStatus {
                 Text(diarizationStatus)
                     .font(.caption)
@@ -337,6 +383,30 @@ struct ReviewWindow: View {
         .help("La page publiée ne sera visible que de toi et de cette personne, si son compte Confluence est trouvé. Utilise la loupe pour chercher directement le compte Confluence par nom.")
     }
 
+    /// Restricts the published page to specific people, for any meeting
+    /// type — on top of whatever the type itself already applies (e.g. a
+    /// one-to-one's fixed counterpart above). Pre-filled from the meeting
+    /// type's own default list, still editable per meeting.
+    private func restrictedViewersEditor(_ meeting: Meeting) -> some View {
+        RestrictedViewersEditor(
+            viewers: meeting.restrictedViewers,
+            search: { await session.searchConfluenceUsers(matching: $0) },
+            onAdd: { session.addRestrictedViewer($0, for: meeting) },
+            onRemove: { session.removeRestrictedViewer($0, for: meeting) }
+        )
+    }
+
+    /// Human-readable list of where a meeting was already published, for the
+    /// full local-deletion confirmation ("Confluence", "Notion", or both).
+    /// Comma-joined rather than a localized "and", like every other list in
+    /// this file (issue keys, attendees…) — no extra translation key needed.
+    private func publishedServicesSummary(_ meeting: Meeting) -> String {
+        var services: [String] = []
+        if meeting.isPublished { services.append("Confluence") }
+        if meeting.isPublishedToNotion { services.append("Notion") }
+        return services.joined(separator: ", ")
+    }
+
     private func progress(_ message: String) -> some View {
         VStack(spacing: 12) {
             ProgressView()
@@ -356,16 +426,55 @@ struct ReviewWindow: View {
     }
 
     private func empty(_ meeting: Meeting) -> some View {
-        ContentUnavailableView {
-            Label("Pas encore de compte rendu", systemImage: "sparkles")
-        } description: {
-            Text(L("Génère le compte rendu avec %@.", session.settings.providerKind.displayName))
-        } actions: {
+        VStack(spacing: 20) {
+            Spacer()
+            VStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 36))
+                    .foregroundStyle(.secondary)
+                Text("Pas encore de compte rendu").font(.title3.weight(.semibold))
+                Text(L("Génère le compte rendu avec %@.", session.settings.providerKind.displayName))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            // The transcript itself never carries real names — only audio
+            // track labels ("Moi"/"Participants") or, with diarization,
+            // generic "Locuteur N" clusters — which is the root cause of
+            // decisions and action items getting attributed to the wrong
+            // person. Confirming who's actually here, right before
+            // generation, gives the model a closed roster to attribute
+            // statements against instead of guessing.
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Qui était présent ?")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text("Le transcript ne connaît que la piste audio, jamais les vrais noms. Confirme ici qui était là pour que le compte rendu attribue correctement décisions et actions.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                EditableList(title: "Participants", items: confirmedParticipantsBinding(for: meeting))
+            }
+            .frame(maxWidth: 360)
+
             Button("Générer le compte rendu") {
                 Task { await session.generateSummary(for: meeting) }
             }
             .buttonStyle(.borderedProminent)
+            Spacer()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+    }
+
+    /// Writes straight through to the persisted meeting on every edit —
+    /// there's no draft/save step before generation, unlike the summary
+    /// editor's own `draft` buffer, which only exists once a summary is
+    /// there to edit.
+    private func confirmedParticipantsBinding(for meeting: Meeting) -> Binding<[String]> {
+        Binding(
+            get: { meeting.confirmedParticipants },
+            set: { session.setConfirmedParticipants($0, for: meeting) }
+        )
     }
 
     private func editor(_ meeting: Meeting) -> some View {

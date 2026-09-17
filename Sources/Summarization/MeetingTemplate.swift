@@ -232,6 +232,12 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
     /// asks for that counterpart before recording, and the published page is
     /// restricted to those two accounts rather than visible to the whole space.
     public var requiresParticipant: Bool
+    /// Extra people allowed to view a published page of this type, in
+    /// addition to its author — independent of `requiresParticipant`, and
+    /// applicable to any meeting type. Carried over to each new meeting of
+    /// this type as a starting point (see `Meeting.restrictedViewers`), and
+    /// still editable per meeting before publication.
+    public var defaultRestrictedViewers: [RestrictedViewer]
     /// Built-in templates cannot be deleted, only duplicated.
     public var isBuiltIn: Bool
 
@@ -247,6 +253,7 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
         serviceKind: ServiceKind? = nil,
         destination: PublicationDestination = .profileDefault,
         requiresParticipant: Bool = false,
+        defaultRestrictedViewers: [RestrictedViewer] = [],
         isBuiltIn: Bool = false
     ) {
         self.id = id
@@ -260,13 +267,14 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
         self.serviceKind = serviceKind
         self.destination = destination
         self.requiresParticipant = requiresParticipant
+        self.defaultRestrictedViewers = defaultRestrictedViewers
         self.isBuiltIn = isBuiltIn
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, name, symbol, sections, instructions
         case titleFormat, spaceKeyOverride, parent, serviceKind, destination
-        case requiresParticipant, isBuiltIn
+        case requiresParticipant, defaultRestrictedViewers, isBuiltIn
     }
 
     /// Tolerant decoding: templates saved before the destination field was added
@@ -295,6 +303,9 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
             destination = .profileDefault
         }
         requiresParticipant = try container.decodeIfPresent(Bool.self, forKey: .requiresParticipant) ?? false
+        defaultRestrictedViewers = try container.decodeIfPresent(
+            [RestrictedViewer].self, forKey: .defaultRestrictedViewers
+        ) ?? []
         isBuiltIn = try container.decodeIfPresent(Bool.self, forKey: .isBuiltIn) ?? false
     }
 

@@ -2,9 +2,11 @@ import Atlassian
 import SwiftUI
 
 /// Quick Confluence user search, used in place of typing an e-mail by hand
-/// for the one-to-one counterpart: a magnifying-glass button opens a small
-/// popover with a search field and the matching accounts, debounced so every
-/// keystroke doesn't fire a request.
+/// for the one-to-one counterpart (or any other "restrict this page to…"
+/// picker): a magnifying-glass button opens a small popover with a search
+/// field — accepting either a display name or a full e-mail address, see
+/// `ConfluenceClient.searchUsers(matching:)` — and the matching accounts,
+/// debounced so every keystroke doesn't fire a request.
 struct ConfluenceUserSearchButton: View {
     let search: (String) async -> [ConfluenceUserMatch]
     let onSelect: (ConfluenceUserMatch) -> Void
@@ -21,10 +23,10 @@ struct ConfluenceUserSearchButton: View {
             Image(systemName: "magnifyingglass")
         }
         .buttonStyle(.borderless)
-        .help("Rechercher un compte Confluence par nom, plutôt que taper son e-mail")
+        .help("Rechercher un compte Confluence par nom ou par e-mail")
         .popover(isPresented: $isPresented) {
             VStack(alignment: .leading, spacing: 8) {
-                TextField("Nom sur Confluence…", text: $query)
+                TextField("Nom ou e-mail sur Confluence…", text: $query)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 220)
 

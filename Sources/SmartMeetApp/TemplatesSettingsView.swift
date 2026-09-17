@@ -114,6 +114,7 @@ struct TemplatesSettingsView: View {
                 identity
                 titleEditor
                 destinationEditor
+                visibilityEditor
                 sectionsEditor
                 instructionsEditor
 
@@ -280,6 +281,38 @@ struct TemplatesSettingsView: View {
             return SprintPage.extractPageID(from: input) ?? input
         case nil:
             return input
+        }
+    }
+
+    /// Default list of people (in addition to the author) allowed to view a
+    /// page published with this type — carried over to each new meeting of
+    /// this type, still editable per meeting in the review window.
+    private var visibilityEditor: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Visibilité par défaut")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text("Restreint par défaut la page publiée à toi et aux personnes ajoutées ici. Ne concerne pas le one-to-one, déjà restreint à son interlocuteur.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+            RestrictedViewersEditor(
+                viewers: selected.defaultRestrictedViewers,
+                search: { await session.searchConfluenceUsers(matching: $0) },
+                onAdd: { match in
+                    var template = selected
+                    guard !template.defaultRestrictedViewers.contains(where: { $0.accountID == match.accountID })
+                    else { return }
+                    template.defaultRestrictedViewers.append(
+                        RestrictedViewer(displayName: match.displayName, email: match.email, accountID: match.accountID)
+                    )
+                    settings.upsert(template)
+                },
+                onRemove: { viewer in
+                    var template = selected
+                    template.defaultRestrictedViewers.removeAll { $0.accountID == viewer.accountID }
+                    settings.upsert(template)
+                }
+            )
         }
     }
 

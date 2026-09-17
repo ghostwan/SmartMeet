@@ -108,6 +108,32 @@ enum SummaryPrompt {
                 en: "Known attendees (from the calendar): "
             ) + context.knownAttendees.joined(separator: ", ") + "."
         }
+        // Stronger than `knownAttendees`: this list is confirmed by the user
+        // right before generation, not just inferred from a calendar invite —
+        // and it's the model's only way to turn the transcript's generic
+        // track/cluster labels ("Participants", "Locuteur 2"…) into the actual
+        // people who said something, which is the single biggest source of
+        // misattributed decisions and action items.
+        if !context.confirmedParticipants.isEmpty {
+            text += "\n\n" + language.pick(
+                fr: "Personnes présentes à cette réunion, confirmées par l'utilisateur : "
+                    + context.confirmedParticipants.joined(separator: ", ")
+                    + ". Ce sont EXACTEMENT ces personnes, et personne d'autre. Chaque "
+                    + "prise de parole sur la piste « Participants » (ou un locuteur "
+                    + "distingué par diarisation) appartient à l'une d'elles : attribue "
+                    + "`owner`/`person` à l'un de ces prénoms précis dès que le contexte "
+                    + "le permet, jamais à « Participants » ou à un libellé de locuteur "
+                    + "générique.",
+                en: "People confirmed by the user as present at this meeting: "
+                    + context.confirmedParticipants.joined(separator: ", ")
+                    + ". These are EXACTLY these people, and no one else. Every "
+                    + "statement on the \"Participants\" track (or a speaker "
+                    + "distinguished by diarization) belongs to one of them: attribute "
+                    + "`owner`/`person` to one of these exact first names whenever the "
+                    + "context allows it, never to \"Participants\" or a generic "
+                    + "speaker label."
+            )
+        }
         if !context.vocabulary.isEmpty {
             text += "\n" + language.pick(
                 fr: "Vocabulaire métier à orthographier correctement : ",
@@ -281,6 +307,15 @@ enum SummaryPrompt {
 public struct SummaryContext: Sendable {
     public var date: Date
     public var knownAttendees: [String]
+    /// People confirmed by the user as actually present, right before
+    /// generation — distinct from `knownAttendees` (a looser, calendar-sourced
+    /// hint set once at recording time and never reviewed). The transcript
+    /// itself never carries real names: audio tracks are labeled by which
+    /// microphone captured them ("Moi"/"Participants"), and speaker
+    /// diarization only assigns generic, session-relative labels ("Locuteur
+    /// 2"). This closed, user-confirmed roster is what lets the model map
+    /// "who said what" onto actual people instead of guessing.
+    public var confirmedParticipants: [String]
     public var vocabulary: [String]
     /// Name of the person recording. The transcript only knows "Moi" for the mic
     /// track; without this name, their commitments stay anonymous.
@@ -289,11 +324,13 @@ public struct SummaryContext: Sendable {
     public init(
         date: Date = .now,
         knownAttendees: [String] = [],
+        confirmedParticipants: [String] = [],
         vocabulary: [String] = [],
         userName: String? = nil
     ) {
         self.date = date
         self.knownAttendees = knownAttendees
+        self.confirmedParticipants = confirmedParticipants
         self.vocabulary = vocabulary
         self.userName = userName
     }
