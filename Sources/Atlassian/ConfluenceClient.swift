@@ -248,20 +248,24 @@ public struct ConfluenceClient: Sendable {
         }
     }
 
-    /// Restricts read access of a page to the given accounts only — the rest
-    /// of the space no longer sees it. Used for "one-to-one" types, whose
-    /// page only makes sense for the user and a single counterpart.
-    public func restrictReadAccess(pageID: String, accountIDs: [String]) async throws {
+    /// Restricts a page to the given accounts only — the rest of the space no
+    /// longer sees it. Used for "one-to-one" types and for `RestrictedViewer`
+    /// lists, whose page only makes sense for the author and a chosen few.
+    ///
+    /// Sets both the `read` and `update` operations to the same accounts:
+    /// leaving `update` untouched (as an earlier version of this method did)
+    /// results in an empty restriction on it, which Confluence treats as
+    /// "nobody can edit" — not "unrestricted" — locking the author themselves
+    /// out of the very page they just published (see the incident this fixed:
+    /// the account tied to the API token, not necessarily the author, was the
+    /// only one able to write).
+    public func restrictAccess(pageID: String, accountIDs: [String]) async throws {
         let users = accountIDs.map { ["type": "known", "accountId": $0] }
+        let restrictions: [String: Any] = ["user": users, "group": ["results": []]]
         let body: [String: Any] = [
             "results": [
-                [
-                    "operation": "read",
-                    "restrictions": [
-                        "user": users,
-                        "group": ["results": []],
-                    ],
-                ]
+                ["operation": "read", "restrictions": restrictions],
+                ["operation": "update", "restrictions": restrictions],
             ]
         ]
         _ = try await client.request(

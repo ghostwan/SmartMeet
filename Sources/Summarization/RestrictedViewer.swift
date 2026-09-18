@@ -14,7 +14,7 @@ public struct RestrictedViewer: Codable, Sendable, Equatable, Hashable, Identifi
     public var email: String?
     /// Confluence Cloud `accountId`, resolved via the "search Confluence
     /// users" picker at the time this person was added — the only thing
-    /// `ConfluenceClient.restrictReadAccess` needs.
+    /// `ConfluenceClient.restrictAccess` needs.
     public var accountID: String
 
     public init(displayName: String, email: String? = nil, accountID: String) {

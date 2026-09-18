@@ -186,7 +186,7 @@ public struct PublishService: Sendable {
                         ))
                     }
                 }
-                try await confluence.restrictReadAccess(pageID: page.id, accountIDs: Array(Set(accountIDs)))
+                try await confluence.restrictAccess(pageID: page.id, accountIDs: Array(Set(accountIDs)))
             } catch {
                 failures.append(String(
                     format: NSLocalizedString(

@@ -104,5 +104,12 @@ notes, then resets it to this template once the release is published.
   sits next to and looks like it should accept — silently returned no
   result. It now also matches on `user.emailAddress` and merges both result
   sets.
+- Restricting a published page (one-to-one, or the new default/per-meeting
+  visibility list) only ever restricted the `read` operation, leaving
+  `update` untouched — which Confluence treats as "nobody can edit", not
+  "unrestricted". The page's own author, unless they happened to be the
+  account behind the Atlassian API token, could end up locked out of
+  editing their own published minutes. Both `read` and `update` are now
+  restricted to the same accounts.
 
 
