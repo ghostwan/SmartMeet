@@ -166,6 +166,17 @@ public final class AppSettings {
             activeProfile = profile
         }
     }
+    /// Default local folder where one-to-one minutes are saved as markdown
+    /// under the active profile, used whenever a person hasn't configured
+    /// their own. Empty means the feature is off.
+    public var oneToOneDefaultFolderPath: String {
+        get { activeProfile.oneToOneDefaultFolderPath }
+        set {
+            var profile = activeProfile
+            profile.oneToOneDefaultFolderPath = newValue
+            activeProfile = profile
+        }
+    }
     /// User's name: the transcript only knows them by the label "Moi" ("Me").
     public var userName: String {
         didSet { defaults.set(userName, forKey: Key.userName) }
@@ -789,6 +800,18 @@ public final class AppSettings {
         } else {
             oneToOnePeople.append(person)
         }
+    }
+
+    /// Folder a one-to-one's minutes should be saved to as markdown, given
+    /// the counterpart's name — the configured person's own folder if set,
+    /// otherwise the profile's default, `nil` if neither is configured
+    /// (feature off for this meeting).
+    public func oneToOneFolderPath(forParticipantNamed name: String) -> String? {
+        let person = oneToOnePeople.first { $0.name == name }
+        let path = person?.localFolderPath.isEmpty == false
+            ? person!.localFolderPath
+            : oneToOneDefaultFolderPath
+        return path.isEmpty ? nil : path
     }
 
     public func removeOneToOnePerson(_ person: OneToOnePerson) {

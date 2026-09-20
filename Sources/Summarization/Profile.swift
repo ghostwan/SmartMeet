@@ -25,6 +25,11 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
     /// carries its own publication destination and the Jira e-mail tickets
     /// should be shared with, so recording only requires picking a name.
     public var oneToOnePeople: [OneToOnePerson]
+    /// Default local folder where one-to-one minutes are saved as markdown,
+    /// under this profile — overridden per person by `OneToOnePerson
+    /// .localFolderPath`. Empty means the feature is off: nothing is saved
+    /// locally beyond the app's own on-disk store.
+    public var oneToOneDefaultFolderPath: String
     /// Meeting types created by the user for this profile, in addition to the
     /// built-in templates.
     public var customTemplates: [MeetingTemplate]
@@ -112,6 +117,7 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
         vocabulary: [String] = [],
         knownPeople: [String] = [],
         oneToOnePeople: [OneToOnePerson] = [],
+        oneToOneDefaultFolderPath: String = "",
         customTemplates: [MeetingTemplate] = [],
         enabledTemplateIDs: Set<String>? = nil,
         defaultTemplateID: String? = nil,
@@ -137,6 +143,7 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
         self.vocabulary = vocabulary
         self.knownPeople = knownPeople
         self.oneToOnePeople = oneToOnePeople
+        self.oneToOneDefaultFolderPath = oneToOneDefaultFolderPath
         self.customTemplates = customTemplates
         self.enabledTemplateIDs = enabledTemplateIDs ?? [MeetingTemplate.personal.id]
         self.defaultTemplateID = defaultTemplateID ?? MeetingTemplate.personal.id
@@ -160,7 +167,8 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, symbol, vocabulary, knownPeople, oneToOnePeople, customTemplates
+        case id, name, symbol, vocabulary, knownPeople, oneToOnePeople, oneToOneDefaultFolderPath
+        case customTemplates
         case enabledTemplateIDs, defaultTemplateID, defaultServiceKind
         case enabledServices, servicesIncludingTranscript, localeIdentifier, recentTranscriptionLocales
         case defaultOutputLanguage, enabledOutputLanguages, detectMeetings, autoStartOnDetection
@@ -179,6 +187,9 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
         oneToOnePeople = try container.decodeIfPresent(
             [OneToOnePerson].self, forKey: .oneToOnePeople
         ) ?? []
+        oneToOneDefaultFolderPath = try container.decodeIfPresent(
+            String.self, forKey: .oneToOneDefaultFolderPath
+        ) ?? ""
         customTemplates = try container.decodeIfPresent(
             [MeetingTemplate].self, forKey: .customTemplates
         ) ?? []

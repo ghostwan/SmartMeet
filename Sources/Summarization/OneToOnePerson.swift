@@ -22,6 +22,12 @@ public struct OneToOnePerson: Codable, Sendable, Equatable, Identifiable {
     /// from this person's one-to-one action items — e.g. sharing tickets
     /// with a manager or a shared inbox, regardless of who's assigned.
     public var jiraShareEmail: String
+    /// Local folder where this person's one-to-one minutes are saved as a
+    /// markdown file, in addition to whatever service they're published to.
+    /// Empty defers to the profile's own default folder (`Profile
+    /// .oneToOneDefaultFolderPath`), same idea as `.profileDefault` for
+    /// `destination`.
+    public var localFolderPath: String
 
     public init(
         id: String = UUID().uuidString,
@@ -29,7 +35,8 @@ public struct OneToOnePerson: Codable, Sendable, Equatable, Identifiable {
         email: String = "",
         confluenceAccountID: String = "",
         destination: PublicationDestination = .profileDefault,
-        jiraShareEmail: String = ""
+        jiraShareEmail: String = "",
+        localFolderPath: String = ""
     ) {
         self.id = id
         self.name = name
@@ -37,10 +44,11 @@ public struct OneToOnePerson: Codable, Sendable, Equatable, Identifiable {
         self.confluenceAccountID = confluenceAccountID
         self.destination = destination
         self.jiraShareEmail = jiraShareEmail
+        self.localFolderPath = localFolderPath
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, email, confluenceAccountID, destination, jiraShareEmail
+        case id, name, email, confluenceAccountID, destination, jiraShareEmail, localFolderPath
     }
 
     // Tolerant decoding: a person saved before a field existed should still
@@ -58,6 +66,9 @@ public struct OneToOnePerson: Codable, Sendable, Equatable, Identifiable {
         ) ?? .profileDefault
         jiraShareEmail = try container.decodeIfPresent(
             String.self, forKey: .jiraShareEmail
+        ) ?? ""
+        localFolderPath = try container.decodeIfPresent(
+            String.self, forKey: .localFolderPath
         ) ?? ""
     }
 }
