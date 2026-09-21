@@ -14,6 +14,7 @@ struct OneToOnePersonTests {
         #expect(person.confluenceAccountID.isEmpty)
         #expect(person.destination == .profileDefault)
         #expect(person.jiraShareEmail.isEmpty)
+        #expect(person.localFolderPath.isEmpty)
         #expect(!person.id.isEmpty)
     }
 
@@ -24,7 +25,8 @@ struct OneToOnePersonTests {
             email: "sandra@example.com",
             confluenceAccountID: "557058:abcabc-abcabc-abcabc",
             destination: .page(id: "123456"),
-            jiraShareEmail: "manager@example.com"
+            jiraShareEmail: "manager@example.com",
+            localFolderPath: "/Users/example/Documents/One-to-one/Sandra"
         )
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(OneToOnePerson.self, from: data)
@@ -52,6 +54,7 @@ struct ProfileOneToOnePeopleTests {
         let json = #"{"id": "abc", "name": "Travail"}"#
         let profile = try JSONDecoder().decode(Profile.self, from: Data(json.utf8))
         #expect(profile.oneToOnePeople.isEmpty)
+        #expect(profile.oneToOneDefaultFolderPath.isEmpty)
     }
 
     @Test("Deux profils gardent des personnes one-to-one indépendantes")

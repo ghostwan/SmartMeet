@@ -628,6 +628,7 @@ public final class RecordingSession {
             try? store.update(updated, customTemplates: settings.customTemplates)
             meetings = store.loadAll()
             reviewedMeeting = updated
+            exportOneToOneMarkdown(for: updated)
             summaryState = .ready
 
             let template = settings.template(id: updated.templateID)
@@ -708,6 +709,49 @@ public final class RecordingSession {
         try? store.update(meeting, customTemplates: settings.customTemplates)
         reviewedMeeting = meeting
         meetings = store.loadAll()
+        exportOneToOneMarkdown(for: meeting)
+    }
+
+    /// Saves this one-to-one's minutes as a markdown file in the
+    /// counterpart's configured folder (or the profile's default), on top of
+    /// wherever it's published — e.g. a personal paper trail outside
+    /// Confluence. A no-op if no folder is configured for this meeting.
+    private func exportOneToOneMarkdown(for meeting: Meeting) {
+        guard let participant = meeting.oneToOneParticipant, !participant.isEmpty,
+              let summary = meeting.summary,
+              let folderPath = settings.oneToOneFolderPath(forParticipantNamed: participant)
+        else { return }
+
+        let template = settings.template(id: meeting.templateID)
+        let title = template.pageTitle(
+            summaryTitle: summary.title,
+            date: meeting.startedAt,
+            language: meeting.outputLanguage,
+            participant: participant
+        )
+        let markdown = summary.markdown(template: template, language: meeting.outputLanguage)
+        let folderURL = URL(fileURLWithPath: (folderPath as NSString).expandingTildeInPath, isDirectory: true)
+
+        do {
+            try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+            try markdown.write(
+                to: folderURL.appendingPathComponent(Self.sanitizedFileName(title) + ".md"),
+                atomically: true, encoding: .utf8
+            )
+        } catch {
+            // Best-effort: an unwritable folder shouldn't block review or
+            // publication, only the extra local copy.
+        }
+    }
+
+    /// Strips characters the filesystem would reject from a title so it can
+    /// be used as a file name as-is.
+    private static func sanitizedFileName(_ title: String) -> String {
+        let invalidCharacters = CharacterSet(charactersIn: "/\\:*?\"<>|")
+        return title
+            .components(separatedBy: invalidCharacters)
+            .joined(separator: "-")
+            .trimmingCharacters(in: .whitespaces)
     }
 
     /// Changes the meeting type of an already-recorded meeting — used before

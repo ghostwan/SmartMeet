@@ -10,6 +10,10 @@ notes, then resets it to this template once the release is published.
 
 ### Added
 
+- One-to-one minutes can now also be saved as a markdown file to a local
+  folder, in addition to wherever they're published — a default folder for
+  the whole profile, overridable per person in Settings > One-to-one.
+
 - Meeting types can now choose the profile's default destination or a specific
   parent page for either Notion or Confluence. The review window can override
   both service and page for one publication without modifying the type.

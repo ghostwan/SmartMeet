@@ -1,3 +1,4 @@
+import AppKit
 import Atlassian
 import Notion
 import Summarization
@@ -19,12 +20,36 @@ struct OneToOnePeopleSettingsView: View {
     }
 
     var body: some View {
-        HSplitView {
-            list
-            detail
+        VStack(spacing: 0) {
+            defaultFolderEditor
+                .padding([.horizontal, .top])
+            Divider().padding(.top, 12)
+            HSplitView {
+                list
+                detail
+            }
         }
         .onAppear(perform: normalizeSelection)
         .onChange(of: settings.activeProfileID) { normalizeSelection() }
+    }
+
+    /// Default local folder every one-to-one's minutes are saved to as
+    /// markdown, unless the person has their own (see `folderEditor`
+    /// below) — set once for the whole profile instead of on every person.
+    private var defaultFolderEditor: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Dossier de sauvegarde par défaut")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            folderPicker(
+                path: settings.oneToOneDefaultFolderPath,
+                onChoose: { settings.oneToOneDefaultFolderPath = $0 },
+                onClear: { settings.oneToOneDefaultFolderPath = "" }
+            )
+            Text("Chaque one-to-one enregistre aussi son compte rendu en markdown dans ce dossier, sauf si la personne a le sien.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
     }
 
     private var list: some View {
@@ -71,6 +96,7 @@ struct OneToOnePeopleSettingsView: View {
                     identity(selected)
                     restrictionEditor(selected)
                     destinationEditor(selected)
+                    folderEditor(selected)
                     jiraShareEditor(selected)
                 }
                 .padding()
@@ -185,6 +211,59 @@ struct OneToOnePeopleSettingsView: View {
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
+    }
+
+    private func folderEditor(_ person: OneToOnePerson) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Dossier de sauvegarde")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            folderPicker(
+                path: person.localFolderPath,
+                onChoose: { path in
+                    var updated = person
+                    updated.localFolderPath = path
+                    settings.upsert(updated)
+                },
+                onClear: {
+                    var updated = person
+                    updated.localFolderPath = ""
+                    settings.upsert(updated)
+                }
+            )
+            Text("Remplace le dossier par défaut pour cette personne uniquement.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    /// Path display plus the two actions ("Choisir…" / clear) shared by the
+    /// profile-wide default folder and each person's own override.
+    private func folderPicker(
+        path: String, onChoose: @escaping (String) -> Void, onClear: @escaping () -> Void
+    ) -> some View {
+        HStack {
+            Text(path.isEmpty ? L("Aucun dossier choisi") : path)
+                .font(.caption)
+                .foregroundStyle(path.isEmpty ? .tertiary : .primary)
+                .lineLimit(1)
+                .truncationMode(.head)
+            Spacer()
+            Button(L("Choisir…")) { chooseFolder(onChoose: onChoose) }
+            if !path.isEmpty {
+                Button(L("Effacer"), action: onClear)
+            }
+        }
+    }
+
+    private func chooseFolder(onChoose: @escaping (String) -> Void) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = L("Choisir")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        onChoose(url.path)
     }
 
     private func jiraShareEditor(_ person: OneToOnePerson) -> some View {
