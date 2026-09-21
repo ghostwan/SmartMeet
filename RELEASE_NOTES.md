@@ -10,6 +10,12 @@ notes, then resets it to this template once the release is published.
 
 ### Added
 
+- New *Settings › Transcription › Stockage*: the folder where every
+  meeting's audio, transcript and generated minutes are stored on disk can
+  now be chosen freely instead of always being
+  `~/Library/Application Support/SmartMeet`. Global (shared by every
+  profile, since they all read the same physical store), and only affects
+  recordings made after the change — existing meetings stay where they are.
 - One-to-one minutes can now also be saved as a markdown file to a local
   folder, in addition to wherever they're published — a default folder for
   the whole profile, overridable per person in Settings > One-to-one.
@@ -107,6 +113,10 @@ notes, then resets it to this template once the release is published.
   user's personal Confluence space.
 ### Fixed
 
+- The menu bar's meeting list only ever showed the green "published" checkmark
+  for a Confluence publication; a meeting published solely to Notion showed
+  no indicator at all. It now also shows the checkmark when
+  `isPublishedToNotion` is true.
 - Settings window: the tab bar no longer collapses tabs behind a "More"
   overflow button (macOS 26's default tab style adapts to a sidebar past a
   handful of tabs, and the traffic lights ate into the leftmost tab when the

@@ -88,7 +88,7 @@ public final class RecordingSession {
     public var oneToOneJiraShareEmail: String = ""
 
     public let settings: AppSettings
-    private let store: MeetingStore
+    private var store: MeetingStore
     private let calendar = CalendarService()
     private let detector: MeetingDetector
     private let notifier = MeetingNotifier()
@@ -132,7 +132,7 @@ public final class RecordingSession {
         self.selectedTemplateID = settings.defaultTemplateID
         self.selectedOutputLanguage = settings.defaultOutputLanguage
         self.selectedTranscriptionLocale = settings.localeIdentifier
-        self.store = MeetingStore()
+        self.store = MeetingStore(root: settings.recordingsRootURL)
         meetings = store.loadAll()
 
         notifier.onRecord = { [weak self] in Task { await self?.acceptSuggestion() } }
@@ -752,6 +752,18 @@ public final class RecordingSession {
             .components(separatedBy: invalidCharacters)
             .joined(separator: "-")
             .trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Applies a newly chosen recordings root folder (Settings ›
+    /// Transcription › Stockage): only recordings made from this point
+    /// onward use it — meetings already on disk under the previous location
+    /// stay there, they aren't moved automatically. Refused while a
+    /// recording is in progress, to avoid splitting a single meeting's files
+    /// across two folders.
+    public func applyRecordingsRootChange() {
+        guard !isRecording else { return }
+        store = MeetingStore(root: settings.recordingsRootURL)
+        meetings = store.loadAll()
     }
 
     /// Changes the meeting type of an already-recorded meeting — used before

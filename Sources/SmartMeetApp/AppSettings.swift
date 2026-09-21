@@ -37,6 +37,7 @@ public final class AppSettings {
         static let activeProfileID = "activeProfileID"
         static let enabledServices = "enabledServices"
         static let profileKnownPeopleMigrated = "profileKnownPeopleMigrated"
+        static let recordingsRootPath = "recordingsRootPath"
     }
 
     private let defaults = UserDefaults.standard
@@ -180,6 +181,20 @@ public final class AppSettings {
     /// User's name: the transcript only knows them by the label "Moi" ("Me").
     public var userName: String {
         didSet { defaults.set(userName, forKey: Key.userName) }
+    }
+    /// Root folder where every meeting's audio, transcript and generated
+    /// minutes are stored on disk (one subfolder per meeting — see
+    /// `MeetingStore`). Empty means the default location under
+    /// `~/Library/Application Support`. Global rather than per-profile:
+    /// `MeetingStore` has no notion of profiles, every profile reads and
+    /// writes the same physical folder.
+    public var recordingsRootPath: String {
+        didSet { defaults.set(recordingsRootPath, forKey: Key.recordingsRootPath) }
+    }
+    /// `nil` (the default location) unless the user picked a folder of their
+    /// own — passed straight into `MeetingStore.init(root:)`.
+    public var recordingsRootURL: URL? {
+        recordingsRootPath.isEmpty ? nil : URL(fileURLWithPath: recordingsRootPath)
     }
     /// Default language proposed for the minutes under the active profile.
     public var defaultOutputLanguage: SummaryLanguage {
@@ -399,6 +414,7 @@ public final class AppSettings {
         ollamaModel = defaults.string(forKey: Key.ollamaModel) ?? "gemma4"
         claudeCodeModel = defaults.string(forKey: Key.claudeCodeModel) ?? "sonnet"
         userName = defaults.string(forKey: Key.userName) ?? NSFullUserName()
+        recordingsRootPath = defaults.string(forKey: Key.recordingsRootPath) ?? ""
         useCalendar = defaults.object(forKey: Key.useCalendar) as? Bool ?? true
 
         // Profiles: load if present, otherwise migrate every pre-profile

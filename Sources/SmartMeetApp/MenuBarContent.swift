@@ -583,6 +583,11 @@ private struct MeetingRow: View {
                     }
                     if meeting.isPublished {
                         Image(systemName: "checkmark.icloud").foregroundStyle(.green)
+                            .help("Publié sur Confluence")
+                    }
+                    if meeting.isPublishedToNotion {
+                        Image(systemName: "checkmark.icloud").foregroundStyle(.green)
+                            .help("Publié sur Notion")
                     }
                 }
                 .font(.caption)

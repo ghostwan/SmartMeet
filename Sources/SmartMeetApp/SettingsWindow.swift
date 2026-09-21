@@ -94,6 +94,38 @@ struct SettingsWindow: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Stockage") {
+                HStack {
+                    Text(
+                        settings.recordingsRootPath.isEmpty
+                            ? L("Par défaut (~/Library/Application Support/SmartMeet)")
+                            : settings.recordingsRootPath
+                    )
+                    .font(.caption)
+                    .foregroundStyle(settings.recordingsRootPath.isEmpty ? .tertiary : .primary)
+                    .lineLimit(1)
+                    .truncationMode(.head)
+                    Spacer()
+                    Button(L("Choisir…")) { chooseRecordingsRootFolder() }
+                        .disabled(session.isRecording)
+                    if !settings.recordingsRootPath.isEmpty {
+                        Button(L("Réinitialiser")) {
+                            settings.recordingsRootPath = ""
+                            session.applyRecordingsRootChange()
+                        }
+                        .disabled(session.isRecording)
+                    }
+                }
+                Text("Dossier où sont enregistrés l'audio, le transcript et le compte rendu de chaque réunion, un sous-dossier par réunion. Les réunions déjà enregistrées restent à leur emplacement précédent : seules les prochaines utilisent ce nouveau dossier.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                if session.isRecording {
+                    Text("Impossible de changer le dossier pendant un enregistrement en cours.")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
+            }
+
             Picker("Langue", selection: $settings.localeIdentifier) {
                 ForEach(availableLocales, id: \.id) { locale in
                     Text(locale.label).tag(locale.id)
@@ -169,6 +201,20 @@ struct SettingsWindow: View {
         }
         .formStyle(.grouped)
         .padding()
+    }
+
+    /// Lets the user relocate where meetings are stored on disk (audio,
+    /// transcript, generated minutes) — see `applyRecordingsRootChange()`
+    /// for why existing meetings aren't moved.
+    private func chooseRecordingsRootFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = L("Choisir")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        settings.recordingsRootPath = url.path
+        session.applyRecordingsRootChange()
     }
 
     private var summaryTab: some View {
