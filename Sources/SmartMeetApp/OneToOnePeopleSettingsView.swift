@@ -129,26 +129,27 @@ struct OneToOnePeopleSettingsView: View {
     }
 
     private func restrictionEditor(_ person: OneToOnePerson) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let emailBinding = Binding(
+            get: { person.email },
+            set: {
+                var updated = person
+                updated.email = $0
+                // A manual edit invalidates any accountId resolved from a
+                // previous search result.
+                updated.confluenceAccountID = ""
+                settings.upsert(updated)
+            }
+        )
+        return VStack(alignment: .leading, spacing: 6) {
             Text("Restriction Confluence")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
             HStack {
-                TextField(
-                    "E-mail",
-                    text: Binding(
-                        get: { person.email },
-                        set: {
-                            var updated = person
-                            updated.email = $0
-                            // A manual edit invalidates any accountId resolved
-                            // from a previous search result.
-                            updated.confluenceAccountID = ""
-                            settings.upsert(updated)
-                        }
-                    )
-                )
-                .textFieldStyle(.roundedBorder)
+                TextField("Nom ou e-mail", text: emailBinding)
+                    .textFieldStyle(.roundedBorder)
+                // Searches Confluence directly off whatever is typed above
+                // (name or e-mail) instead of asking for it again in a
+                // separate field.
                 ConfluenceUserSearchButton(
                     search: { await session.searchConfluenceUsers(matching: $0) },
                     onSelect: { match in
@@ -156,8 +157,14 @@ struct OneToOnePeopleSettingsView: View {
                         updated.name = updated.name.isEmpty ? match.displayName : updated.name
                         updated.email = match.email ?? updated.email
                         updated.confluenceAccountID = match.accountID
+                        // A found account's e-mail is also a sensible default
+                        // for the Jira watcher, if not already set.
+                        if updated.jiraShareEmail.isEmpty, let email = match.email {
+                            updated.jiraShareEmail = email
+                        }
                         settings.upsert(updated)
-                    }
+                    },
+                    externalQuery: emailBinding
                 )
             }
             Text("La page publiée ne sera visible que de toi et de cette personne, si son compte Confluence est trouvé.")

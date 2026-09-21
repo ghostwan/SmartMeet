@@ -767,6 +767,18 @@ public final class RecordingSession {
         meetings = store.loadAll()
     }
 
+    /// Changes the minutes' language for an already-recorded meeting — used
+    /// before a regeneration, when the language chosen at recording time
+    /// turns out to be the wrong one. Doesn't request minutes on its own:
+    /// it's up to the caller to call `generateSummary` afterward if needed.
+    public func setOutputLanguage(_ language: SummaryLanguage, for meeting: Meeting) {
+        var updated = meeting
+        updated.outputLanguage = language
+        try? store.update(updated, customTemplates: settings.customTemplates)
+        if reviewedMeeting?.id == meeting.id { reviewedMeeting = updated }
+        meetings = store.loadAll()
+    }
+
     /// Confirms who was actually present before generating the minutes — the
     /// transcript itself only carries generic track/diarization labels
     /// ("Participants", "Locuteur 2"), never real names, which is the root

@@ -3,18 +3,28 @@ import SwiftUI
 
 /// Quick Confluence user search, used in place of typing an e-mail by hand
 /// for the one-to-one counterpart (or any other "restrict this page to…"
-/// picker): a magnifying-glass button opens a small popover with a search
-/// field — accepting either a display name or a full e-mail address, see
-/// `ConfluenceClient.searchUsers(matching:)` — and the matching accounts,
-/// debounced so every keystroke doesn't fire a request.
+/// picker): a magnifying-glass button opens a small popover with the
+/// matching accounts — accepting either a display name or a full e-mail
+/// address, see `ConfluenceClient.searchUsers(matching:)` — debounced so
+/// every keystroke doesn't fire a request. Either searches its own input
+/// field, or (via `externalQuery`) reuses a field the caller already has,
+/// so the person isn't asked to type the same name twice.
 struct ConfluenceUserSearchButton: View {
     let search: (String) async -> [ConfluenceUserMatch]
     let onSelect: (ConfluenceUserMatch) -> Void
+    /// When set, the popover searches straight off this field's current text
+    /// (a name or an e-mail already typed next to the magnifying glass)
+    /// instead of showing its own input — avoids asking the same thing
+    /// twice for the one-to-one restriction field, which already accepts
+    /// both.
+    var externalQuery: Binding<String>? = nil
 
     @State private var isPresented = false
-    @State private var query = ""
+    @State private var internalQuery = ""
     @State private var results: [ConfluenceUserMatch] = []
     @State private var isSearching = false
+
+    private var query: String { externalQuery?.wrappedValue ?? internalQuery }
 
     var body: some View {
         Button {
@@ -26,14 +36,22 @@ struct ConfluenceUserSearchButton: View {
         .help("Rechercher un compte Confluence par nom ou par e-mail")
         .popover(isPresented: $isPresented) {
             VStack(alignment: .leading, spacing: 8) {
-                TextField("Nom ou e-mail sur Confluence…", text: $query)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 220)
+                if externalQuery == nil {
+                    TextField("Nom ou e-mail sur Confluence…", text: $internalQuery)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 220)
+                }
 
                 if isSearching {
                     ProgressView().controlSize(.small)
                 } else if query.trimmingCharacters(in: .whitespaces).count >= 2 && results.isEmpty {
                     Text("Aucun résultat").font(.caption).foregroundStyle(.secondary)
+                } else if externalQuery != nil
+                    && query.trimmingCharacters(in: .whitespaces).count < 2
+                {
+                    Text("Tape au moins 2 caractères dans le champ à gauche")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 if !results.isEmpty {

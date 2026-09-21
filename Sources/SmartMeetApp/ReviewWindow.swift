@@ -20,6 +20,7 @@ struct ReviewWindow: View {
     @State private var showParticipantsPopover = false
     @State private var showTranscript = false
     @State private var templateSelection: String = ""
+    @State private var languageSelection: SummaryLanguage = .french
     @State private var oneToOneNameInput: String = ""
     @State private var oneToOneEmailInput: String = ""
     @State private var oneToOneAccountIDInput: String = ""
@@ -65,6 +66,7 @@ struct ReviewWindow: View {
         .onChange(of: session.reviewedMeeting?.id, initial: true) {
             load(meeting)
             templateSelection = meeting.templateID
+            languageSelection = meeting.outputLanguage
             oneToOneNameInput = meeting.oneToOneParticipant ?? ""
             oneToOneEmailInput = meeting.oneToOneParticipantEmail ?? ""
             let template = session.template(for: meeting)
@@ -222,10 +224,22 @@ struct ReviewWindow: View {
                     .frame(width: 170)
                     .help("Type appliqué à la prochaine régénération")
 
+                    Picker("Langue", selection: $languageSelection) {
+                        ForEach(session.settings.availableOutputLanguages) { language in
+                            Text("\(language.flag) \(language.displayName)").tag(language)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 130)
+                    .help("Langue appliquée à la prochaine régénération")
+
                     Button("Régénérer") {
                         Task {
                             if templateSelection != meeting.templateID {
                                 session.setTemplate(templateSelection, for: meeting)
+                            }
+                            if languageSelection != meeting.outputLanguage {
+                                session.setOutputLanguage(languageSelection, for: meeting)
                             }
                             loadedMeetingID = nil
                             await session.generateSummary(for: session.reviewedMeeting ?? meeting)

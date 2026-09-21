@@ -85,8 +85,18 @@ notes, then resets it to this template once the release is published.
   configured per meeting type in *Settings › Types de réunion*, and stays
   editable per meeting from the review window before publication, using the
   same Confluence search picker as the one-to-one counterpart.
+- The review window now lets you change the minutes' language and regenerate
+  from there, next to the existing meeting-type picker — no need to redo the
+  recording to fix a language chosen by mistake, or to get the same minutes
+  in another language.
 
 ### Changed
+
+- *Settings › One-to-one*'s restriction field now accepts either a display
+  name or an e-mail, and its magnifying-glass button searches Confluence
+  straight off whatever is typed there instead of opening a second, separate
+  search field. Picking a match also prefills the Jira watcher e-mail below
+  it if that field was still empty.
 
 - The README now includes English screenshots rendered from isolated mock
   profiles and meetings, with no real user data or credentials.
