@@ -134,7 +134,11 @@ notes, then resets it to this template once the release is published.
   isn't a page — publishing as a child of a folder works the same as
   publishing as a child of a page. Also, *Settings › Services*' default
   parent page field used to silently ignore an unparseable input instead
-  of saying so.
+  of saying so. Destination resolution also now re-normalizes the stored
+  ID at publish time, so a destination saved before this fix (still
+  holding the raw folder URL instead of its numeric ID) heals itself on
+  the next publish instead of requiring the field to be retyped in
+  Settings.
 - The review window's "Régénérer" button, when both the meeting type and
   the language were changed at the same time, silently reverted the type
   change: each was persisted through its own separate write, starting over

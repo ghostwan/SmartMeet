@@ -64,7 +64,13 @@ public struct PublishService: Sendable {
         }
 
         if let pageID {
-            let page = try await confluence.page(id: pageID)
+            // Defensive: a destination saved before URL parsing supported
+            // e.g. Confluence folder URLs may still hold the raw URL rather
+            // than a bare ID (settings screens now normalize on input, but
+            // this doesn't retroactively fix what's already persisted).
+            // A no-op for anything already a bare ID.
+            let normalizedID = SprintPage.extractPageID(from: pageID) ?? pageID
+            let page = try await confluence.page(id: normalizedID)
             return ResolvedDestination(
                 spaceKey: page.spaceKey,
                 spaceID: page.spaceID,
