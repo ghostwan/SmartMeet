@@ -184,10 +184,15 @@ struct ServicesSettingsView: View {
             settings.atlassian.parentPageID = ""
             return
         }
-        if let id = SprintPage.extractPageID(from: trimmed) {
-            settings.atlassian.parentPageID = id
-            confluencePageInput = id
+        guard let id = SprintPage.extractPageID(from: trimmed) else {
+            // Otherwise this fails silently: the field looks accepted but
+            // `parentPageID` is left untouched, and the mistake only
+            // surfaces much later as a confusing publish-time error.
+            statusMessage = L("❌ Identifiant ou URL de page/dossier Confluence non reconnu.")
+            return
         }
+        settings.atlassian.parentPageID = id
+        confluencePageInput = id
     }
 
     private var notionForm: some View {

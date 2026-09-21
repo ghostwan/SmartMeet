@@ -15,6 +15,7 @@ struct OneToOnePersonTests {
         #expect(person.destination == .profileDefault)
         #expect(person.jiraShareEmail.isEmpty)
         #expect(person.localFolderPath.isEmpty)
+        #expect(person.lastManualPageID.isEmpty)
         #expect(!person.id.isEmpty)
     }
 
@@ -26,11 +27,27 @@ struct OneToOnePersonTests {
             confluenceAccountID: "557058:abcabc-abcabc-abcabc",
             destination: .page(id: "123456"),
             jiraShareEmail: "manager@example.com",
-            localFolderPath: "/Users/example/Documents/One-to-one/Sandra"
+            localFolderPath: "/Users/example/Documents/One-to-one/Sandra",
+            lastManualPageID: "123456"
         )
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(OneToOnePerson.self, from: data)
         #expect(decoded == original)
+    }
+
+    @Test("Le dernier identifiant de page tapé survit au passage par la destination par défaut")
+    func lastManualPageIDSurvivesEncoding() throws {
+        var person = OneToOnePerson(name: "Sandra", destination: .page(id: "123456"))
+        person.lastManualPageID = "123456"
+        // Switching back to the type's default destination clears the
+        // active destination, but the last typed page must stay remembered
+        // so the field isn't empty when switching back to "specific page".
+        person.destination = .profileDefault
+
+        let data = try JSONEncoder().encode(person)
+        let decoded = try JSONDecoder().decode(OneToOnePerson.self, from: data)
+        #expect(decoded.destination == .profileDefault)
+        #expect(decoded.lastManualPageID == "123456")
     }
 
     @Test("Deux personnes gardent des destinations indépendantes")

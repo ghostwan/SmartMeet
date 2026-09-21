@@ -10,6 +10,12 @@ notes, then resets it to this template once the release is published.
 
 ### Added
 
+- New built-in meeting type, *Compte rendu court* ("Short summary"): only
+  three sections (TL;DR, decisions, action items) instead of the usual six,
+  with instructions telling the model not to restate the same information
+  across sections — for whoever wants the gist, not an exhaustive account.
+  Not enabled by default on existing profiles; add it from *Settings ›
+  Types de réunion*.
 - New *Settings › Transcription › Stockage*: the folder where every
   meeting's audio, transcript and generated minutes are stored on disk can
   now be chosen freely instead of always being
@@ -98,6 +104,10 @@ notes, then resets it to this template once the release is published.
 
 ### Changed
 
+- The review window's "Créer les tickets Jira" checkbox now defaults to
+  unchecked instead of checked — creating Jira tickets from action items is
+  now an explicit, opt-in choice on each publication rather than something
+  to remember to turn off.
 - *Settings › One-to-one*'s restriction field now accepts either a display
   name or an e-mail, and its magnifying-glass button searches Confluence
   straight off whatever is typed there instead of opening a second, separate
@@ -113,6 +123,31 @@ notes, then resets it to this template once the release is published.
   user's personal Confluence space.
 ### Fixed
 
+- A Confluence *folder* URL (`/wiki/spaces/KEY/folder/12345/Title`) entered
+  as a publication destination — default parent, a meeting type's, or a
+  one-to-one person's — was rejected: the URL parser only recognized page
+  URLs (`/pages/…`) and the legacy `viewpage.action?pageId=…`, and even
+  once parsed, resolving the destination only ever queried the pages API,
+  which 404s on a folder's ID (folders are a distinct content type in
+  Confluence's v2 API). Both are fixed: folder URLs are now parsed, and
+  destination resolution falls back to the folders endpoint when the ID
+  isn't a page — publishing as a child of a folder works the same as
+  publishing as a child of a page. Also, *Settings › Services*' default
+  parent page field used to silently ignore an unparseable input instead
+  of saying so.
+- The review window's "Régénérer" button, when both the meeting type and
+  the language were changed at the same time, silently reverted the type
+  change: each was persisted through its own separate write, starting over
+  from the same pre-change meeting snapshot, so the second write had no
+  idea about the first one's change. Both are now applied together in a
+  single write.
+- The "specific page" field for a meeting type's or a one-to-one person's
+  publication destination (*Settings › Types de réunion* / *One-to-one*)
+  used to lose whatever page ID had been typed as soon as the picker was
+  switched to the default destination and back — the field only existed
+  on the `.page(id:)` case, `.profileDefault` had nowhere to keep it. The
+  last typed page is now remembered independently and restored when
+  switching back to "Page spécifique".
 - The menu bar's meeting list only ever showed the green "published" checkmark
   for a Confluence publication; a meeting published solely to Notion showed
   no indicator at all. It now also shows the checkmark when

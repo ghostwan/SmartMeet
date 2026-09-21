@@ -20,6 +20,10 @@ public struct SprintPage: Codable, Sendable, Equatable {
     ///
     /// URLs take several forms depending on the page's age:
     /// `/wiki/spaces/KEY/pages/12345/Title`, `/wiki/pages/viewpage.action?pageId=12345`.
+    /// A Confluence *folder* URL (`/wiki/spaces/KEY/folder/12345/Title`) is
+    /// also accepted: folders are a distinct content type from pages, but the
+    /// Confluence API happily takes either one as a page's `parentId` —
+    /// nothing needs to be an actual page to hold minutes under it.
     public static func extractPageID(from input: String) -> String? {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -32,7 +36,7 @@ public struct SprintPage: Codable, Sendable, Equatable {
                 return pageId
             }
             let parts = components.path.split(separator: "/").map(String.init)
-            if let index = parts.firstIndex(of: "pages"),
+            if let index = parts.firstIndex(where: { $0 == "pages" || $0 == "folder" }),
                parts.indices.contains(index + 1),
                parts[index + 1].allSatisfy(\.isNumber) {
                 return parts[index + 1]

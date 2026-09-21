@@ -28,6 +28,11 @@ public struct OneToOnePerson: Codable, Sendable, Equatable, Identifiable {
     /// .oneToOneDefaultFolderPath`), same idea as `.profileDefault` for
     /// `destination`.
     public var localFolderPath: String
+    /// Last page ID/URL typed in the "specific page" field, kept even after
+    /// switching `destination` back to `.profileDefault` — a `.page(id:)`
+    /// only exists while that mode is selected, so without this the typed
+    /// value would be lost the moment the picker flips away and back.
+    public var lastManualPageID: String
 
     public init(
         id: String = UUID().uuidString,
@@ -36,7 +41,8 @@ public struct OneToOnePerson: Codable, Sendable, Equatable, Identifiable {
         confluenceAccountID: String = "",
         destination: PublicationDestination = .profileDefault,
         jiraShareEmail: String = "",
-        localFolderPath: String = ""
+        localFolderPath: String = "",
+        lastManualPageID: String = ""
     ) {
         self.id = id
         self.name = name
@@ -45,10 +51,12 @@ public struct OneToOnePerson: Codable, Sendable, Equatable, Identifiable {
         self.destination = destination
         self.jiraShareEmail = jiraShareEmail
         self.localFolderPath = localFolderPath
+        self.lastManualPageID = lastManualPageID
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, name, email, confluenceAccountID, destination, jiraShareEmail, localFolderPath
+        case lastManualPageID
     }
 
     // Tolerant decoding: a person saved before a field existed should still
@@ -70,5 +78,8 @@ public struct OneToOnePerson: Codable, Sendable, Equatable, Identifiable {
         localFolderPath = try container.decodeIfPresent(
             String.self, forKey: .localFolderPath
         ) ?? ""
+        lastManualPageID = try container.decodeIfPresent(
+            String.self, forKey: .lastManualPageID
+        ) ?? destination.pageID ?? ""
     }
 }

@@ -766,29 +766,25 @@ public final class RecordingSession {
         meetings = store.loadAll()
     }
 
-    /// Changes the meeting type of an already-recorded meeting — used before
-    /// a regeneration, when the type originally chosen turns out unsuitable
-    /// (e.g. a personal conversation recorded by mistake with a work-related
-    /// type). Doesn't request minutes on its own: it's up to the caller to
-    /// call `generateSummary` afterward if needed.
-    public func setTemplate(_ templateID: String, for meeting: Meeting) {
+    /// Applies a possibly-changed meeting type and/or output language in a
+    /// single write, right before a regeneration. Doing it as two separate
+    /// calls (one per field, each starting over from the same `meeting`
+    /// snapshot the caller passed in) would have the second call silently
+    /// undo the first's change, since neither knows about the other's
+    /// update. Returns the updated meeting so the caller can regenerate
+    /// against it right away, without depending on `reviewedMeeting` having
+    /// been refreshed synchronously.
+    @discardableResult
+    public func applyRegenerationSettings(
+        templateID: String, language: SummaryLanguage, for meeting: Meeting
+    ) -> Meeting {
         var updated = meeting
         updated.templateID = templateID
-        try? store.update(updated, customTemplates: settings.customTemplates)
-        if reviewedMeeting?.id == meeting.id { reviewedMeeting = updated }
-        meetings = store.loadAll()
-    }
-
-    /// Changes the minutes' language for an already-recorded meeting — used
-    /// before a regeneration, when the language chosen at recording time
-    /// turns out to be the wrong one. Doesn't request minutes on its own:
-    /// it's up to the caller to call `generateSummary` afterward if needed.
-    public func setOutputLanguage(_ language: SummaryLanguage, for meeting: Meeting) {
-        var updated = meeting
         updated.outputLanguage = language
         try? store.update(updated, customTemplates: settings.customTemplates)
         if reviewedMeeting?.id == meeting.id { reviewedMeeting = updated }
         meetings = store.loadAll()
+        return updated
     }
 
     /// Confirms who was actually present before generating the minutes — the

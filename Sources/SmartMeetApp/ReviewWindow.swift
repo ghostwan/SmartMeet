@@ -9,7 +9,7 @@ import SwiftUI
 struct ReviewWindow: View {
     @Bindable var session: RecordingSession
     @State private var draft = MeetingSummary()
-    @State private var createJiraIssues = true
+    @State private var createJiraIssues = false
     @State private var createNotionTasks = true
     @State private var loadedMeetingID: UUID?
     @State private var diarizationStatus: String?
@@ -235,14 +235,20 @@ struct ReviewWindow: View {
 
                     Button("Régénérer") {
                         Task {
-                            if templateSelection != meeting.templateID {
-                                session.setTemplate(templateSelection, for: meeting)
-                            }
-                            if languageSelection != meeting.outputLanguage {
-                                session.setOutputLanguage(languageSelection, for: meeting)
+                            let target: Meeting
+                            if templateSelection != meeting.templateID
+                                || languageSelection != meeting.outputLanguage
+                            {
+                                target = session.applyRegenerationSettings(
+                                    templateID: templateSelection,
+                                    language: languageSelection,
+                                    for: meeting
+                                )
+                            } else {
+                                target = session.reviewedMeeting ?? meeting
                             }
                             loadedMeetingID = nil
-                            await session.generateSummary(for: session.reviewedMeeting ?? meeting)
+                            await session.generateSummary(for: target)
                         }
                     }
                 }

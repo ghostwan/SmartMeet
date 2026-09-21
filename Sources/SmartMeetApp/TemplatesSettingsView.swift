@@ -215,7 +215,9 @@ struct TemplatesSettingsView: View {
                         get: { id },
                         set: { value in
                             var template = selected
-                            template.destination = .page(id: normalizedPageID(value))
+                            let normalized = normalizedPageID(value)
+                            template.destination = .page(id: normalized)
+                            template.lastManualPageID = normalized
                             settings.upsert(template)
                         }
                     )
@@ -266,7 +268,11 @@ struct TemplatesSettingsView: View {
                 var template = selected
                 template.destination = switch mode {
                 case .profileDefault: .profileDefault
-                case .specificPage: .page(id: selected.destination.pageID ?? "")
+                // Reuses the last page typed here, if any, instead of
+                // starting from an empty field every time —
+                // `selected.destination.pageID` alone would be `nil` as
+                // soon as `.profileDefault` was selected in between.
+                case .specificPage: .page(id: selected.lastManualPageID)
                 }
                 settings.upsert(template)
             }

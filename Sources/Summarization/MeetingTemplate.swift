@@ -227,6 +227,11 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
     /// different service if it later becomes unavailable.
     public var serviceKind: ServiceKind?
     public var destination: PublicationDestination
+    /// Last page ID/URL typed in the "specific page" field, kept even after
+    /// switching `destination` back to `.profileDefault` — a `.page(id:)`
+    /// only exists while that mode is selected, so without this the typed
+    /// value would be lost the moment the picker flips away and back.
+    public var lastManualPageID: String
     /// True for a type that involves exactly two people (the user and a single
     /// counterpart) — a one-to-one, typically. This drives two things: the UI
     /// asks for that counterpart before recording, and the published page is
@@ -252,6 +257,7 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
         parent: ParentPageReference = .spaceHome,
         serviceKind: ServiceKind? = nil,
         destination: PublicationDestination = .profileDefault,
+        lastManualPageID: String = "",
         requiresParticipant: Bool = false,
         defaultRestrictedViewers: [RestrictedViewer] = [],
         isBuiltIn: Bool = false
@@ -266,6 +272,7 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
         self.parent = parent
         self.serviceKind = serviceKind
         self.destination = destination
+        self.lastManualPageID = lastManualPageID
         self.requiresParticipant = requiresParticipant
         self.defaultRestrictedViewers = defaultRestrictedViewers
         self.isBuiltIn = isBuiltIn
@@ -274,6 +281,7 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
     private enum CodingKeys: String, CodingKey {
         case id, name, symbol, sections, instructions
         case titleFormat, spaceKeyOverride, parent, serviceKind, destination
+        case lastManualPageID
         case requiresParticipant, defaultRestrictedViewers, isBuiltIn
     }
 
@@ -302,6 +310,9 @@ public struct MeetingTemplate: Codable, Sendable, Identifiable, Equatable, Hasha
         } else {
             destination = .profileDefault
         }
+        lastManualPageID = try container.decodeIfPresent(
+            String.self, forKey: .lastManualPageID
+        ) ?? destination.pageID ?? ""
         requiresParticipant = try container.decodeIfPresent(Bool.self, forKey: .requiresParticipant) ?? false
         defaultRestrictedViewers = try container.decodeIfPresent(
             [RestrictedViewer].self, forKey: .defaultRestrictedViewers
@@ -338,6 +349,8 @@ public extension MeetingTemplate {
         switch (id, name) {
         case ("builtin.generic", "Réunion de travail"):
             canonicalName = "Réunion de travail"
+        case ("builtin.compact", "Compte rendu court"):
+            canonicalName = "Compte rendu court"
         case ("builtin.daily", "Daily"):
             canonicalName = "Daily"
         case ("builtin.synchro", "Synchro"):
@@ -367,6 +380,39 @@ public extension MeetingTemplate {
         symbol: "doc.text",
         sections: [.tldr, .decisions, .actionItems, .topics, .openQuestions, .nextSteps],
         instructions: "",
+        titleFormat: "{summary} — {date}",
+        isBuiltIn: true
+    )
+
+    /// Deliberately minimal: three sections that don't overlap, instead of
+    /// the six-section shape shared by most other types (where `tldr` tends
+    /// to restate `decisions`/`actionItems`, and `topics`/`openQuestions`/
+    /// `nextSteps` tend to restate each other). For someone who wants the
+    /// gist in under a minute, not an exhaustive account of the meeting.
+    static let compact = MeetingTemplate(
+        id: "builtin.compact",
+        name: "Compte rendu court",
+        symbol: "bolt.fill",
+        sections: [.tldr, .decisions, .actionItems],
+        instructions: """
+        Rédige un compte rendu volontairement court : trois sections seulement, \
+        chacune n'apparaissant qu'une fois.
+
+        - `tldr` : deux phrases maximum, le contexte général de la réunion. Ne \
+        liste jamais les décisions ou les actions déjà présentes dans les \
+        sections dédiées — c'est un résumé de situation, pas un sommaire de ce \
+        qui suit.
+        - `decisions` : uniquement ce qui a été explicitement tranché, en une \
+        phrase chacune. N'y mets pas ce qui devient une action assignée à \
+        quelqu'un : ça va dans `actionItems`, pas aux deux endroits.
+        - `actionItems` : uniquement les engagements concrets avec un \
+        responsable identifiable. Pas de reformulation d'une décision déjà \
+        listée plus haut si elle ne demande aucun suivi.
+
+        En cas de doute entre deux sections pour la même information, choisis \
+        celle qui convient le mieux et n'y reviens pas ailleurs — la brièveté \
+        prime sur l'exhaustivité.
+        """,
         titleFormat: "{summary} — {date}",
         isBuiltIn: true
     )
@@ -490,7 +536,9 @@ public extension MeetingTemplate {
         isBuiltIn: true
     )
 
-    static let builtIns: [MeetingTemplate] = [personal, generic, daily, synchro, retrospective, oneToOne]
+    static let builtIns: [MeetingTemplate] = [
+        personal, generic, compact, daily, synchro, retrospective, oneToOne,
+    ]
 
     static let builtInIDs = Set(builtIns.map(\.id))
 

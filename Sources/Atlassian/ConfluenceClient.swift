@@ -99,11 +99,40 @@ public struct ConfluenceClient: Sendable {
     }
 
     /// Re-reads a page to confirm it exists and retrieve its title. Used to
-    /// validate the sprint page entered by the user.
+    /// validate the destination page entered by the user.
+    ///
+    /// Falls back to the folders endpoint if the ID doesn't match a page:
+    /// a Confluence *folder* is a distinct content type from a page in the
+    /// v2 API (`/wiki/api/v2/folders/{id}` rather than `/pages/{id}`), but
+    /// the create-page endpoint accepts either one as `parentId` — nothing
+    /// stops minutes from being published as a child of a folder.
     public func page(id: String) async throws -> ConfluencePage {
+        do {
+            return try await fetchPage(id: id)
+        } catch AtlassianError.http(404, _) {
+            return try await fetchFolder(id: id)
+        }
+    }
+
+    private func fetchPage(id: String) async throws -> ConfluencePage {
+        let payload = try await client.request("GET", "/wiki/api/v2/pages/\(id)")
+        let title = payload["title"] as? String ?? ""
+        guard !title.isEmpty else { throw AtlassianError.unexpectedResponse }
+        let spaceID = string(payload["spaceId"])
+        let spacePayload = try await client.request("GET", "/wiki/api/v2/spaces/\(spaceID)")
+        let spaceKey = spacePayload["key"] as? String ?? ""
+        let url = configuration.baseURL.map {
+            $0.appending(path: "wiki/spaces/\(spaceKey)/pages/\(id)")
+        }
+        return ConfluencePage(
+            id: id, title: title, spaceID: spaceID, spaceKey: spaceKey, url: url
+        )
+    }
+
+    private func fetchFolder(id: String) async throws -> ConfluencePage {
         let payload: [String: Any]
         do {
-            payload = try await client.request("GET", "/wiki/api/v2/pages/\(id)")
+            payload = try await client.request("GET", "/wiki/api/v2/folders/\(id)")
         } catch AtlassianError.http(404, _) {
             throw AtlassianError.pageNotFound(id: id)
         }
@@ -113,7 +142,7 @@ public struct ConfluenceClient: Sendable {
         let spacePayload = try await client.request("GET", "/wiki/api/v2/spaces/\(spaceID)")
         let spaceKey = spacePayload["key"] as? String ?? ""
         let url = configuration.baseURL.map {
-            $0.appending(path: "wiki/spaces/\(spaceKey)/pages/\(id)")
+            $0.appending(path: "wiki/spaces/\(spaceKey)/folder/\(id)")
         }
         return ConfluencePage(
             id: id, title: title, spaceID: spaceID, spaceKey: spaceKey, url: url

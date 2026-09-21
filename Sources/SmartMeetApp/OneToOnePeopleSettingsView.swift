@@ -187,7 +187,11 @@ struct OneToOnePeopleSettingsView: View {
                         var updated = person
                         updated.destination = switch mode {
                         case .typeDefault: .profileDefault
-                        case .specificPage: .page(id: person.destination.pageID ?? "")
+                        // Reuses the last page typed here, if any, instead
+                        // of starting from an empty field every time —
+                        // `person.destination.pageID` alone would be `nil`
+                        // as soon as `.typeDefault` was selected in between.
+                        case .specificPage: .page(id: person.lastManualPageID)
                         }
                         settings.upsert(updated)
                     }
@@ -206,7 +210,9 @@ struct OneToOnePeopleSettingsView: View {
                         get: { id },
                         set: { value in
                             var updated = person
-                            updated.destination = .page(id: normalizedPageID(value))
+                            let normalized = normalizedPageID(value)
+                            updated.destination = .page(id: normalized)
+                            updated.lastManualPageID = normalized
                             settings.upsert(updated)
                         }
                     )

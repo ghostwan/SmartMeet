@@ -118,6 +118,12 @@ struct SprintPageTests {
         #expect(SprintPage.extractPageID(from: url) == "123456")
     }
 
+    @Test("Un dossier Confluence est reconnu comme une page")
+    func folderURL() {
+        let url = "https://netatmo.atlassian.net/wiki/spaces/SE/folder/6722355279/Louis"
+        #expect(SprintPage.extractPageID(from: url) == "6722355279")
+    }
+
     @Test("Une saisie non exploitable est rejetée")
     func rejectsGarbage() {
         #expect(SprintPage.extractPageID(from: "") == nil)
@@ -160,6 +166,23 @@ struct DestinationTests {
         #expect(template.serviceKind == nil)
         #expect(template.destination == .profileDefault)
         #expect(template.defaultRestrictedViewers.isEmpty)
+        #expect(template.lastManualPageID == "")
+    }
+
+    @Test("Le dernier identifiant de page tapé survit au passage par la destination par défaut")
+    func lastManualPageIDSurvivesEncoding() throws {
+        var template = MeetingTemplate(name: "Sprint review", sections: [.tldr])
+        template.destination = .page(id: "PAGE-123")
+        template.lastManualPageID = "PAGE-123"
+        // Switching back to the profile default clears the active
+        // destination, but the last typed page must stay remembered so the
+        // field isn't empty when switching back to "specific page".
+        template.destination = .profileDefault
+
+        let data = try JSONEncoder().encode(template)
+        let decoded = try JSONDecoder().decode(MeetingTemplate.self, from: data)
+        #expect(decoded.destination == .profileDefault)
+        #expect(decoded.lastManualPageID == "PAGE-123")
     }
 
     @Test("Les personnes autorisées à voir la page par défaut survivent à l'encodage")

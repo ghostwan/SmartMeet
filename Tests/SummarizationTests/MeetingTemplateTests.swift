@@ -25,6 +25,16 @@ struct MeetingTemplateTests {
         #expect(!MeetingTemplate.retrospective.sections.contains(.tldr))
     }
 
+    @Test("Le compte rendu court se limite à trois sections sans chevauchement")
+    func compactHasOnlyThreeSections() {
+        #expect(MeetingTemplate.compact.sections == [.tldr, .decisions, .actionItems])
+        // Deliberately excludes the sections most prone to restating one
+        // another (topics/openQuestions/nextSteps).
+        #expect(!MeetingTemplate.compact.sections.contains(.topics))
+        #expect(!MeetingTemplate.compact.sections.contains(.openQuestions))
+        #expect(!MeetingTemplate.compact.sections.contains(.nextSteps))
+    }
+
     @Test("La consigne de dépersonnalisation est bien transmise au modèle")
     func retroInstructsDepersonalisation() {
         let prompt = SummaryPrompt.single(
