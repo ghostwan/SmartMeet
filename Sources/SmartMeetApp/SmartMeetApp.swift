@@ -32,6 +32,11 @@ struct SmartMeetApp: App {
         // `.expanded` gives the title bar its own row, so the tab bar below
         // it gets the window's full width to itself.
         .windowToolbarStyle(.expanded)
+
+        Window("What's New", id: "whatsNew") {
+            WhatsNewWindow()
+        }
+        .defaultSize(width: 520, height: 460)
     }
 }
 
@@ -42,6 +47,7 @@ private struct MenuBarLabel: View {
     var body: some View {
         Image(systemName: symbol)
             .symbolRenderingMode(.hierarchical)
+            .task { session.checkForNewVersion() }
             .onChange(of: session.windowToOpen) { _, requested in
                 guard let requested else { return }
                 openWindow(id: requested)

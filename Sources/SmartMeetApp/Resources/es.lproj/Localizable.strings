@@ -378,7 +378,18 @@
    Detección de fin de reunión (MeetingNotifier.swift, SettingsWindow.swift)
    ============================================================ */
 "Proposer de générer le compte rendu quand la réunion semble terminée" = "Proponer generar el acta cuando la reunión parece haber terminado";
-"Basé sur l'application de visioconférence qui n'utilise plus le micro depuis un moment — une simple proposition, jamais un arrêt automatique : une coupure passagère (réseau, micro coupé volontairement…) ne doit pas arrêter l'enregistrement à ta place." = "Basado en que la aplicación de videoconferencia ya no usa el micrófono desde hace un rato — solo una sugerencia, nunca una parada automática: un corte pasajero (red, micrófono silenciado a propósito…) no debe detener la grabación en tu lugar.";
-"Continuer l'enregistrement" = "Seguir grabando";
-"La réunion semble terminée" = "La reunión parece haber terminado";
-"Générer le compte rendu, ou continuer l'enregistrement ?" = "¿Generar el acta, o seguir grabando?";
+"Basé sur deux signaux, chacun suffisant seul : l'application de visioconférence qui n'utilise plus le micro depuis un moment, ou l'heure de fin prévue au calendrier qui est dépassée (utile si l'application reste ouverte malgré une coupure réseau). L'enregistrement est alors mis en pause — pas arrêté — et une notification propose de reprendre ou de terminer et générer le compte rendu." = "Basado en dos señales, cualquiera de ellas suficiente por sí sola: la aplicación de videoconferencia que ha dejado de usar el micrófono durante un rato, o la hora de fin prevista en el calendario que ya ha pasado (útil si la aplicación permanece abierta pese a un corte de red). La grabación se pausa entonces — no se detiene — y una notificación propone reanudar o terminar y generar el acta.";
+"Arrêter automatiquement après une durée maximale" = "Detener automáticamente tras una duración máxima";
+"%.0f heure(s)" = "%.0f hora(s)";
+"Garde-fou distinct de la proposition ci-dessus : au-delà de cette durée, la session est arrêtée et le compte rendu généré sans attendre de confirmation — pour la réunion oubliée qui tourne encore des heures plus tard." = "Una salvaguarda distinta de la sugerencia anterior: superada esta duración, la sesión se detiene y el acta se genera sin esperar confirmación — para la reunión olvidada que sigue en marcha horas después.";
+"Réunion probablement terminée" = "Reunión probablemente terminada";
+"Reprendre" = "Reanudar";
+"Terminer" = "Terminar";
+"Nouveautés" = "Novedades";
+"Terminer et générer" = "Terminar y generar";
+"Réunion en pause — terminée ?" = "Reunión en pausa — ¿ha terminado?";
+"L'enregistrement est en pause." = "La grabación está en pausa.";
+"Enregistrement arrêté automatiquement" = "Grabación detenida automáticamente";
+"Durée maximale de %.0f h atteinte — le compte rendu a été généré." = "Duración máxima de %.0f h alcanzada — el acta ha sido generada.";
+"%@ ne capte plus le micro depuis un moment." = "%@ no capta el micrófono desde hace un rato.";
+"L'heure de fin prévue au calendrier est dépassée." = "La hora de fin prevista en el calendario ya ha pasado.";

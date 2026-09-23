@@ -18,6 +18,12 @@ public final class RecordingSession {
         case idle
         case preparing
         case recording(since: Date)
+        /// Hardware capture is released (mic + system tap) because the
+        /// meeting looked like it might be over, but nothing is finalized
+        /// yet: the same session resumes right where it left off if the
+        /// user says the meeting is still going, or gets stopped and its
+        /// minutes generated if they confirm it's over.
+        case paused(since: Date)
         case finishing
         case failed(String)
     }
@@ -110,9 +116,10 @@ public final class RecordingSession {
     /// to `nil` as soon as it picks it up again: a transient interruption
     /// shouldn't count.
     private var conferencingAppAbsentSince: Date?
-    /// Prevents re-notifying in a loop as long as the absence continues
-    /// without the user having responded.
-    private var meetingEndNotified = false
+    /// Why the session is currently paused (app absent vs. calendar overrun),
+    /// kept only to word the in-app banner — `nil` whenever `state` isn't
+    /// `.paused`.
+    private var meetingEndPauseReason: MeetingEndReason?
     /// Set when the user responds "keep recording": won't come back before
     /// this delay, even if the tracked app remains absent in the meantime.
     private var meetingEndSnoozedUntil: Date?
@@ -123,8 +130,30 @@ public final class RecordingSession {
     /// meeting's end — a network hiccup or a mic muted for a moment
     /// shouldn't be enough.
     private static let endOfMeetingGracePeriod: Double = 90
+    /// Margin past the calendar event's scheduled end before treating it as a
+    /// signal on its own — catches a network drop or a call that quietly
+    /// stayed connected well after the meeting was supposed to end, which the
+    /// app-absence signal alone can miss (the conferencing app can keep
+    /// reporting itself as capturing the microphone throughout).
+    private static let calendarOverrunGracePeriod: Double = 300
     /// Delay before suggesting again, once the user has chosen to continue.
     private static let endOfMeetingSnooze: Double = 300
+
+    /// Why a session got paused — purely for wording the notification and
+    /// the in-app banner; the decision itself is made by `MeetingEndDetector`.
+    private enum MeetingEndReason: Sendable, Equatable {
+        case conferencingAppAbsent(String)
+        case calendarOverrun
+
+        var message: String {
+            switch self {
+            case .conferencingAppAbsent(let app):
+                L("%@ ne capte plus le micro depuis un moment.", app)
+            case .calendarOverrun:
+                L("L'heure de fin prévue au calendrier est dépassée.")
+            }
+        }
+    }
 
     public init(settings: AppSettings = AppSettings()) {
         self.settings = settings
@@ -148,8 +177,25 @@ public final class RecordingSession {
             Task { await self?.stopAndGenerateSummaryFromNotification() }
         }
         notifier.onMeetingEndedKeepRecording = { [weak self] in
-            self?.snoozeMeetingEndDetection()
+            Task { await self?.resumeAfterPause() }
         }
+    }
+
+    /// Opens "What's New" once, the first time this build's version differs
+    /// from the last one the user actually saw — not on every launch. A
+    /// fresh install (no stored value yet) is treated as "already seen":
+    /// nothing to celebrate for a user who's never run an older version.
+    /// Called from the menu bar label's own `.task`, once its view — and
+    /// therefore its `onChange(of: windowToOpen)` observer — actually
+    /// exists: setting this from `init()` would silently do nothing, since
+    /// nothing would be watching for the change yet at that point.
+    public func checkForNewVersion() {
+        let key = "lastSeenAppVersion"
+        let current = AppVersion.current
+        let lastSeen = UserDefaults.standard.string(forKey: key)
+        UserDefaults.standard.set(current, forKey: key)
+        guard let lastSeen, lastSeen != current else { return }
+        windowToOpen = "whatsNew"
     }
 
     /// Switches every session-level selection and background behavior to the
@@ -212,50 +258,108 @@ public final class RecordingSession {
         }
     }
 
-    /// Monitors, during recording, whether the tracked video-conferencing app
-    /// still picks up the microphone. A continuous absence beyond a grace
-    /// period suggests (never forces) generating the minutes — see
-    /// `endOfMeetingGracePeriod` for the reasoning on transient interruptions.
+    /// Monitors, during a recording (and while paused, for the hard duration
+    /// cap below), whether the meeting looks like it's over — see
+    /// `MeetingEndDetector` for the two signals combined. The calendar end
+    /// date is captured once here rather than re-read on every tick:
+    /// `detectedCalendarMeeting` doesn't change during a recording.
     private func observeMeetingEnd() {
         endOfMeetingObserver?.cancel()
-        guard settings.detectMeetingEnd, let appName = monitoredConferencingApp else { return }
+        let calendarEndDate = detectedCalendarMeeting?.endDate
 
         endOfMeetingObserver = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(Self.endOfMeetingCheckInterval))
-                guard let self, self.isRecording else { return }
-
-                let stillActive = ConferencingDetector.activeApps()
-                    .contains { $0.name == appName }
-                if stillActive {
-                    self.conferencingAppAbsentSince = nil
-                    self.meetingEndNotified = false
-                    continue
-                }
-
-                if let snoozedUntil = self.meetingEndSnoozedUntil, Date.now < snoozedUntil {
-                    continue
-                }
-                let absentSince = self.conferencingAppAbsentSince ?? Date.now
-                self.conferencingAppAbsentSince = absentSince
-
-                guard !self.meetingEndNotified,
-                      Date.now.timeIntervalSince(absentSince) >= Self.endOfMeetingGracePeriod,
-                      let meetingID = self.meetingID
-                else { continue }
-
-                self.meetingEndNotified = true
-                self.notifier.announceMeetingEnded(meetingID: meetingID)
+                guard let self, self.isSessionActive else { return }
+                await self.performEndOfMeetingCheck(calendarEndDate: calendarEndDate)
             }
         }
     }
 
-    /// Response to the "Generate minutes" action from the end-of-meeting
-    /// notification: stops the recording, then generates the minutes even if
-    /// `autoSummarize` is off — the user just explicitly requested it by
-    /// tapping the action, this is no longer a decision made on their behalf.
-    private func stopAndGenerateSummaryFromNotification() async {
-        guard isRecording else { return }
+    private func performEndOfMeetingCheck(calendarEndDate: Date?) async {
+        // Hard safety net, independent of `detectMeetingEnd` and of
+        // everything below: a forgotten recording must eventually stop on
+        // its own, whether or not the softer heuristics ever fired (or even
+        // apply — this also runs while already paused).
+        if let maxHours = settings.maxRecordingDurationHours, let startedAt,
+           Date.now.timeIntervalSince(startedAt) >= maxHours * 3600
+        {
+            await stopForMaxDuration()
+            return
+        }
+
+        guard isRecording, settings.detectMeetingEnd else { return }
+
+        if let appName = monitoredConferencingApp {
+            let stillActive = ConferencingDetector.activeApps().contains { $0.name == appName }
+            if stillActive {
+                conferencingAppAbsentSince = nil
+            } else if conferencingAppAbsentSince == nil {
+                conferencingAppAbsentSince = .now
+            }
+        }
+
+        if let snoozedUntil = meetingEndSnoozedUntil, Date.now < snoozedUntil { return }
+
+        let appAbsenceDuration = conferencingAppAbsentSince.map { Date.now.timeIntervalSince($0) }
+        guard MeetingEndDetector.shouldPause(
+            appAbsenceDuration: appAbsenceDuration,
+            appAbsenceGracePeriod: Self.endOfMeetingGracePeriod,
+            calendarEndDate: calendarEndDate,
+            calendarOverrunGracePeriod: Self.calendarOverrunGracePeriod
+        ), let meetingID else { return }
+
+        let reason: MeetingEndReason = (appAbsenceDuration ?? 0) >= Self.endOfMeetingGracePeriod
+            ? .conferencingAppAbsent(monitoredConferencingApp ?? "")
+            : .calendarOverrun
+        await pauseForSuspectedEnd(reason: reason, meetingID: meetingID)
+    }
+
+    /// Releases hardware capture as soon as the meeting looks like it might
+    /// be over, instead of merely notifying and letting it keep recording
+    /// dead air until someone notices — a missed notification used to mean
+    /// hours of pointless recording. The session isn't finalized: `resume`
+    /// picks up right where this left off.
+    private func pauseForSuspectedEnd(reason: MeetingEndReason, meetingID: UUID) async {
+        guard isRecording, let recorder else { return }
+        await recorder.pause()
+        state = .paused(since: .now)
+        meetingEndPauseReason = reason
+        notifier.announceMeetingEnded(meetingID: meetingID, reasonMessage: reason.message)
+    }
+
+    /// Restarts hardware capture after a pause — either from the "Reprendre"
+    /// notification action or the equivalent in-app banner button. Feeds the
+    /// same transcriber and the same on-disk files; only the paused interval
+    /// itself goes unrecorded.
+    public func resumeAfterPause() async {
+        guard isPaused, let recorder, !pipelineTasks.isEmpty else { return }
+        do {
+            let buffers = try await recorder.resume()
+            let transcriber = self.transcriber
+            pipelineTasks[0] = Task {
+                for await buffer in buffers { await transcriber?.append(buffer) }
+            }
+            state = .recording(since: startedAt ?? .now)
+            meetingEndPauseReason = nil
+            // Postpones the next check so resuming doesn't instantly
+            // re-trigger the very signal that caused the pause (the app can
+            // take a moment to reappear as active, and a calendar overrun
+            // would otherwise fire again on the very next tick).
+            snoozeMeetingEndDetection()
+        } catch {
+            state = .failed(error.localizedDescription)
+        }
+    }
+
+    /// Response to the "Generate minutes" action, from either the
+    /// end-of-meeting notification or its in-app banner equivalent: stops
+    /// the recording, then generates the minutes even if `autoSummarize` is
+    /// off — the user just explicitly requested it, this is no longer a
+    /// decision made on their behalf. Works whether the session is still
+    /// actively recording or already paused.
+    public func stopAndGenerateSummaryFromNotification() async {
+        guard isSessionActive else { return }
         let shouldForceSummary = !settings.autoSummarize
         await stop()
         if shouldForceSummary, let meeting = reviewedMeeting {
@@ -263,12 +367,21 @@ public final class RecordingSession {
         }
     }
 
-    /// Response to the "Keep recording" action: only postpones the next
-    /// suggestion, so as not to re-trigger a notification on every cycle
-    /// while the video call remains off.
+    /// Hard cap reached: forces the stop and the generation regardless of
+    /// `autoSummarize`, unlike every other path in this file — the whole
+    /// point is to not depend on the user noticing anything.
+    private func stopForMaxDuration() async {
+        let hours = settings.maxRecordingDurationHours ?? 0
+        let id = meetingID
+        await stopAndGenerateSummaryFromNotification()
+        if let id { notifier.announceMaxDurationReached(meetingID: id, hours: hours) }
+    }
+
+    /// Response to "Keep recording"/"Resume": only postpones the next
+    /// check, so as not to re-trigger a notification on every cycle while
+    /// the signal that caused the pause is still true.
     private func snoozeMeetingEndDetection() {
         meetingEndSnoozedUntil = Date.now.addingTimeInterval(Self.endOfMeetingSnooze)
-        meetingEndNotified = false
         conferencingAppAbsentSince = nil
     }
 
@@ -402,6 +515,22 @@ public final class RecordingSession {
         return false
     }
 
+    public var isPaused: Bool {
+        if case .paused = state { return true }
+        return false
+    }
+
+    /// True while a meeting is being captured *or* paused pending a
+    /// resume/stop decision — as opposed to `isRecording`, which is strictly
+    /// "audio is being captured right now". Used to gate anything that
+    /// shouldn't happen mid-meeting (starting another recording, offering a
+    /// different suggestion…) regardless of the pause.
+    public var isSessionActive: Bool { isRecording || isPaused }
+
+    /// Human-readable reason the session is currently paused, for the
+    /// in-app banner. `nil` outside of `.paused`.
+    public var pausedReasonText: String? { meetingEndPauseReason?.message }
+
     public var isBusy: Bool {
         switch state {
         case .preparing, .finishing: true
@@ -419,7 +548,7 @@ public final class RecordingSession {
     // MARK: - Recording
 
     public func toggle() async {
-        isRecording ? await stop() : await start()
+        isSessionActive ? await stop() : await start()
     }
 
     /// Queries the calendar to pre-fill the title and attendees.
@@ -463,7 +592,7 @@ public final class RecordingSession {
             monitoredConferencingApp = ConferencingDetector.activeApps().first?.name
         }
         conferencingAppAbsentSince = nil
-        meetingEndNotified = false
+        meetingEndPauseReason = nil
         meetingEndSnoozedUntil = nil
 
         do {
@@ -502,7 +631,7 @@ public final class RecordingSession {
     }
 
     public func stop() async {
-        guard isRecording else { return }
+        guard isSessionActive else { return }
         state = .finishing
 
         let result = await recorder?.stop()
@@ -599,10 +728,23 @@ public final class RecordingSession {
         summaryState = .running(L("Analyse du transcript…"))
 
         let generator = SummaryGenerator(provider: provider)
+        let template = settings.template(id: meeting.templateID)
+        let oneToOneParticipant = meeting.oneToOneParticipant?.trimmingCharacters(in: .whitespaces)
+        // For a one-to-one, the other party is known unambiguously from the
+        // "with whom" field — never up for guessing like a generic meeting's
+        // roster — so it's folded into `confirmedParticipants` automatically
+        // rather than asking the user to re-type it in the separate
+        // "Participants" list.
+        var confirmedParticipants = meeting.confirmedParticipants
+        if template.requiresParticipant, let oneToOneParticipant, !oneToOneParticipant.isEmpty,
+           !confirmedParticipants.contains(oneToOneParticipant)
+        {
+            confirmedParticipants.append(oneToOneParticipant)
+        }
         let context = SummaryContext(
             date: meeting.startedAt,
             knownAttendees: meeting.knownAttendees,
-            confirmedParticipants: meeting.confirmedParticipants,
+            confirmedParticipants: confirmedParticipants,
             vocabulary: settings.contextualVocabulary,
             userName: settings.userName
         )
@@ -612,7 +754,7 @@ public final class RecordingSession {
             let summary = try await generator.generate(
                 transcript: transcript,
                 context: context,
-                template: settings.template(id: meeting.templateID),
+                template: template,
                 language: meeting.outputLanguage
             ) { progress in
                 Task { @MainActor [weak self] in
@@ -624,14 +766,24 @@ public final class RecordingSession {
             var updated = meeting
             updated.summary = summary
             updated.tokenUsage = usageBox.total
-            if !summary.title.isEmpty { updated.title = summary.title }
+            // A one-to-one's title names its counterpart directly rather than
+            // whatever the model happened to title the conversation: it's the
+            // one piece of context the user always wants at a glance when
+            // scanning a list of these recurring meetings.
+            if template.requiresParticipant, let oneToOneParticipant, !oneToOneParticipant.isEmpty {
+                updated.title = meeting.outputLanguage.pick(
+                    fr: "One to one avec \(oneToOneParticipant)",
+                    en: "One to one with \(oneToOneParticipant)"
+                )
+            } else if !summary.title.isEmpty {
+                updated.title = summary.title
+            }
             try? store.update(updated, customTemplates: settings.customTemplates)
             meetings = store.loadAll()
             reviewedMeeting = updated
             exportOneToOneMarkdown(for: updated)
             summaryState = .ready
 
-            let template = settings.template(id: updated.templateID)
             if settings.autoPublish, settings.canAutoPublish(template: template) {
                 await publishAutomatically(updated)
             } else {
@@ -1082,6 +1234,14 @@ public final class RecordingSession {
         store.transcriptMarkdown(for: meeting.id)
     }
 
+    /// Persists a user-corrected transcript (e.g. a mangled proper noun or a
+    /// garbled sentence spotted while reviewing) so that the next
+    /// `generateSummary` — which always re-reads the transcript from disk —
+    /// picks up the fix instead of the original transcription.
+    public func updateTranscript(_ text: String, for meeting: Meeting) {
+        try? store.updateTranscriptText(text, for: meeting.id)
+    }
+
     public func hasRawRecording(for meeting: Meeting) -> Bool {
         store.hasRawRecording(for: meeting.id)
     }
@@ -1193,7 +1353,7 @@ public final class RecordingSession {
         endOfMeetingObserver = nil
         monitoredConferencingApp = nil
         conferencingAppAbsentSince = nil
-        meetingEndNotified = false
+        meetingEndPauseReason = nil
         meetingEndSnoozedUntil = nil
     }
 

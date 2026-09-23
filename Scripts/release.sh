@@ -37,6 +37,46 @@ fail() {
 	exit 1
 }
 
+VERSION_NUMBER="${VERSION#v}"
+
+step "Version bump"
+# VERSION is the single source of truth `bundle-app.sh` reads to stamp
+# CFBundleShortVersionString: it must be updated, committed and pushed
+# *before* bundling below, or the build would ship under the previous
+# version number.
+echo "$VERSION_NUMBER" >VERSION
+
+# Folds this release's RELEASE_NOTES.md ("Unreleased") content into
+# CHANGELOG.md under its own dated heading, right after the file's leading
+# comment and before whatever was already there — CHANGELOG.md itself is
+# never cleared (see its own header), unlike RELEASE_NOTES.md below.
+if [ -f RELEASE_NOTES.md ] && [ -f CHANGELOG.md ]; then
+	ENTRY="$(mktemp)"
+	{
+		echo "## ${VERSION_NUMBER} — $(date +%Y-%m-%d)"
+		echo
+		sed -n '/^## Unreleased/,$p' RELEASE_NOTES.md | tail -n +2
+	} >"$ENTRY"
+
+	FIRST_HEADING_LINE="$(grep -n '^## ' CHANGELOG.md | head -1 | cut -d: -f1)"
+	TMP_CHANGELOG="$(mktemp)"
+	head -n "$((FIRST_HEADING_LINE - 1))" CHANGELOG.md >"$TMP_CHANGELOG"
+	cat "$ENTRY" >>"$TMP_CHANGELOG"
+	echo >>"$TMP_CHANGELOG"
+	tail -n "+${FIRST_HEADING_LINE}" CHANGELOG.md >>"$TMP_CHANGELOG"
+	mv "$TMP_CHANGELOG" CHANGELOG.md
+	rm -f "$ENTRY"
+fi
+
+if [ "$DRAFT" = false ]; then
+	git add VERSION CHANGELOG.md
+	git commit -m "Bump version to ${VERSION_NUMBER}"
+	git push
+	echo "✓ VERSION and CHANGELOG.md updated and pushed"
+else
+	echo "✓ VERSION and CHANGELOG.md updated locally (draft: not committed)"
+fi
+
 step "Signed bundle (release)"
 SMARTMEET_CONFIGURATION=release ./Scripts/bundle-app.sh || fail "Bundle assembly failed."
 codesign --verify --strict build/SmartMeet.app || fail "Invalid signature."

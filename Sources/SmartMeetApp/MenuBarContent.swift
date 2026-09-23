@@ -20,17 +20,21 @@ struct MenuBarContent: View {
                 errorBanner(message)
             }
 
+            if session.isPaused {
+                pausedBanner
+            }
+
             if session.isRecording {
                 consentReminder
             }
 
-            if !session.isRecording {
+            if !session.isSessionActive {
                 templatePicker
             }
 
-            if let suggestion = session.suggestion, !session.isRecording {
+            if let suggestion = session.suggestion, !session.isSessionActive {
                 suggestionBanner(suggestion)
-            } else if let meeting = session.detectedCalendarMeeting, !session.isRecording {
+            } else if let meeting = session.detectedCalendarMeeting, !session.isSessionActive {
                 calendarHint(meeting)
             }
 
@@ -38,7 +42,7 @@ struct MenuBarContent: View {
             // (cleared on the next start, not on stop) and a fixed 240pt panel
             // would otherwise hide the meeting list below, since the menu bar
             // window doesn't scroll.
-            if session.isRecording {
+            if session.isSessionActive {
                 TranscriptView(segments: session.segments, volatile: session.volatileText)
                     .frame(height: 240)
                 Divider()
@@ -87,6 +91,11 @@ struct MenuBarContent: View {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    private func openWhatsNew() {
+        openWindow(id: "whatsNew")
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     private var header: some View {        HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("SmartMeet").font(.headline)
@@ -116,14 +125,18 @@ struct MenuBarContent: View {
                 Task { await session.toggle() }
             } label: {
                 Label(
-                    session.isRecording ? "Arrêter" : "Enregistrer",
-                    systemImage: session.isRecording ? "stop.fill" : "record.circle"
+                    session.isSessionActive ? "Arrêter" : "Enregistrer",
+                    systemImage: session.isSessionActive ? "stop.fill" : "record.circle"
                 )
                 .frame(minWidth: 88)
             }
             .buttonStyle(.borderedProminent)
-            .tint(session.isRecording ? .red : .accentColor)
+            .tint(session.isSessionActive ? .red : .accentColor)
             .disabled(session.isBusy)
+
+            Button { openWhatsNew() } label: { Image(systemName: "sparkles") }
+                .buttonStyle(.borderless)
+                .help("Nouveautés")
 
             Button { openSettings() } label: { Image(systemName: "gearshape") }
                 .buttonStyle(.borderless)
@@ -334,6 +347,8 @@ struct MenuBarContent: View {
         case .preparing: L("Préparation des modèles…")
         case .recording(let since):
             L("Enregistrement · %@", Self.elapsed(since: since))
+        case .paused(let since):
+            L("En pause · %@", Self.elapsed(since: since))
         case .finishing: L("Finalisation…")
         case .failed: L("Erreur")
         }
@@ -342,6 +357,42 @@ struct MenuBarContent: View {
     private static func elapsed(since date: Date) -> String {
         let total = Int(Date.now.timeIntervalSince(date))
         return String(format: "%02d:%02d", total / 60, total % 60)
+    }
+
+    /// Shown while the session is paused (see `MeetingEndDetector`): the
+    /// in-app equivalent of the "meeting ended?" notification, for whoever
+    /// doesn't see — or dismisses without reading — a system banner while
+    /// away from their Mac.
+    private var pausedBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "pause.circle.fill")
+                .font(.title3)
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Réunion probablement terminée")
+                    .font(.callout.weight(.medium))
+                if let reason = session.pausedReasonText {
+                    Text(reason)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+            Spacer()
+            Button("Reprendre") {
+                Task { await session.resumeAfterPause() }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            Button("Terminer") {
+                Task { await session.stopAndGenerateSummaryFromNotification() }
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(.orange.opacity(0.12))
     }
 
     /// Recording suggestion, shown when a meeting is detected.

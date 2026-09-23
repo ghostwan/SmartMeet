@@ -110,6 +110,25 @@ public struct MeetingStore: Sendable {
         )) ?? ""
     }
 
+    /// Overwrites the readable transcript with user-corrected text — e.g. a
+    /// mis-transcribed proper noun or a garbled sentence spotted while
+    /// reviewing before regenerating the minutes. Deliberately touches only
+    /// `transcript.md`, not `segments.json`: the structured, timestamped
+    /// segments stay the diarization/re-transcription source of truth, while
+    /// this free-text edit only affects what actually gets sent to the model.
+    /// A later `rediarize` rebuilds `transcript.md` from `segments.json` and
+    /// would silently discard this edit — an accepted trade-off, since
+    /// re-running diarization after manually fixing the transcript text is
+    /// not an expected workflow.
+    public func updateTranscriptText(_ text: String, for id: UUID) throws {
+        let directory = try prepareDirectory(for: id)
+        try text.write(
+            to: directory.appending(path: "transcript.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+    }
+
     public func loadAll() -> [Meeting] {
         let contents = (try? FileManager.default.contentsOfDirectory(
             at: root,

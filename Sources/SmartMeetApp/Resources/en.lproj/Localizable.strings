@@ -378,7 +378,18 @@
    End-of-meeting detection (MeetingNotifier.swift, SettingsWindow.swift)
    ============================================================ */
 "Proposer de générer le compte rendu quand la réunion semble terminée" = "Suggest generating the minutes when the meeting seems to be over";
-"Basé sur l'application de visioconférence qui n'utilise plus le micro depuis un moment — une simple proposition, jamais un arrêt automatique : une coupure passagère (réseau, micro coupé volontairement…) ne doit pas arrêter l'enregistrement à ta place." = "Based on the video conferencing app no longer using the microphone for a while — just a suggestion, never an automatic stop: a brief interruption (network, microphone muted on purpose…) shouldn't stop the recording on your behalf.";
-"Continuer l'enregistrement" = "Keep recording";
-"La réunion semble terminée" = "The meeting seems to be over";
-"Générer le compte rendu, ou continuer l'enregistrement ?" = "Generate the minutes, or keep recording?";
+"Basé sur deux signaux, chacun suffisant seul : l'application de visioconférence qui n'utilise plus le micro depuis un moment, ou l'heure de fin prévue au calendrier qui est dépassée (utile si l'application reste ouverte malgré une coupure réseau). L'enregistrement est alors mis en pause — pas arrêté — et une notification propose de reprendre ou de terminer et générer le compte rendu." = "Based on two signals, either one sufficient on its own: the video conferencing app no longer using the microphone for a while, or the calendar event's scheduled end time having passed (useful if the app stays open despite a network drop). The recording is then paused — not stopped — and a notification offers to resume or to finish and generate the minutes.";
+"Arrêter automatiquement après une durée maximale" = "Automatically stop after a maximum duration";
+"%.0f heure(s)" = "%.0f hour(s)";
+"Garde-fou distinct de la proposition ci-dessus : au-delà de cette durée, la session est arrêtée et le compte rendu généré sans attendre de confirmation — pour la réunion oubliée qui tourne encore des heures plus tard." = "A separate safety net from the suggestion above: past this duration, the session is stopped and the minutes generated without waiting for confirmation — for the meeting that was forgotten and left running hours later.";
+"Réunion probablement terminée" = "Meeting probably over";
+"Reprendre" = "Resume";
+"Terminer" = "Finish";
+"Nouveautés" = "What's New";
+"Terminer et générer" = "Finish and generate";
+"Réunion en pause — terminée ?" = "Meeting paused — is it over?";
+"L'enregistrement est en pause." = "Recording is paused.";
+"Enregistrement arrêté automatiquement" = "Recording stopped automatically";
+"Durée maximale de %.0f h atteinte — le compte rendu a été généré." = "Maximum duration of %.0f h reached — the minutes have been generated.";
+"%@ ne capte plus le micro depuis un moment." = "%@ hasn't picked up the microphone for a while.";
+"L'heure de fin prévue au calendrier est dépassée." = "The calendar event's scheduled end time has passed.";

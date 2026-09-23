@@ -54,6 +54,20 @@ Scripts/ship.sh --amend
 Don't use `--skip-tests`: the suite runs in a few tens of milliseconds, there is
 no legitimate reason to bypass it.
 
+When the user says "compile et install" (or "compile and install"), it means:
+build, test, bundle, **copy `build/SmartMeet.app` into `/Applications`**
+(replacing any previous copy), then launch it from there — not the copy left
+in `build/`. This keeps the LaunchServices-registered app the one actually
+being tested.
+
+```sh
+swift build && swift test && ./Scripts/bundle-app.sh
+pkill -x SmartMeet
+rm -rf /Applications/SmartMeet.app
+cp -R build/SmartMeet.app /Applications/
+open /Applications/SmartMeet.app
+```
+
 ## Code signing
 
 `Scripts/bundle-app.sh` and `Scripts/bundle-spike.sh` share

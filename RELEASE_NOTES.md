@@ -101,8 +101,45 @@ notes, then resets it to this template once the release is published.
   from there, next to the existing meeting-type picker — no need to redo the
   recording to fix a language chosen by mistake, or to get the same minutes
   in another language.
+- The transcript sheet (review window › "Transcription") is now editable
+  instead of read-only: a mis-transcribed proper noun or a garbled sentence
+  can be corrected and saved, then the minutes regenerated straight from the
+  corrected text ("Enregistrer et régénérer").
+- New "What's New" window, showing the bundled `CHANGELOG.md` (always in
+  English, regardless of the app's own localized UI): opens automatically
+  the first time a new version is launched, and stays reachable anytime from
+  a sparkles button in the menu bar. `Scripts/release.sh` now folds each
+  release's notes into `CHANGELOG.md` (never cleared, unlike
+  `RELEASE_NOTES.md`) and bumps the single-source-of-truth `VERSION` file,
+  which `Scripts/bundle-app.sh` stamps into `CFBundleShortVersionString`
+  (with the git commit count as `CFBundleVersion`).
+- End-of-meeting detection now also considers the calendar event's scheduled
+  end time as a signal on its own, independent of the conferencing app —
+  catches a network drop or a call that quietly stays "active" from Core
+  Audio's point of view well past the meeting's actual end. More
+  importantly, a suspected end now *pauses* the recording (releasing the
+  microphone and system-audio capture) instead of only sending a
+  notification and continuing to record: a missed or dismissed notification
+  used to mean hours of pointless dead-air recording. The paused session can
+  be resumed exactly where it left off, or stopped and its minutes
+  generated, from either the notification or a persistent in-app banner (for
+  whoever isn't at their Mac to see the system banner). New hard safety net,
+  independent of the above and on by default: *Settings › Détection des
+  réunions* can cap a recording's total duration (default 4h) — past it, the
+  session stops and its minutes generate automatically, no confirmation
+  asked, for the meeting that's simply been forgotten and left running.
 
 ### Changed
+
+- One-to-one minutes are now titled "One to one avec {Nom}" (or "with {Name}"
+  in English) instead of whatever title the model came up with, as soon as
+  the counterpart is set — consistent and identifiable at a glance across a
+  list of recurring 1:1s. The one-to-one counterpart is also now
+  automatically added to the confirmed participants list sent to the model,
+  instead of only being used for the title and page restriction: no more
+  re-typing their name a second time in "Participants" to get their
+  statements correctly attributed.
+
 
 - The review window's "Créer les tickets Jira" checkbox now defaults to
   unchecked instead of checked — creating Jira tickets from action items is

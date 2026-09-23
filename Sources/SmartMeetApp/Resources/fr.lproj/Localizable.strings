@@ -378,7 +378,18 @@
    Détection de fin de réunion (MeetingNotifier.swift, SettingsWindow.swift)
    ============================================================ */
 "Proposer de générer le compte rendu quand la réunion semble terminée" = "Proposer de générer le compte rendu quand la réunion semble terminée";
-"Basé sur l'application de visioconférence qui n'utilise plus le micro depuis un moment — une simple proposition, jamais un arrêt automatique : une coupure passagère (réseau, micro coupé volontairement…) ne doit pas arrêter l'enregistrement à ta place." = "Basé sur l'application de visioconférence qui n'utilise plus le micro depuis un moment — une simple proposition, jamais un arrêt automatique : une coupure passagère (réseau, micro coupé volontairement…) ne doit pas arrêter l'enregistrement à ta place.";
-"Continuer l'enregistrement" = "Continuer l'enregistrement";
-"La réunion semble terminée" = "La réunion semble terminée";
-"Générer le compte rendu, ou continuer l'enregistrement ?" = "Générer le compte rendu, ou continuer l'enregistrement ?";
+"Basé sur deux signaux, chacun suffisant seul : l'application de visioconférence qui n'utilise plus le micro depuis un moment, ou l'heure de fin prévue au calendrier qui est dépassée (utile si l'application reste ouverte malgré une coupure réseau). L'enregistrement est alors mis en pause — pas arrêté — et une notification propose de reprendre ou de terminer et générer le compte rendu." = "Basé sur deux signaux, chacun suffisant seul : l'application de visioconférence qui n'utilise plus le micro depuis un moment, ou l'heure de fin prévue au calendrier qui est dépassée (utile si l'application reste ouverte malgré une coupure réseau). L'enregistrement est alors mis en pause — pas arrêté — et une notification propose de reprendre ou de terminer et générer le compte rendu.";
+"Arrêter automatiquement après une durée maximale" = "Arrêter automatiquement après une durée maximale";
+"%.0f heure(s)" = "%.0f heure(s)";
+"Garde-fou distinct de la proposition ci-dessus : au-delà de cette durée, la session est arrêtée et le compte rendu généré sans attendre de confirmation — pour la réunion oubliée qui tourne encore des heures plus tard." = "Garde-fou distinct de la proposition ci-dessus : au-delà de cette durée, la session est arrêtée et le compte rendu généré sans attendre de confirmation — pour la réunion oubliée qui tourne encore des heures plus tard.";
+"Réunion probablement terminée" = "Réunion probablement terminée";
+"Reprendre" = "Reprendre";
+"Terminer" = "Terminer";
+"Nouveautés" = "Nouveautés";
+"Terminer et générer" = "Terminer et générer";
+"Réunion en pause — terminée ?" = "Réunion en pause — terminée ?";
+"L'enregistrement est en pause." = "L'enregistrement est en pause.";
+"Enregistrement arrêté automatiquement" = "Enregistrement arrêté automatiquement";
+"Durée maximale de %.0f h atteinte — le compte rendu a été généré." = "Durée maximale de %.0f h atteinte — le compte rendu a été généré.";
+"%@ ne capte plus le micro depuis un moment." = "%@ ne capte plus le micro depuis un moment.";
+"L'heure de fin prévue au calendrier est dépassée." = "L'heure de fin prévue au calendrier est dépassée.";

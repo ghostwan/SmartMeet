@@ -316,7 +316,16 @@ struct ReviewWindow: View {
         }
         .padding()
         .sheet(isPresented: $showTranscript) {
-            TranscriptSheet(meeting: meeting, transcript: session.transcript(for: meeting))
+            TranscriptSheet(
+                meeting: meeting,
+                transcript: session.transcript(for: meeting),
+                onSave: { session.updateTranscript($0, for: meeting) },
+                onSaveAndRegenerate: { text in
+                    session.updateTranscript(text, for: meeting)
+                    loadedMeetingID = nil
+                    Task { await session.generateSummary(for: meeting) }
+                }
+            )
         }
     }
 
@@ -1068,12 +1077,32 @@ struct ReviewWindow: View {
     }
 }
 
-/// Raw transcript of the meeting (the one used to generate the minutes),
-/// shown read-only from the review window.
+/// Raw transcript of the meeting (the one used to generate the minutes) —
+/// editable, so a mis-transcribed name or a garbled sentence spotted while
+/// reviewing can be fixed and fed back into a fresh generation, instead of
+/// letting the error propagate into every future regeneration.
 private struct TranscriptSheet: View {
     let meeting: Meeting
     let transcript: String
+    let onSave: (String) -> Void
+    let onSaveAndRegenerate: (String) -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var editedTranscript: String
+
+    init(
+        meeting: Meeting,
+        transcript: String,
+        onSave: @escaping (String) -> Void,
+        onSaveAndRegenerate: @escaping (String) -> Void
+    ) {
+        self.meeting = meeting
+        self.transcript = transcript
+        self.onSave = onSave
+        self.onSaveAndRegenerate = onSaveAndRegenerate
+        _editedTranscript = State(initialValue: transcript)
+    }
+
+    private var hasUnsavedEdits: Bool { editedTranscript != transcript }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1084,7 +1113,7 @@ private struct TranscriptSheet: View {
                 Spacer()
                 Button("Copier") {
                     NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(transcript, forType: .string)
+                    NSPasteboard.general.setString(editedTranscript, forType: .string)
                 }
                 Button("Fermer") { dismiss() }
             }
@@ -1099,13 +1128,29 @@ private struct TranscriptSheet: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView {
-                    Text(transcript)
-                        .font(.callout)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
+                TextEditor(text: $editedTranscript)
+                    .font(.callout)
+                    .padding(4)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                Divider()
+                HStack {
+                    Text("Corrige le transcript puis régénère le compte rendu à partir du texte corrigé.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Enregistrer") {
+                        onSave(editedTranscript)
+                    }
+                    .disabled(!hasUnsavedEdits)
+                    Button("Enregistrer et régénérer") {
+                        onSaveAndRegenerate(editedTranscript)
+                        dismiss()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!hasUnsavedEdits)
                 }
+                .padding()
             }
         }
         .frame(minWidth: 520, minHeight: 480)

@@ -17,6 +17,7 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
         static let published = "meeting-published"
         static let failure = "meeting-failure"
         static let meetingEnded = "meeting-ended"
+        static let maxDurationReached = "max-duration-reached"
     }
 
     private enum Action {
@@ -95,9 +96,14 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
             UNNotificationCategory(
                 identifier: Category.meetingEnded,
                 actions: [
-                    action(Action.generateSummary, L("Générer le compte rendu"), foreground: true),
-                    action(Action.keepRecording, L("Continuer l'enregistrement")),
+                    action(Action.generateSummary, L("Terminer et générer"), foreground: true),
+                    action(Action.keepRecording, L("Reprendre")),
                 ],
+                intentIdentifiers: []
+            ),
+            UNNotificationCategory(
+                identifier: Category.maxDurationReached,
+                actions: [action(Action.review, L("Relire"), foreground: true)],
                 intentIdentifiers: []
             ),
         ])
@@ -187,15 +193,32 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
     }
 
     /// The tracked video-conferencing app has stopped picking up the microphone
-    /// for a while: the meeting seems to be over. Just a suggestion — never an
-    /// automatic stop, since a transient interruption (network hiccup, mic
-    /// muted on purpose…) shouldn't end the recording in the user's place.
-    func announceMeetingEnded(meetingID: UUID) {
+    /// for a while, or the calendar event's scheduled end has passed: the
+    /// meeting seems to be over. Recording is already paused by this point
+    /// (see `RecordingSession.pauseForSuspectedEnd`) rather than left running
+    /// on the assumption this notification gets seen — it's just how the
+    /// user is told, and offered a quick way to resume if it's a false
+    /// positive.
+    func announceMeetingEnded(meetingID: UUID, reasonMessage: String) {
         send(
             id: "ended-\(meetingID.uuidString)",
             category: Category.meetingEnded,
-            title: L("La réunion semble terminée"),
-            body: L("Générer le compte rendu, ou continuer l'enregistrement ?"),
+            title: L("Réunion en pause — terminée ?"),
+            body: reasonMessage + " " + L("L'enregistrement est en pause."),
+            payload: [Payload.meetingID: meetingID.uuidString]
+        )
+    }
+
+    /// The hard duration cap was reached: the recording was stopped and its
+    /// minutes generated automatically, without asking — unlike every other
+    /// notification here, this reports something already done rather than
+    /// asking for a decision.
+    func announceMaxDurationReached(meetingID: UUID, hours: Double) {
+        send(
+            id: "maxduration-\(meetingID.uuidString)",
+            category: Category.maxDurationReached,
+            title: L("Enregistrement arrêté automatiquement"),
+            body: L("Durée maximale de %.0f h atteinte — le compte rendu a été généré.", hours),
             payload: [Payload.meetingID: meetingID.uuidString]
         )
     }
@@ -277,9 +300,12 @@ final class MeetingNotifier: NSObject, UNUserNotificationCenterDelegate {
                 onMeetingEndedGenerateSummary?()
             case (Category.meetingEnded, _):
                 // Tapping the banner itself remains the least committal choice:
-                // keep recording rather than risk stopping it via a hasty tap
+                // resume recording rather than risk stopping it via a hasty tap
                 // on the notification.
                 onMeetingEndedKeepRecording?()
+
+            case (Category.maxDurationReached, _):
+                if let meetingID { onReview?(meetingID) }
 
             default:
                 break

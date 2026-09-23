@@ -271,6 +271,18 @@ public final class AppSettings {
             activeProfile = profile
         }
     }
+    /// Hard cap, in hours, past which a recording is stopped and its minutes
+    /// generated automatically — unlike `detectMeetingEnd`, this one forces
+    /// the stop. `nil` disables it. Meant as a safety net for a meeting left
+    /// running for hours after being forgotten, not a normal detection path.
+    public var maxRecordingDurationHours: Double? {
+        get { activeProfile.maxRecordingDurationHours }
+        set {
+            var profile = activeProfile
+            profile.maxRecordingDurationHours = newValue
+            activeProfile = profile
+        }
+    }
     public var autoSummarize: Bool {
         get { activeProfile.autoSummarize }
         set {

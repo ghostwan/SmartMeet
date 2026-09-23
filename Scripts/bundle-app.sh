@@ -23,6 +23,20 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp Sources/SmartMeetApp/Info.plist "$APP/Contents/Info.plist"
 cp "$BIN" "$APP/Contents/MacOS/SmartMeet"
 
+# Version: VERSION (X.Y.Z) is the single source of truth, never hand-edited
+# in Info.plist. CFBundleVersion (the build number, distinct from the
+# marketing version) is the commit count — monotonically increasing across
+# builds without needing its own bookkeeping.
+VERSION="$(cat VERSION 2>/dev/null || echo "0.0.0")"
+BUILD_NUMBER="$(git rev-list --count HEAD 2>/dev/null || echo "1")"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP/Contents/Info.plist"
+
+# Release notes: bundled as a plain resource, read and displayed by the
+# "What's New" window — always in English regardless of the app's own
+# localized UI, since the notes are only ever written in English.
+cp CHANGELOG.md "$APP/Contents/Resources/CHANGELOG.md"
+
 # Localization: plain .lproj folders (no String Catalog / SPM resource bundle
 # here — the bundle is assembled by hand, so Bundle.main resolves them
 # directly without any extra resource-bundle plumbing).

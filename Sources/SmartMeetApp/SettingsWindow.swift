@@ -181,7 +181,29 @@ struct SettingsWindow: View {
                     "Proposer de générer le compte rendu quand la réunion semble terminée",
                     isOn: $settings.detectMeetingEnd
                 )
-                Text("Basé sur l'application de visioconférence qui n'utilise plus le micro depuis un moment — une simple proposition, jamais un arrêt automatique : une coupure passagère (réseau, micro coupé volontairement…) ne doit pas arrêter l'enregistrement à ta place.")
+                Text("Basé sur deux signaux, chacun suffisant seul : l'application de visioconférence qui n'utilise plus le micro depuis un moment, ou l'heure de fin prévue au calendrier qui est dépassée (utile si l'application reste ouverte malgré une coupure réseau). L'enregistrement est alors mis en pause — pas arrêté — et une notification propose de reprendre ou de terminer et générer le compte rendu.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Toggle(
+                    "Arrêter automatiquement après une durée maximale",
+                    isOn: Binding(
+                        get: { settings.maxRecordingDurationHours != nil },
+                        set: { settings.maxRecordingDurationHours = $0 ? 4 : nil }
+                    )
+                )
+                if let hours = settings.maxRecordingDurationHours {
+                    Stepper(
+                        L("%.0f heure(s)", hours),
+                        value: Binding(
+                            get: { hours },
+                            set: { settings.maxRecordingDurationHours = $0 }
+                        ),
+                        in: 1...12,
+                        step: 1
+                    )
+                }
+                Text("Garde-fou distinct de la proposition ci-dessus : au-delà de cette durée, la session est arrêtée et le compte rendu généré sans attendre de confirmation — pour la réunion oubliée qui tourne encore des heures plus tard.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

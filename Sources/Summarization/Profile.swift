@@ -74,6 +74,13 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
     /// tracked video-conferencing app has stopped picking up the microphone
     /// for a while, under this profile.
     public var detectMeetingEnd: Bool
+    /// Hard safety net, under this profile: past this many hours of
+    /// continuous recording, the session is stopped and the minutes
+    /// generated automatically — unlike `detectMeetingEnd`, this one does
+    /// force the stop, deliberately, since the alternative observed in
+    /// practice is a meeting left running for hours after being forgotten.
+    /// `nil` disables the cap entirely.
+    public var maxRecordingDurationHours: Double?
     /// Generates the minutes automatically after a recording, under this
     /// profile.
     public var autoSummarize: Bool
@@ -131,6 +138,7 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
         detectMeetings: Bool = true,
         autoStartOnDetection: Bool = false,
         detectMeetingEnd: Bool = true,
+        maxRecordingDurationHours: Double? = 4,
         autoSummarize: Bool = true,
         autoPublish: Bool = false,
         autoCreateJiraIssues: Bool = false,
@@ -159,6 +167,7 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
         self.detectMeetings = detectMeetings
         self.autoStartOnDetection = autoStartOnDetection
         self.detectMeetingEnd = detectMeetingEnd
+        self.maxRecordingDurationHours = maxRecordingDurationHours
         self.autoSummarize = autoSummarize
         self.autoPublish = autoPublish
         self.autoCreateJiraIssues = autoCreateJiraIssues
@@ -174,6 +183,7 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
         case defaultOutputLanguage, enabledOutputLanguages, detectMeetings, autoStartOnDetection
         case detectMeetingEnd, autoSummarize, autoPublish, autoCreateJiraIssues, autoCreateNotionTasks
         case diarizeMicrophoneTrack
+        case maxRecordingDurationHours
     }
     // Tolerant decoding: a profile saved before a field existed should still
     // load, with a sensible default rather than failing the whole array.
@@ -252,5 +262,16 @@ public struct Profile: Codable, Sendable, Equatable, Identifiable {
         diarizeMicrophoneTrack = try container.decodeIfPresent(
             Bool.self, forKey: .diarizeMicrophoneTrack
         ) ?? false
+        // Missing entirely (profile saved before this safety net existed):
+        // defaults to the same 4h cap a new profile starts with. Present but
+        // explicitly `null`: the user turned the cap off, which must survive
+        // the round-trip rather than silently reverting to 4h.
+        if container.contains(.maxRecordingDurationHours) {
+            maxRecordingDurationHours = try container.decodeIfPresent(
+                Double.self, forKey: .maxRecordingDurationHours
+            )
+        } else {
+            maxRecordingDurationHours = 4
+        }
     }
 }

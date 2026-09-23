@@ -48,6 +48,34 @@ public actor DualTrackRecorder {
         // A single time reference, taken before either capture starts.
         sessionStartHostTime = AudioClock.now
 
+        return try beginCapture()
+    }
+
+    /// Releases both hardware captures (microphone engine, system tap)
+    /// without finalizing the session: the audio files stay open, and the
+    /// session clock (`sessionStartHostTime`) is untouched, ready to accept
+    /// more buffers if `resume()` is called. Used when a meeting looks like
+    /// it might be over but could still resume (a network drop, a call put
+    /// on hold): pausing avoids capturing and transcribing dead air
+    /// indefinitely without losing the session or forcing a fresh one.
+    public func pause() async {
+        microphone.stop()
+        systemAudio.stop()
+        for pump in pumps { await pump.value }
+        pumps.removeAll()
+    }
+
+    /// Restarts both hardware captures after `pause()`, still writing into
+    /// the same files and indexed on the same session clock — only the gap
+    /// itself goes unrecorded. Returns a brand-new merged stream; the caller
+    /// must resubscribe to it (the previous one has already finished).
+    public func resume() throws -> AsyncStream<TrackBuffer> {
+        try beginCapture()
+    }
+
+    /// Shared by `start()` and `resume()`: starts both hardware captures and
+    /// wires the pump tasks that feed the merged stream and write to disk.
+    private func beginCapture() throws -> AsyncStream<TrackBuffer> {
         // The system tap first: it's the one that can fail (TCC, device).
         let systemStream = try systemAudio.start()
         let microphoneStream: AsyncStream<TimedAudioBuffer>
